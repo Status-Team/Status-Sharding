@@ -1,7 +1,7 @@
 import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialized, Awaitable } from '../types';
 import { ProcessMessage, BaseMessage, DataType } from '../other/message';
+import { ShardingUtils } from '../other/shardingUtils';
 import { ClusterHandler } from '../handlers/message';
-import ShardingUtils from '../other/shardingUtils';
 import { ClusterManager } from './clusterManager';
 import { ShardingClient } from './clusterClient';
 import { Serializable } from 'child_process';

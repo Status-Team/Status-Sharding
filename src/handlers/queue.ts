@@ -1,4 +1,4 @@
-import ShardingUtils from '../other/shardingUtils';
+import { ShardingUtils } from '../other/shardingUtils';
 import { QueueOptions } from '../types';
 
 export interface QueueItem {

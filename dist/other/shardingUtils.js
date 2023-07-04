@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.ShardingUtils = void 0;
 const types_1 = require("../types");
 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 class ShardingUtils {
@@ -88,5 +89,5 @@ class ShardingUtils {
         return response.shards * (1000 / guildsPerShard);
     }
 }
-exports.default = ShardingUtils;
+exports.ShardingUtils = ShardingUtils;
 //# sourceMappingURL=shardingUtils.js.map

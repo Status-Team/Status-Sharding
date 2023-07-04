@@ -8,8 +8,8 @@ const types_1 = require("../types");
 const discord_js_1 = require("discord.js");
 const message_1 = require("../other/message");
 const message_2 = require("../handlers/message");
+const shardingUtils_1 = require("../other/shardingUtils");
 const promise_1 = require("../handlers/promise");
-const shardingUtils_1 = __importDefault(require("../other/shardingUtils"));
 const worker_1 = require("../classes/worker");
 const child_1 = require("../classes/child");
 const data_1 = require("../other/data");
@@ -93,7 +93,7 @@ class ClusterClient extends events_1.default {
         return this.process?.send(message);
     }
     async evalOnManager(script, options) {
-        const nonce = shardingUtils_1.default.generateNonce();
+        const nonce = shardingUtils_1.ShardingUtils.generateNonce();
         this.process?.send({
             data: {
                 options,
@@ -105,7 +105,7 @@ class ClusterClient extends events_1.default {
         return this.promise.create(nonce, options?.timeout);
     }
     async broadcastEval(script, options) {
-        const nonce = shardingUtils_1.default.generateNonce();
+        const nonce = shardingUtils_1.ShardingUtils.generateNonce();
         this.process?.send({
             data: {
                 options,
@@ -117,7 +117,7 @@ class ClusterClient extends events_1.default {
         return this.promise.create(nonce, options?.timeout);
     }
     async evalOnGuild(guildId, script, options) {
-        const nonce = shardingUtils_1.default.generateNonce();
+        const nonce = shardingUtils_1.ShardingUtils.generateNonce();
         this.process?.send({
             data: {
                 script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}') || (() => { return Promise.reject(new Error('CLUSTERING_GUILD_NOT_FOUND | Guild with ID ${guildId} not found.')); })())`,
@@ -141,7 +141,7 @@ class ClusterClient extends events_1.default {
     request(message, options = {}) {
         if (!this.process)
             return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
-        const nonce = shardingUtils_1.default.generateNonce();
+        const nonce = shardingUtils_1.ShardingUtils.generateNonce();
         this.process?.send({
             data: message,
             _type: types_1.MessageTypes.CustomRequest,

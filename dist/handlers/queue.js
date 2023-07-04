@@ -1,10 +1,7 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Queue = void 0;
-const shardingUtils_1 = __importDefault(require("../other/shardingUtils"));
+const shardingUtils_1 = require("../other/shardingUtils");
 class Queue {
     options;
     paused = false;
@@ -30,7 +27,7 @@ class Queue {
                 continue;
             const timeout = this.queue[0].timeout;
             await this.next();
-            await shardingUtils_1.default.delayFor(timeout);
+            await shardingUtils_1.ShardingUtils.delayFor(timeout);
         }
         return this;
     }

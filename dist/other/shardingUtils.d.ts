@@ -1,4 +1,4 @@
-export default class ShardingUtils {
+export declare class ShardingUtils {
     static generateNonce(): string;
     static chunkArray<T>(array: T[], chunkSize: number): T[][];
     static delayFor(ms: number): Promise<void>;

@@ -1,10 +1,7 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReClusterManager = void 0;
-const shardingUtils_1 = __importDefault(require("../other/shardingUtils"));
+const shardingUtils_1 = require("../other/shardingUtils");
 class ReClusterManager {
     manager;
     inProgress = false;
@@ -21,7 +18,7 @@ class ReClusterManager {
         this.inProgress = true;
         this.manager.triggerMaintenance('Reclustering..');
         this.manager._debug('[ReClustering] Enabling Maintenance Mode on all clusters.');
-        const listOfShardsForCluster = shardingUtils_1.default.chunkArray(this.manager.options.shardList || [], this.manager.options.shardsPerClusters || this.manager.options.totalShards);
+        const listOfShardsForCluster = shardingUtils_1.ShardingUtils.chunkArray(this.manager.options.shardList || [], this.manager.options.shardsPerClusters || this.manager.options.totalShards);
         const newClusters = new Map();
         const oldClusters = new Map();
         for (const cf of this.manager.clusters.values())

@@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Cluster = void 0;
 const types_1 = require("../types");
 const message_1 = require("../other/message");
+const shardingUtils_1 = require("../other/shardingUtils");
 const message_2 = require("../handlers/message");
-const shardingUtils_1 = __importDefault(require("../other/shardingUtils"));
 const worker_1 = require("../classes/worker");
 const child_1 = require("../classes/child");
 const events_1 = __importDefault(require("events"));
@@ -105,7 +105,7 @@ class Cluster extends events_1.default {
         if (this.thread)
             await this.kill({ force: true });
         if (delay > 0)
-            await shardingUtils_1.default.delayFor(delay);
+            await shardingUtils_1.ShardingUtils.delayFor(delay);
         // const heartbeat = this.manager.heartbeat;
         // if (heartbeat) heartbeat.clusters.get(this.id)?.stop();
         return this.spawn(timeout);
@@ -122,7 +122,7 @@ class Cluster extends events_1.default {
     async request(message, options = {}) {
         if (!this.thread)
             return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
-        const nonce = shardingUtils_1.default.generateNonce();
+        const nonce = shardingUtils_1.ShardingUtils.generateNonce();
         this.thread?.send({
             _type: types_1.MessageTypes.CustomRequest,
             _nonce: nonce,
@@ -136,7 +136,7 @@ class Cluster extends events_1.default {
     async evalOnClient(script, options) {
         if (!this.thread)
             return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
-        const nonce = shardingUtils_1.default.generateNonce();
+        const nonce = shardingUtils_1.ShardingUtils.generateNonce();
         this.thread?.send({
             _type: types_1.MessageTypes.ClientEvalRequest,
             _nonce: nonce,

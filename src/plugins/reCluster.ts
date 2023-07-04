@@ -1,5 +1,5 @@
 import { ClusterManager } from '../core/clusterManager';
-import ShardingUtils from '../other/shardingUtils';
+import { ShardingUtils } from '../other/shardingUtils';
 import { ReClusterOptions } from '../types';
 import { Cluster } from '../core/cluster';
 

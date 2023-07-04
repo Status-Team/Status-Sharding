@@ -2,17 +2,17 @@ import { Awaitable, ClusterHeartbeatOptions, ClusterManagerCreateOptions, Cluste
 import { ChildProcess, Serializable } from 'child_process';
 import { HeartbeatManager } from '../plugins/heartbeat';
 import { ReClusterManager } from '../plugins/reCluster';
+import { ShardingUtils } from '../other/shardingUtils';
 import { PromiseHandler } from '../handlers/promise';
-import ShardingUtils from '../other/shardingUtils';
 import { ShardingClient } from './clusterClient';
 import { Queue } from '../handlers/queue';
 import { Worker } from 'worker_threads';
 import { Cluster } from './cluster';
+import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import { Guild } from 'discord.js';
 
 export class ClusterManager extends EventEmitter {
 	public ready: boolean; // Check if all clusters are ready.

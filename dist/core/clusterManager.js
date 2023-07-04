@@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClusterManager = void 0;
 const heartbeat_1 = require("../plugins/heartbeat");
 const reCluster_1 = require("../plugins/reCluster");
+const shardingUtils_1 = require("../other/shardingUtils");
 const promise_1 = require("../handlers/promise");
-const shardingUtils_1 = __importDefault(require("../other/shardingUtils"));
 const queue_1 = require("../handlers/queue");
 const cluster_1 = require("./cluster");
 const events_1 = __importDefault(require("events"));
@@ -40,7 +40,7 @@ class ClusterManager extends events_1.default {
             totalClusters: options.totalClusters === undefined ? -1 : options.totalClusters,
             shardsPerClusters: options.shardsPerClusters === undefined ? -1 : options.shardsPerClusters,
             respawn: options.respawn === undefined ? true : options.respawn,
-            heartbeat: shardingUtils_1.default.mergeObjects(options.heartbeat || {}, { maxRestarts: 3, interval: 30000, timeout: 45000, maxMissedHeartbeats: 4 }),
+            heartbeat: shardingUtils_1.ShardingUtils.mergeObjects(options.heartbeat || {}, { maxRestarts: 3, interval: 30000, timeout: 45000, maxMissedHeartbeats: 4 }),
             mode: options.mode === undefined ? 'worker' : options.mode,
             shardList: [], clusterList: [],
             spawnOptions: {
@@ -79,7 +79,7 @@ class ClusterManager extends events_1.default {
         if (this.options.token?.includes('Bot ') || this.options.token?.includes('Bearer '))
             this.options.token = this.options.token.slice(this.options.token.indexOf(' ') + 1);
         const cpuCores = os_1.default.cpus().length;
-        this.options.totalShards = this.options.totalShards !== -1 ? this.options.totalShards : await shardingUtils_1.default.getRecommendedShards(this.options.token) || 1;
+        this.options.totalShards = this.options.totalShards !== -1 ? this.options.totalShards : await shardingUtils_1.ShardingUtils.getRecommendedShards(this.options.token) || 1;
         this.options.totalClusters = (this.options.totalClusters === -1) ? (cpuCores > this.options.totalShards ? this.options.totalShards : cpuCores) : this.options.totalClusters;
         this.options.shardsPerClusters = (this.options.shardsPerClusters === -1) ? Math.ceil(this.options.totalShards / this.options.totalClusters) : this.options.shardsPerClusters;
         if (this.options.totalShards < 1)
@@ -121,7 +121,7 @@ class ClusterManager extends events_1.default {
         if (this.options.clusterList.some((cluster) => cluster < 0))
             throw new Error('CLIENT_INVALID_OPTION | Cluster List has invalid clusters.');
         this._debug(`[ClusterManager] Spawning ${this.options.totalClusters} Clusters with ${this.options.totalShards} Shards.`);
-        const listOfShardsForCluster = shardingUtils_1.default.chunkArray(this.options.shardList || [], this.options.shardsPerClusters || this.options.totalShards);
+        const listOfShardsForCluster = shardingUtils_1.ShardingUtils.chunkArray(this.options.shardList || [], this.options.shardsPerClusters || this.options.totalShards);
         if (listOfShardsForCluster.length !== this.options.totalClusters)
             this.options.totalClusters = listOfShardsForCluster.length;
         this.options.totalShards = listOfShardsForCluster.reduce((acc, curr) => acc + curr.length, 0);
@@ -151,12 +151,12 @@ class ClusterManager extends events_1.default {
         let i = 0;
         this._debug('[ClusterManager] Respawning all clusters.');
         const promises = [];
-        const listOfShardsForCluster = shardingUtils_1.default.chunkArray(this.options.shardList || [], this.options.shardsPerClusters || this.options.totalShards);
+        const listOfShardsForCluster = shardingUtils_1.ShardingUtils.chunkArray(this.options.shardList || [], this.options.shardsPerClusters || this.options.totalShards);
         for (const cluster of this.clusters.values()) {
             promises.push(cluster.respawn(respawnDelay, timeout));
             const length = listOfShardsForCluster[i]?.length || this.options.totalShards / this.options.totalClusters;
             if (++s < this.clusters.size && clusterDelay > 0)
-                promises.push(shardingUtils_1.default.delayFor(length * clusterDelay));
+                promises.push(shardingUtils_1.ShardingUtils.delayFor(length * clusterDelay));
             i++;
         }
         await Promise.all(promises);
@@ -187,7 +187,7 @@ class ClusterManager extends events_1.default {
                 return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
         }
         if (options?.guildId)
-            options.cluster = shardingUtils_1.default.clusterIdForGuildId(options.guildId, this.options.totalShards, this.options.totalClusters);
+            options.cluster = shardingUtils_1.ShardingUtils.clusterIdForGuildId(options.guildId, this.options.totalShards, this.options.totalClusters);
         if (options?.shard !== undefined) {
             const shardIds = Array.isArray(options.shard) ? options.shard : [options.shard];
             if (shardIds.some((s) => s < 0))

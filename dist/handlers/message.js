@@ -1,10 +1,7 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClusterClientHandler = exports.ClusterHandler = void 0;
-const shardingUtils_1 = __importDefault(require("../other/shardingUtils"));
+const shardingUtils_1 = require("../other/shardingUtils");
 const types_1 = require("../types");
 class ClusterHandler {
     cluster;
@@ -40,7 +37,7 @@ class ClusterHandler {
                     this.ipc.send({
                         _type: types_1.MessageTypes.ClientBroadcastResponseError,
                         _nonce: message._nonce,
-                        data: shardingUtils_1.default.makePlainError(err),
+                        data: shardingUtils_1.ShardingUtils.makePlainError(err),
                     });
                 });
                 break;
@@ -52,7 +49,7 @@ class ClusterHandler {
                     this.ipc.send({
                         _type: types_1.MessageTypes.ClientManagerEvalResponseError,
                         _nonce: message._nonce,
-                        data: shardingUtils_1.default.makePlainError(result.error),
+                        data: shardingUtils_1.ShardingUtils.makePlainError(result.error),
                     });
                 }
                 else {
@@ -127,7 +124,7 @@ class ClusterClientHandler {
                     this.clusterClient._respond('error', {
                         _type: types_1.MessageTypes.ClientEvalResponseError,
                         _nonce: message._nonce,
-                        data: shardingUtils_1.default.makePlainError(err),
+                        data: shardingUtils_1.ShardingUtils.makePlainError(err),
                     });
                 }
                 break;

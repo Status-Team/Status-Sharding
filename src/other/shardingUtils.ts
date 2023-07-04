@@ -2,7 +2,7 @@ import { DefaultOptions, Endpoints } from '../types';
 
 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-export default class ShardingUtils {
+export class ShardingUtils {
 	public static generateNonce() {
 		let randomStr = '';
 

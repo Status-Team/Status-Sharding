@@ -2,8 +2,8 @@ import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable }
 import { ClientOptions, Client as DiscordClient, Guild } from 'discord.js';
 import { BaseMessage, DataType, ProcessMessage } from '../other/message';
 import { ClusterClientHandler } from '../handlers/message';
+import { ShardingUtils } from '../other/shardingUtils';
 import { PromiseHandler } from '../handlers/promise';
-import ShardingUtils from '../other/shardingUtils';
 import { ClusterManager } from './clusterManager';
 import { WorkerClient } from '../classes/worker';
 import { ChildClient } from '../classes/child';
