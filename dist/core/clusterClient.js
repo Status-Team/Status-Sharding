@@ -63,9 +63,13 @@ class ClusterClient extends events_1.default {
     }
     // Array of shard Id's of this client.
     get shards() {
-        return this.client.ws.shards.size ? this.client.ws.shards : this.info.ShardList;
+        return this.client.ws.shards;
     }
     // Total number of shards.
+    get totalShards() {
+        return this.client.ws.shards.size;
+    }
+    // Total number of clusters.
     get totalClusters() {
         return this.info.ClusterCount;
     }

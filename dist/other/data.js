@@ -24,7 +24,6 @@ function getInfo() {
             LastShardId: shardList[shardList.length - 1],
             AutoLogin: process.env.AUTO_LOGIN === 'true',
             Token: process.env.DISCORD_TOKEN,
-            DebugFull: process.env.DEBUG_FULL === 'true',
         };
     }
     else {
@@ -40,7 +39,6 @@ function getInfo() {
             LastShardId: worker_threads_1.workerData.SHARD_LIST[worker_threads_1.workerData.SHARD_LIST.length - 1],
             AutoLogin: worker_threads_1.workerData.AUTO_LOGIN,
             Token: worker_threads_1.workerData.DISCORD_TOKEN,
-            DebugFull: worker_threads_1.workerData.DEBUG_FULL,
         };
     }
     return data;

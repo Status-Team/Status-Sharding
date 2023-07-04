@@ -20,7 +20,8 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
     private messageHandler;
     constructor(client: InternalClient);
     get id(): number;
-    get shards(): number[] | import("@discordjs/collection").Collection<number, import("discord.js").WebSocketShard>;
+    get shards(): import("@discordjs/collection").Collection<number, import("discord.js").WebSocketShard>;
+    get totalShards(): number;
     get totalClusters(): number;
     get info(): import("../types").ClusterClientData;
     send(message: Serializable): Promise<void> | undefined;

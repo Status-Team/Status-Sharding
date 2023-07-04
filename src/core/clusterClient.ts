@@ -67,10 +67,15 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 
 	// Array of shard Id's of this client.
 	public get shards() {
-		return this.client.ws.shards.size;
+		return this.client.ws.shards;
 	}
 
 	// Total number of shards.
+	public get totalShards() {
+		return this.client.ws.shards.size;
+	}
+
+	// Total number of clusters.
 	public get totalClusters() {
 		return this.info.ClusterCount;
 	}

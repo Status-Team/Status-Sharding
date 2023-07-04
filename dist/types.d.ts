@@ -71,7 +71,6 @@ export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
     spawnOptions?: ClusterSpawnOptions;
     clusterData?: object;
     clusterOptions?: T extends 'worker' ? WorkerThreadOptions : ChildProcessOptions;
-    customInstances?: ClusterManagerInstance[];
     autoLogin?: boolean;
 }
 export interface ClusterManagerOptions<T extends ClusteringMode> extends ClusterManagerCreateOptions<T> {
