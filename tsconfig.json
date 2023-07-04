@@ -1,0 +1,26 @@
+{
+	"compilerOptions": {
+		"module": "CommonJS",
+		"target": "ES2022",
+		"sourceMap": true,
+		"outDir": "./dist",
+		"skipLibCheck": true,
+		"noImplicitAny": true,
+		"declaration": true,
+		"strict": true,
+		"strictNullChecks": true,
+		"esModuleInterop": true,
+		"baseUrl": "./",
+		"plugins": [
+			{
+				"transform": "typia/lib/transform"
+			}
+		]
+	},
+	"include": [
+		"src/**/*",
+	],
+	"exclude": [
+		"node_modules"
+	]
+}
