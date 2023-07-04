@@ -26,7 +26,6 @@ export function getInfo() {
 			LastShardId: shardList[shardList.length - 1],
 			AutoLogin: process.env.AUTO_LOGIN === 'true',
 			Token: process.env.DISCORD_TOKEN as string,
-			DebugFull: process.env.DEBUG_FULL === 'true',
 		};
 	} else {
 		data = {
@@ -41,7 +40,6 @@ export function getInfo() {
 			LastShardId: workerData.SHARD_LIST[workerData.SHARD_LIST.length - 1],
 			AutoLogin: workerData.AUTO_LOGIN,
 			Token: workerData.DISCORD_TOKEN,
-			DebugFull: workerData.DEBUG_FULL,
 		};
 	}
 
