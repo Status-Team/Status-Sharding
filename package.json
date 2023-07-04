@@ -15,6 +15,25 @@
 	"dependencies": {
 		"discord.js": "^14.8.0"
 	},
+	"keywords": [
+		"discord",
+		"discord.js",
+		"sharding",
+		"discord-sharding",
+		"discord-bot",
+		"discord-sharding-bot",
+		"discord-bot-sharding",
+		"discord-bot-sharding-example",
+		"discord-sharding-example",
+		"discord.js-sharding-example",
+		"discord.js-bot-sharding-example",
+		"discord.js-sharding",
+		"discord.js-bot-sharding",
+		"discord.js-sharding-example",
+		"discord.js-bot-sharding-example",
+		"discord.js-sharding-example",
+		"discord.js-bot-sharding-example"
+	],
 	"devDependencies": {
 		"@types/node": "^20.3.3",
 		"@typescript-eslint/eslint-plugin": "^5.48.1",
