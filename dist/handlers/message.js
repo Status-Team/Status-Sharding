@@ -138,12 +138,12 @@ class ClusterClientHandler {
                 break;
             }
             case types_1.MessageTypes.ClientMaintenanceDisable: {
-                this.clusterClient.maintenance = false;
+                this.clusterClient.maintenance = '';
                 this.clusterClient.emit('ready', this.clusterClient);
                 break;
             }
             case types_1.MessageTypes.ClientMaintenanceEnable: {
-                this.clusterClient.maintenance = message.data || true;
+                this.clusterClient.maintenance = message.data || '';
                 break;
             }
             case types_1.MessageTypes.Heartbeat: {

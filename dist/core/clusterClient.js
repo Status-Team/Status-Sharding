@@ -40,9 +40,7 @@ class ClusterClient extends events_1.default {
         // If the Cluster is spawned automatically or with an own controller.
         this.queue = { mode: this.info.ClusterQueueMode };
         // If the Cluster is under maintenance.
-        this.maintenance = this.info.Maintenance;
-        if (!this.maintenance)
-            this.maintenance = false;
+        this.maintenance = '';
         // Wait 100ms so listener can be added.
         this.ready = false;
         this.process = (this.info.ClusterManagerMode === 'process' ? new child_1.ChildClient() : this.info.ClusterManagerMode === 'worker' ? new worker_1.WorkerClient() : null);

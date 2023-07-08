@@ -36,6 +36,8 @@ class Cluster extends events_1.default {
         this.thread = null;
         this.env = Object.assign({}, process.env, {
             SHARD_LIST: this.shardList,
+            CLUSTER_MANAGER_MODE: this.manager.options.mode,
+            CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
             TOTAL_SHARDS: this.totalShards,
             CLUSTER_MANAGER: true,
             CLUSTER: this.id,

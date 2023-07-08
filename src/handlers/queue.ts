@@ -16,7 +16,7 @@ export class Queue {
 
 	// Starts the queue and run's the item functions.
 	public async start(): Promise<Queue> {
-		if (!this.options.auto) {
+		if (this.options.mode !== 'auto') {
 			return new Promise((resolve) => {
 				const interval = setInterval(() => {
 					if (this.queue.length === 0) {

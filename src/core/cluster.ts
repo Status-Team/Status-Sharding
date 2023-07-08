@@ -27,6 +27,8 @@ export class Cluster extends EventEmitter {
 		TOTAL_SHARDS: number;
 		CLUSTER_MANAGER: boolean;
 		CLUSTER: number;
+		CLUSTER_MANAGER_MODE: 'process' | 'worker';
+		CLUSTER_QUEUE_MODE: 'auto' | 'manual';
 		CLUSTER_COUNT: number;
 		DISCORD_TOKEN: string;
 		AUTO_LOGIN: boolean;
@@ -42,6 +44,8 @@ export class Cluster extends EventEmitter {
 
 		this.env = Object.assign({}, process.env, {
 			SHARD_LIST: this.shardList,
+			CLUSTER_MANAGER_MODE: this.manager.options.mode,
+			CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
 			TOTAL_SHARDS: this.totalShards,
 			CLUSTER_MANAGER: true,
 			CLUSTER: this.id,

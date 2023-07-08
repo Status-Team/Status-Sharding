@@ -12,6 +12,7 @@ import EventEmitter from 'events';
 export declare class ClusterManager extends EventEmitter {
     file: string;
     ready: boolean;
+    maintenance: string;
     readonly options: ClusterManagerOptions<ClusteringMode>;
     readonly promise: PromiseHandler;
     readonly clusters: Map<number, Cluster>;

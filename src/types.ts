@@ -114,7 +114,7 @@ export interface ClusterHeartbeatOptions {
 }
 
 export interface QueueOptions {
-    auto: boolean; // Whether the spawn queue be automatically managed.
+    mode?: 'auto' | 'manual'; // Whether the spawn queue be automatically managed.
     timeout?: number; // Time to wait until next item.
 }
 

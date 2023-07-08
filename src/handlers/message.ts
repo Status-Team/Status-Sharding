@@ -140,12 +140,12 @@ export class ClusterClientHandler<InternalClient extends ShardingClient = Shardi
 				break;
 			}
 			case MessageTypes.ClientMaintenanceDisable: {
-				this.clusterClient.maintenance = false;
+				this.clusterClient.maintenance = '';
 				this.clusterClient.emit('ready', this.clusterClient);
 				break;
 			}
 			case MessageTypes.ClientMaintenanceEnable: {
-				this.clusterClient.maintenance = (message.data as DataTypes['maintenance']) || true;
+				this.clusterClient.maintenance = (message.data as DataTypes['maintenance']) || '';
 				break;
 			}
 			case MessageTypes.Heartbeat: {

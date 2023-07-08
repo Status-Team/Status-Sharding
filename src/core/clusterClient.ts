@@ -28,7 +28,7 @@ export class ShardingClient extends DiscordClient {
 export class ClusterClient<InternalClient extends ShardingClient = ShardingClient> extends EventEmitter {
 	public ready: boolean;
 	public promise: PromiseHandler;
-	public maintenance: string | undefined | boolean;
+	public maintenance: string;
 	private process: ChildClient | WorkerClient | null;
 	private queue: { mode: 'auto' | string | undefined };
 	private messageHandler: ClusterClientHandler<InternalClient>;
@@ -40,8 +40,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		this.queue = { mode: this.info.ClusterQueueMode };
 
 		// If the Cluster is under maintenance.
-		this.maintenance = this.info.Maintenance;
-		if (!this.maintenance) this.maintenance = false;
+		this.maintenance = '';
 
 		// Wait 100ms so listener can be added.
 		this.ready = false;

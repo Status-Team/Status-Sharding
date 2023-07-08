@@ -14,7 +14,7 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
     client: InternalClient;
     ready: boolean;
     promise: PromiseHandler;
-    maintenance: string | undefined | boolean;
+    maintenance: string;
     private process;
     private queue;
     private messageHandler;

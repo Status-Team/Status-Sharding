@@ -112,7 +112,7 @@ export interface ClusterHeartbeatOptions {
     timeout?: number;
 }
 export interface QueueOptions {
-    auto: boolean;
+    mode?: 'auto' | 'manual';
     timeout?: number;
 }
 export interface ClusterKillOptions {

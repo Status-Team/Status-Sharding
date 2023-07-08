@@ -17,6 +17,7 @@ const fs_1 = __importDefault(require("fs"));
 class ClusterManager extends events_1.default {
     file;
     ready; // Check if all clusters are ready.
+    maintenance;
     options;
     promise; // Promise Handler for the ClusterManager.
     clusters; // A collection of all clusters the manager spawned.
@@ -56,15 +57,15 @@ class ClusterManager extends events_1.default {
         process.env.CLUSTER_MANAGER = 'true';
         process.env.CLUSTER_MANAGER_MODE = options.mode;
         process.env.DISCORD_TOKEN = String(options.token) || undefined;
-        process.env.MAINTENANCE = undefined;
-        process.env.CLUSTER_QUEUE_MODE = options.queueOptions?.auto ? 'auto' : 'manual';
+        process.env.CLUSTER_QUEUE_MODE = options.queueOptions?.mode ?? 'auto';
         this.ready = false;
         this.clusters = new Map();
+        this.maintenance = '';
         this.promise = new promise_1.PromiseHandler();
         this.reCluster = new reCluster_1.ReClusterManager(this);
         this.heartbeat = new heartbeat_1.HeartbeatManager(this);
         this.clusterQueue = new queue_1.Queue(this.options.queueOptions || {
-            auto: true, timeout: this.options.spawnOptions.timeout || this.options.spawnOptions.delay,
+            mode: 'auto', timeout: this.options.spawnOptions.timeout || this.options.spawnOptions.delay,
         });
         this._debug('[ClusterManager] Initialized successfully.');
     }
@@ -269,7 +270,7 @@ class ClusterManager extends events_1.default {
     // Triggers a maintenance mode for all clusters.
     triggerMaintenance(reason) {
         this._debug('[ClusterManager] Triggering maintenance mode for all clusters.');
-        process.env.MAINTENANCE = reason;
+        this.maintenance = reason;
         for (const cluster of this.clusters.values()) {
             cluster.triggerMaintenance(reason);
         }
