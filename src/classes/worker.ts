@@ -2,14 +2,14 @@ import { Worker as WorkerThread, WorkerOptions, parentPort, workerData, MessageP
 import { Serializable } from 'child_process';
 
 export interface WorkerThreadOptions extends WorkerOptions {
-	clusterData: unknown | undefined;
+	clusterData: NodeJS.ProcessEnv | undefined;
 }
 
 export class Worker {
 	public process: WorkerThread | null = null;
 	public workerOptions: WorkerOptions;
 
-	constructor(private file: string, private options: WorkerThreadOptions) {
+	constructor(private file: string, options: WorkerThreadOptions) {
 		this.workerOptions = {
 			workerData: options.clusterData,
 			...options,

@@ -89,8 +89,7 @@ export interface ClusterClientData {
     ClusterCount: number;
     ClusterId: number;
     ClusterManagerMode: ClusteringMode;
-    Maintenance?: string;
-    ClusterQueueMode?: 'auto' | string | undefined;
+    ClusterQueueMode?: 'auto' | 'manual';
     FirstShardId: number;
     LastShardId: number;
     AutoLogin: boolean;

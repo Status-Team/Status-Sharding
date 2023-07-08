@@ -42,19 +42,16 @@ class ClusterManager extends events_1.default {
             shardsPerClusters: options.shardsPerClusters === undefined ? -1 : options.shardsPerClusters,
             respawn: options.respawn === undefined ? true : options.respawn,
             heartbeat: shardingUtils_1.ShardingUtils.mergeObjects(options.heartbeat || {}, { maxRestarts: 3, interval: 30000, timeout: 45000, maxMissedHeartbeats: 4 }),
-            mode: options.mode === undefined ? 'worker' : options.mode,
+            mode: options.mode || 'worker',
             shardList: [], clusterList: [],
             spawnOptions: {
                 timeout: options.spawnOptions?.timeout ?? -1,
                 delay: options.spawnOptions?.delay ?? 7000,
             },
         };
-        process.env.SHARD_LIST = undefined;
         process.env.AUTO_LOGIN = options.autoLogin ? 'true' : undefined;
         process.env.TOTAL_SHARDS = String(options.totalShards);
-        process.env.CLUSTER = undefined;
         process.env.CLUSTER_COUNT = String(options.totalClusters);
-        process.env.CLUSTER_MANAGER = 'true';
         process.env.CLUSTER_MANAGER_MODE = options.mode;
         process.env.DISCORD_TOKEN = String(options.token) || undefined;
         process.env.CLUSTER_QUEUE_MODE = options.queueOptions?.mode ?? 'auto';

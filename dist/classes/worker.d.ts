@@ -1,13 +1,13 @@
 /// <reference types="node" />
 /// <reference types="node" />
+/// <reference types="node" />
 import { Worker as WorkerThread, WorkerOptions, MessagePort } from 'worker_threads';
 import { Serializable } from 'child_process';
 export interface WorkerThreadOptions extends WorkerOptions {
-    clusterData: unknown | undefined;
+    clusterData: NodeJS.ProcessEnv | undefined;
 }
 export declare class Worker {
     private file;
-    private options;
     process: WorkerThread | null;
     workerOptions: WorkerOptions;
     constructor(file: string, options: WorkerThreadOptions);

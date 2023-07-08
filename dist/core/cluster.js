@@ -19,28 +19,25 @@ class Cluster extends events_1.default {
     manager;
     id;
     shardList;
-    ThreadOrProcess;
     ready;
     thread;
     messageHandler;
     lastHeartbeatReceived;
-    env;
+    envData;
     constructor(manager, id, shardList) {
         super();
         this.manager = manager;
         this.id = id;
         this.shardList = shardList;
         this.lastHeartbeatReceived = Date.now();
-        this.ThreadOrProcess = manager.options.mode === 'worker' ? worker_1.Worker : child_1.Child;
         this.ready = false;
         this.thread = null;
-        this.env = Object.assign({}, process.env, {
+        this.envData = Object.assign({}, process.env, {
             SHARD_LIST: this.shardList,
+            TOTAL_SHARDS: this.totalShards,
+            CLUSTER: this.id,
             CLUSTER_MANAGER_MODE: this.manager.options.mode,
             CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
-            TOTAL_SHARDS: this.totalShards,
-            CLUSTER_MANAGER: true,
-            CLUSTER: this.id,
             CLUSTER_COUNT: this.manager.options.totalClusters,
             DISCORD_TOKEN: this.manager.options.token,
             AUTO_LOGIN: this.manager.options.autoLogin ?? false,
@@ -55,13 +52,14 @@ class Cluster extends events_1.default {
     async spawn(spawnTimeout = 30000) {
         if (this.thread)
             throw new Error('CLUSTER ALREADY SPAWNED | Cluster ' + this.id + ' has already been spawned.');
-        this.thread = new this.ThreadOrProcess(path_1.default.resolve(this.manager.file), {
+        const options = {
             ...this.manager.options.clusterOptions,
             execArgv: this.manager.options.execArgv,
-            env: this.env,
+            env: this.envData,
             args: [...(this.manager.options.shardArgs || []), '--clusterId ' + this.id, `--shards [${this.shardList.join(', ').trim()}]`],
-            clusterData: { ...this.env, ...this.manager.options.clusterData },
-        });
+            clusterData: { ...this.envData, ...this.manager.options.clusterData },
+        };
+        this.thread = this.manager.options.mode === 'process' ? new child_1.Child(path_1.default.resolve(this.manager.file), options) : new worker_1.Worker(path_1.default.resolve(this.manager.file), options);
         this.messageHandler = new message_2.ClusterHandler(this, this.thread);
         const thread = this.thread.spawn();
         thread.on('message', this._handleMessage.bind(this));

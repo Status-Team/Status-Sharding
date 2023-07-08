@@ -4,12 +4,10 @@ exports.WorkerClient = exports.Worker = void 0;
 const worker_threads_1 = require("worker_threads");
 class Worker {
     file;
-    options;
     process = null;
     workerOptions;
     constructor(file, options) {
         this.file = file;
-        this.options = options;
         this.workerOptions = {
             workerData: options.clusterData,
             ...options,

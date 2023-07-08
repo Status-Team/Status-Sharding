@@ -32,13 +32,10 @@ class ClusterClient extends events_1.default {
     promise;
     maintenance;
     process;
-    queue;
     messageHandler;
     constructor(client) {
         super();
         this.client = client;
-        // If the Cluster is spawned automatically or with an own controller.
-        this.queue = { mode: this.info.ClusterQueueMode };
         // If the Cluster is under maintenance.
         this.maintenance = '';
         // Wait 100ms so listener can be added.
@@ -192,7 +189,7 @@ class ClusterClient extends events_1.default {
     }
     // Manually spawn the next cluster, when queue mode is on 'manual'.
     spawnNextCluster() {
-        if (this.queue.mode === 'auto')
+        if (this.info.ClusterQueueMode === 'auto')
             throw new Error('Next Cluster can just be spawned when the queue is not on auto mode.');
         return this.process?.send({
             _type: types_1.MessageTypes.ClientSpawnNextCluster,

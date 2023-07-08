@@ -30,14 +30,10 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	public promise: PromiseHandler;
 	public maintenance: string;
 	private process: ChildClient | WorkerClient | null;
-	private queue: { mode: 'auto' | string | undefined };
 	private messageHandler: ClusterClientHandler<InternalClient>;
 
 	constructor(public client: InternalClient) {
 		super();
-
-		// If the Cluster is spawned automatically or with an own controller.
-		this.queue = { mode: this.info.ClusterQueueMode };
 
 		// If the Cluster is under maintenance.
 		this.maintenance = '';
@@ -229,7 +225,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 
 	// Manually spawn the next cluster, when queue mode is on 'manual'.
 	public spawnNextCluster() {
-		if (this.queue.mode === 'auto') throw new Error('Next Cluster can just be spawned when the queue is not on auto mode.');
+		if (this.info.ClusterQueueMode === 'auto') throw new Error('Next Cluster can just be spawned when the queue is not on auto mode.');
 
 		return this.process?.send({
 			_type: MessageTypes.ClientSpawnNextCluster,

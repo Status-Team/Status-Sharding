@@ -16,7 +16,6 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
     promise: PromiseHandler;
     maintenance: string;
     private process;
-    private queue;
     private messageHandler;
     constructor(client: InternalClient);
     get id(): number;

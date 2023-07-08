@@ -15,17 +15,14 @@ import path from 'path';
 // Each one has a Child that contains an instance of the bot and its Client.
 // When its child process/worker exits for any reason, the cluster will spawn a new one to replace it as necessary.
 export class Cluster extends EventEmitter {
-	private ThreadOrProcess: typeof Worker | typeof Child;
-
 	public ready: boolean;
 	private thread: null | Worker | Child;
 	private messageHandler?: ClusterHandler;
 	public lastHeartbeatReceived: number;
 
-	private env: NodeJS.ProcessEnv & {
+	private envData: NodeJS.ProcessEnv & {
 		SHARD_LIST: number[];
 		TOTAL_SHARDS: number;
-		CLUSTER_MANAGER: boolean;
 		CLUSTER: number;
 		CLUSTER_MANAGER_MODE: 'process' | 'worker';
 		CLUSTER_QUEUE_MODE: 'auto' | 'manual';
@@ -38,17 +35,15 @@ export class Cluster extends EventEmitter {
 		super();
 
 		this.lastHeartbeatReceived = Date.now();
-		this.ThreadOrProcess = manager.options.mode === 'worker' ? Worker : Child;
 
 		this.ready = false; this.thread = null;
 
-		this.env = Object.assign({}, process.env, {
+		this.envData = Object.assign({}, process.env, {
 			SHARD_LIST: this.shardList,
+			TOTAL_SHARDS: this.totalShards,
+			CLUSTER: this.id,
 			CLUSTER_MANAGER_MODE: this.manager.options.mode,
 			CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
-			TOTAL_SHARDS: this.totalShards,
-			CLUSTER_MANAGER: true,
-			CLUSTER: this.id,
 			CLUSTER_COUNT: this.manager.options.totalClusters,
 			DISCORD_TOKEN: this.manager.options.token,
 			AUTO_LOGIN: this.manager.options.autoLogin ?? false,
@@ -66,14 +61,15 @@ export class Cluster extends EventEmitter {
 	public async spawn(spawnTimeout = 30000) {
 		if (this.thread) throw new Error('CLUSTER ALREADY SPAWNED | Cluster ' + this.id + ' has already been spawned.');
 
-		this.thread = new this.ThreadOrProcess(path.resolve(this.manager.file), {
+		const options = {
 			...this.manager.options.clusterOptions,
 			execArgv: this.manager.options.execArgv,
-			env: this.env,
+			env: this.envData,
 			args: [...(this.manager.options.shardArgs || []), '--clusterId ' + this.id, `--shards [${this.shardList.join(', ').trim()}]`],
-			clusterData: { ...this.env, ...this.manager.options.clusterData },
-		});
+			clusterData: { ...this.envData, ...this.manager.options.clusterData },
+		};
 
+		this.thread = this.manager.options.mode === 'process' ? new Child(path.resolve(this.manager.file), options) : new Worker(path.resolve(this.manager.file), options);
 		this.messageHandler = new ClusterHandler(this, this.thread);
 
 		const thread = this.thread.spawn();
