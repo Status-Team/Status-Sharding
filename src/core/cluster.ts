@@ -118,7 +118,7 @@ export class Cluster extends EventEmitter {
 		this.manager._debug('[KILL] Cluster killed with reason: ' + (options?.reason || 'Unknown reason.'));
 	}
 
-	public async respawn(delay = this.manager.options.spawnOptions.delay || 500, timeout = this.manager.options.spawnOptions.timeout || 30000) {
+	public async respawn(delay = this.manager.options.spawnOptions.delay || 800, timeout = this.manager.options.spawnOptions.timeout || 30000) {
 		if (this.thread) await this.kill({ force: true });
 		if (delay > 0) await ShardingUtils.delayFor(delay);
 

@@ -46,7 +46,7 @@ export class ClusterManager extends EventEmitter {
 			shardList: [], clusterList: [],
 			spawnOptions: {
 				timeout: options.spawnOptions?.timeout ?? -1,
-				delay: options.spawnOptions?.delay ?? 7000,
+				delay: options.spawnOptions?.delay ?? 8000,
 			},
 		};
 
@@ -74,7 +74,7 @@ export class ClusterManager extends EventEmitter {
 
 	// Spawns multiple internal clusters.
 	public async spawn(): Promise<Queue> {
-		if (this.options.spawnOptions.delay < 7000) process.emitWarning('Spawn Delay is smaller than 7s, this can cause global rate limits on /gateway/bot', {
+		if (this.options.spawnOptions.delay < 8000) process.emitWarning('Spawn Delay is smaller than 8s, this can cause global rate limits on /gateway/bot', {
 			code: 'SHARDING_DELAY',
 		});
 
@@ -145,7 +145,7 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Kills all running clusters and respawns them.
-	public async respawnAll({ clusterDelay = 5000, respawnDelay = 500, timeout = 30000 }) {
+	public async respawnAll({ clusterDelay = 8000, respawnDelay = 800, timeout = 30000 }) {
 		this.promise.nonces.clear();
 		let s = 0; let i = 0;
 		this._debug('[ClusterManager] Respawning all clusters.');
