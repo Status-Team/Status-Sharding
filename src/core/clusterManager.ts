@@ -23,7 +23,6 @@ export class ClusterManager extends EventEmitter {
 	readonly reCluster: ReClusterManager; // ReCluster Manager for the ClusterManager.
 	readonly heartbeat: HeartbeatManager; // Heartbeat Manager for the ClusterManager.
 	readonly clusterQueue: Queue; // Queue for the ClusterManager.
-	readonly customInstances?: Map<number, Cluster>; // Custom Bot Instances.
 
 	constructor(public file: string, options: ClusterManagerCreateOptions<ClusteringMode>) {
 		super();

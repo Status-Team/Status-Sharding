@@ -24,7 +24,6 @@ class ClusterManager extends events_1.default {
     reCluster; // ReCluster Manager for the ClusterManager.
     heartbeat; // Heartbeat Manager for the ClusterManager.
     clusterQueue; // Queue for the ClusterManager.
-    customInstances; // Custom Bot Instances.
     constructor(file, options) {
         super();
         this.file = file;

@@ -66,7 +66,6 @@ export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
     spawnOptions?: ClusterSpawnOptions; // Options to pass to the spawn, respawn method.
     clusterData?: object; // Data, which is passed to the Cluster.
     clusterOptions?: T extends 'worker' ? WorkerThreadOptions : ChildProcessOptions; // Options, which is passed when forking a child or creating a thread.
-    // customInstances?: ClusterManagerInstance[]; // Custom Bot Instances.
     autoLogin?: boolean; // Auto login.
 }
 
@@ -98,11 +97,6 @@ export interface ClusterClientData {
 export interface ClusterSpawnOptions {
     delay?: number;
     timeout?: number;
-}
-
-export interface ClusterManagerInstance {
-    token: string; // The token of the discord bot.
-    identifier?: string; // Identifier of the bot.
 }
 
 export interface ClusterHeartbeatOptions {

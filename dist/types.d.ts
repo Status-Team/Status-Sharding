@@ -100,10 +100,6 @@ export interface ClusterSpawnOptions {
     delay?: number;
     timeout?: number;
 }
-export interface ClusterManagerInstance {
-    token: string;
-    identifier?: string;
-}
 export interface ClusterHeartbeatOptions {
     maxMissedHeartbeats?: number;
     maxRestarts?: number;

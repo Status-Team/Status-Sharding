@@ -20,9 +20,9 @@ class Cluster extends events_1.default {
     id;
     shardList;
     ready;
+    lastHeartbeatReceived;
     thread;
     messageHandler;
-    lastHeartbeatReceived;
     envData;
     constructor(manager, id, shardList) {
         super();

@@ -6,7 +6,7 @@ import { Cluster } from '../core/cluster';
 export class ReClusterManager {
 	private inProgress = false;
 
-	constructor(private manager: ClusterManager) {}
+	constructor(private readonly manager: ClusterManager) {}
 
 	public async start(options: ReClusterOptions): Promise<boolean> {
 		if (this.inProgress) throw new Error('RECLUSTER_IN_PROGRESS | ReClustering is already in progress.');

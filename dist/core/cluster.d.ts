@@ -12,9 +12,9 @@ export declare class Cluster extends EventEmitter {
     id: number;
     shardList: number[];
     ready: boolean;
+    lastHeartbeatReceived: number;
     private thread;
     private messageHandler?;
-    lastHeartbeatReceived: number;
     private envData;
     constructor(manager: ClusterManager, id: number, shardList: number[]);
     get totalShards(): number;
