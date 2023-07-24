@@ -17,14 +17,14 @@ const fs_1 = __importDefault(require("fs"));
 class ClusterManager extends events_1.default {
     file;
     ready; // Check if all clusters are ready.
-    maintenance;
-    options;
+    maintenance; // Maintenance mode reason.
+    options; // Options for the ClusterManager.
     promise; // Promise Handler for the ClusterManager.
     clusters; // A collection of all clusters the manager spawned.
     reCluster; // ReCluster Manager for the ClusterManager.
     heartbeat; // Heartbeat Manager for the ClusterManager.
     clusterQueue; // Queue for the ClusterManager.
-    // customInstances?: Map<number, Cluster>; // Custom Bot Instances. (maybe?)
+    customInstances; // Custom Bot Instances.
     constructor(file, options) {
         super();
         this.file = file;
@@ -46,7 +46,7 @@ class ClusterManager extends events_1.default {
             shardList: [], clusterList: [],
             spawnOptions: {
                 timeout: options.spawnOptions?.timeout ?? -1,
-                delay: options.spawnOptions?.delay ?? 7000,
+                delay: options.spawnOptions?.delay ?? 8000,
             },
         };
         process.env.AUTO_LOGIN = options.autoLogin ? 'true' : undefined;
@@ -62,14 +62,14 @@ class ClusterManager extends events_1.default {
         this.reCluster = new reCluster_1.ReClusterManager(this);
         this.heartbeat = new heartbeat_1.HeartbeatManager(this);
         this.clusterQueue = new queue_1.Queue(this.options.queueOptions || {
-            mode: 'auto', timeout: this.options.spawnOptions.timeout || this.options.spawnOptions.delay,
+            mode: 'auto', timeout: this.options.spawnOptions.timeout || 30000,
         });
         this._debug('[ClusterManager] Initialized successfully.');
     }
     // Spawns multiple internal clusters.
     async spawn() {
-        if (this.options.spawnOptions.delay < 7000)
-            process.emitWarning('Spawn Delay is smaller than 7s, this can cause global rate limits on /gateway/bot', {
+        if (this.options.spawnOptions.delay < 8000)
+            process.emitWarning('Spawn Delay is smaller than 8s, this can cause global rate limits on /gateway/bot', {
                 code: 'SHARDING_DELAY',
             });
         if (!this.options.token)
@@ -143,7 +143,7 @@ class ClusterManager extends events_1.default {
         return Promise.all(promises);
     }
     // Kills all running clusters and respawns them.
-    async respawnAll({ clusterDelay = 5000, respawnDelay = 500, timeout = 30000 }) {
+    async respawnAll({ clusterDelay = 8000, respawnDelay = 800, timeout = 30000 }) {
         this.promise.nonces.clear();
         let s = 0;
         let i = 0;
@@ -235,6 +235,7 @@ class ClusterManager extends events_1.default {
             return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found.'));
         return cl.evalOnClient(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
     }
+    // Runs a method with given arguments on a given Cluster's process.
     async evalOnCluster(cluster, script, options) {
         if (this.clusters.size === 0)
             return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
@@ -245,6 +246,7 @@ class ClusterManager extends events_1.default {
             return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found.'));
         return cl.eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
     }
+    // Runs a method with given arguments on a given Cluster's process and Guild.
     async evalOnGuild(guildId, script, options) {
         if (this.clusters.size === 0)
             return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));

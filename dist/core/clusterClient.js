@@ -29,8 +29,8 @@ exports.ShardingClient = ShardingClient;
 class ClusterClient extends events_1.default {
     client;
     ready;
-    promise;
     maintenance;
+    promise;
     process;
     messageHandler;
     constructor(client) {

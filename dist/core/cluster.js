@@ -101,7 +101,7 @@ class Cluster extends events_1.default {
         this.manager.heartbeat.removeCluster(this.id);
         this.manager._debug('[KILL] Cluster killed with reason: ' + (options?.reason || 'Unknown reason.'));
     }
-    async respawn(delay = this.manager.options.spawnOptions.delay || 500, timeout = this.manager.options.spawnOptions.timeout || 30000) {
+    async respawn(delay = this.manager.options.spawnOptions.delay || 800, timeout = this.manager.options.spawnOptions.timeout || 30000) {
         if (this.thread)
             await this.kill({ force: true });
         if (delay > 0)
@@ -173,7 +173,7 @@ class Cluster extends events_1.default {
         }
     }
     _handleExit(exitCode) {
-        this.manager.heartbeat.removeCluster(this.id);
+        this.manager.heartbeat.removeCluster(this.id, true);
         this.emit('death', this, this.thread?.process);
         this.manager._debug('[Death] [Cluster ' + this.id + '] Cluster died with exit code ' + exitCode + '.');
         this.ready = false;

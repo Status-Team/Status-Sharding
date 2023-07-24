@@ -27,8 +27,8 @@ export class ShardingClient extends DiscordClient {
 
 export class ClusterClient<InternalClient extends ShardingClient = ShardingClient> extends EventEmitter {
 	public ready: boolean;
-	public promise: PromiseHandler;
 	public maintenance: string;
+	public promise: PromiseHandler;
 	private process: ChildClient | WorkerClient | null;
 	private messageHandler: ClusterClientHandler<InternalClient>;
 

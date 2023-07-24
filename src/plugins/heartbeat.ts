@@ -25,8 +25,21 @@ export class HeartbeatManager {
 		return this.beats.get(id) || this.beats.set(id, { missedBeats: 0, restarts: 0 }).get(id) as HeartbeatData;
 	}
 
-	public removeCluster(id: number) {
+	public removeCluster(id: number, tryRespawn = true) {
+		const cluster = this.getClusterStats(id);
 		this.beats.delete(id);
+
+		if (tryRespawn) {
+			if (cluster.restarts < this.manager.options.heartbeat.maxRestarts) {
+				this.manager._debug(`Cluster ${id} is restarting... (${this.manager.options.heartbeat.maxRestarts - cluster.restarts} left.)`);
+				this.manager.clusters.get(id)?.spawn();
+
+				cluster.missedBeats = 0;
+				cluster.restarts++;
+
+				this.beats.set(id, cluster);
+			} else this.manager._debug(`Cluster ${id} reached the maximum amount of restarts. (${cluster.restarts})`);
+		}
 	}
 
 	public addMissedBeat(id: number) {

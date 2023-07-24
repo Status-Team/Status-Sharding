@@ -19,6 +19,7 @@ export declare class ClusterManager extends EventEmitter {
     readonly reCluster: ReClusterManager;
     readonly heartbeat: HeartbeatManager;
     readonly clusterQueue: Queue;
+    readonly customInstances?: Map<number, Cluster>;
     constructor(file: string, options: ClusterManagerCreateOptions<ClusteringMode>);
     spawn(): Promise<Queue>;
     broadcast(message: Serializable): Promise<void[]>;

@@ -202,7 +202,7 @@ export class Cluster extends EventEmitter {
 	}
 
 	private _handleExit(exitCode: number) {
-		this.manager.heartbeat.removeCluster(this.id);
+		this.manager.heartbeat.removeCluster(this.id, true);
 		this.emit('death', this, this.thread?.process);
 
 		this.manager._debug('[Death] [Cluster ' + this.id + '] Cluster died with exit code ' + exitCode + '.');

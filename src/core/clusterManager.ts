@@ -16,14 +16,14 @@ import fs from 'fs';
 
 export class ClusterManager extends EventEmitter {
 	public ready: boolean; // Check if all clusters are ready.
-	public maintenance: string;
-	readonly options: ClusterManagerOptions<ClusteringMode>;
+	public maintenance: string; // Maintenance mode reason.
+	readonly options: ClusterManagerOptions<ClusteringMode>; // Options for the ClusterManager.
 	readonly promise: PromiseHandler; // Promise Handler for the ClusterManager.
 	readonly clusters: Map<number, Cluster>; // A collection of all clusters the manager spawned.
 	readonly reCluster: ReClusterManager; // ReCluster Manager for the ClusterManager.
 	readonly heartbeat: HeartbeatManager; // Heartbeat Manager for the ClusterManager.
 	readonly clusterQueue: Queue; // Queue for the ClusterManager.
-	// customInstances?: Map<number, Cluster>; // Custom Bot Instances. (maybe?)
+	readonly customInstances?: Map<number, Cluster>; // Custom Bot Instances.
 
 	constructor(public file: string, options: ClusterManagerCreateOptions<ClusteringMode>) {
 		super();
@@ -66,7 +66,7 @@ export class ClusterManager extends EventEmitter {
 		this.heartbeat = new HeartbeatManager(this);
 
 		this.clusterQueue = new Queue(this.options.queueOptions || {
-			mode: 'auto', timeout: this.options.spawnOptions.timeout || this.options.spawnOptions.delay,
+			mode: 'auto', timeout: this.options.spawnOptions.timeout || 30000,
 		});
 
 		this._debug('[ClusterManager] Initialized successfully.');
@@ -243,6 +243,7 @@ export class ClusterManager extends EventEmitter {
 		return cl.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
 	}
 
+	// Runs a method with given arguments on a given Cluster's process.
 	public async evalOnCluster<T, P>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
@@ -253,6 +254,7 @@ export class ClusterManager extends EventEmitter {
 		return cl.eval<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
 	}
 
+	// Runs a method with given arguments on a given Cluster's process and Guild.
 	public async evalOnGuild<T, P>(guildId: string, script: string | ((client: ShardingClient, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<T extends never ? unknown : Serialized<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Ids must be a string.'));

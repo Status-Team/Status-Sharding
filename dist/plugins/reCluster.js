@@ -28,7 +28,7 @@ class ReClusterManager {
             const clusterId = this.manager.options.clusterList[i] || i;
             this.manager.clusterQueue.add({
                 args: [this.manager.options.spawnOptions.timeout !== -1 ? this.manager.options.spawnOptions.timeout + this.manager.options.spawnOptions.delay * length : this.manager.options.spawnOptions.timeout],
-                timeout: (this.manager.options.spawnOptions.delay || 7000) * length,
+                timeout: (this.manager.options.spawnOptions.delay || 8000) * length,
                 run: async (...a) => {
                     if (!this.manager)
                         throw new Error('Manager is missing on ReClusterManager.');

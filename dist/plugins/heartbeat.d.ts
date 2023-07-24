@@ -7,6 +7,6 @@ export declare class HeartbeatManager {
     constructor(manager: ClusterManager);
     stop(): void;
     getClusterStats(id: number): HeartbeatData;
-    removeCluster(id: number): void;
+    removeCluster(id: number, tryRespawn?: boolean): void;
     addMissedBeat(id: number): void;
 }
