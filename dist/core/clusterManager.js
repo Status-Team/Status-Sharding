@@ -223,6 +223,26 @@ class ClusterManager extends events_1.default {
         }
         return Promise.all(promises);
     }
+    async broadcastEvalWithCustomInstances(script, options, customInstances) {
+        if (this.clusters.size === 0)
+            return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
+        const promises = [];
+        for (const cluster of this.clusters.values()) {
+            promises.push({
+                isCustomInstance: false,
+                result: await cluster.evalOnClient(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`),
+            });
+        }
+        for (const customInstance of customInstances || []) {
+            if ((!customInstance)._eval)
+                customInstance._eval = function (_) { return eval(_); }.bind(customInstance);
+            promises.push({
+                isCustomInstance: true,
+                result: await customInstance._eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`),
+            });
+        }
+        return (await Promise.all(promises.map((p) => p.result))).map((result, i) => ({ isCustomInstance: promises[i].isCustomInstance, result: result }));
+    }
     // Runs a method with given arguments on a given Cluster's Client.
     async evalOnClusterClient(cluster, script, options) {
         if (this.clusters.size === 0)

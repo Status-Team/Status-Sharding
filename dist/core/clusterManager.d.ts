@@ -1,5 +1,6 @@
 /// <reference types="node" />
 import { Awaitable, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized } from '../types';
+import { Guild, Client as DiscordClient } from 'discord.js';
 import { Serializable } from 'child_process';
 import { HeartbeatManager } from '../plugins/heartbeat';
 import { ReClusterManager } from '../plugins/reCluster';
@@ -7,7 +8,6 @@ import { PromiseHandler } from '../handlers/promise';
 import { ShardingClient } from './clusterClient';
 import { Queue } from '../handlers/queue';
 import { Cluster } from './cluster';
-import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 export declare class ClusterManager extends EventEmitter {
     file: string;
@@ -35,6 +35,13 @@ export declare class ClusterManager extends EventEmitter {
         error: Error | undefined;
     }>;
     broadcastEval<T, P>(script: string | ((client: ShardingClient, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]>;
+    broadcastEvalWithCustomInstances<T, P>(script: string | ((client: ShardingClient, context: Serialized<P>) => Awaitable<T>), options?: {
+        context?: P;
+        timeout?: number;
+    }, customInstances?: DiscordClient[]): Promise<{
+        isCustomInstance: boolean;
+        result: T extends never ? unknown : Serialized<T>;
+    }[]>;
     evalOnClusterClient<T, P>(cluster: number, script: string | ((client: ShardingClient, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>>;
     evalOnCluster<T, P>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>>;
     evalOnGuild<T, P>(guildId: string, script: string | ((client: ShardingClient, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: {

@@ -1,4 +1,5 @@
 import { Awaitable, ClusterHeartbeatOptions, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized } from '../types';
+import { Guild, Client as DiscordClient } from 'discord.js';
 import { ChildProcess, Serializable } from 'child_process';
 import { HeartbeatManager } from '../plugins/heartbeat';
 import { ReClusterManager } from '../plugins/reCluster';
@@ -8,7 +9,6 @@ import { ShardingClient } from './clusterClient';
 import { Queue } from '../handlers/queue';
 import { Worker } from 'worker_threads';
 import { Cluster } from './cluster';
-import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 import path from 'path';
 import os from 'os';
@@ -229,6 +229,35 @@ export class ClusterManager extends EventEmitter {
 		}
 
 		return Promise.all(promises);
+	}
+
+	public async broadcastEvalWithCustomInstances<T, P>(script: string | ((client: ShardingClient, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }, customInstances?: DiscordClient[]): Promise<{ isCustomInstance: boolean; result: T extends never ? unknown : Serialized<T>; }[]> {
+		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
+
+		const promises: {
+			isCustomInstance: boolean;
+			result: T extends never ? unknown : Serialized<T>;
+		}[] = [];
+
+		for (const cluster of this.clusters.values()) {
+			promises.push({
+				isCustomInstance: false,
+				result: await cluster.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`),
+			});
+		}
+
+		for (const customInstance of customInstances || []) {
+			type EvalObject = { _eval: <T>(script: string) => T; };
+
+			if ((!customInstance as unknown as EvalObject)._eval) (customInstance as unknown as EvalObject)._eval = function (_: string) { return eval(_); }.bind(customInstance);
+
+			promises.push({
+				isCustomInstance: true,
+				result: await (customInstance as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`),
+			});
+		}
+
+		return (await Promise.all(promises.map((p) => p.result))).map((result, i) => ({ isCustomInstance: promises[i].isCustomInstance, result: result }));
 	}
 
 	// Runs a method with given arguments on a given Cluster's Client.
