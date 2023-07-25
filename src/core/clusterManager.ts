@@ -184,7 +184,7 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Evaluates a script on all clusters, or a given cluster, in the context of the Clients.
-	public async broadcastEval<T, P>(script: string | ((client: ShardingClient, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]> {
+	public async broadcastEval<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if ((options?.cluster !== undefined || options?.shard !== undefined) && options?.guildId !== undefined) return Promise.reject(new Error('CLUSTERING_INVALID_OPTION | Cannot use both guildId and cluster/shard options.'));
 
@@ -231,7 +231,7 @@ export class ClusterManager extends EventEmitter {
 		return Promise.all(promises);
 	}
 
-	public async broadcastEvalWithCustomInstances<T, P>(script: string | ((client: ShardingClient, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }, customInstances?: DiscordClient[]): Promise<{ isCustomInstance: boolean; result: T extends never ? unknown : Serialized<T>; }[]> {
+	public async broadcastEvalWithCustomInstances<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }, customInstances?: DiscordClient[]): Promise<{ isCustomInstance: boolean; result: T extends never ? unknown : Serialized<T>; }[]> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 
 		const promises: {
@@ -261,7 +261,7 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Runs a method with given arguments on a given Cluster's Client.
-	public async evalOnClusterClient<T, P>(cluster: number, script: string | ((client: ShardingClient, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnClusterClient<T, P, C = ShardingClient>(cluster: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
@@ -283,11 +283,11 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Runs a method with given arguments on a given Cluster's process and Guild.
-	public async evalOnGuild<T, P>(guildId: string, script: string | ((client: ShardingClient, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<T extends never ? unknown : Serialized<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Ids must be a string.'));
 
-		return this.broadcastEval<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}') || (() => { return Promise.reject(new Error('CLUSTERING_GUILD_NOT_FOUND | Guild with ID ${guildId} not found.')); })())`, {
+		return this.broadcastEval<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}')())`, {
 			...options, guildId,
 		}).then((e) => e?.[0]);
 	}
@@ -322,7 +322,7 @@ export class ClusterManager extends EventEmitter {
 }
 
 // Credits for EventEmitter typings: https://github.com/discordjs/discord.js/blob/main/packages/rest/src/lib/RequestManager.ts#L159
-export interface ClusterManager {
+export declare interface ClusterManager {
 	emit: (<K extends keyof ClusterManagerEvents>(event: K, ...args: ClusterManagerEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterManagerEvents>, ...args: unknown[]) => boolean);
 	off: (<K extends keyof ClusterManagerEvents>(event: K, listener: (...args: ClusterManagerEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterManagerEvents>, listener: (...args: unknown[]) => void) => this);
 	on: (<K extends keyof ClusterManagerEvents>(event: K, listener: (...args: ClusterManagerEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterManagerEvents>, listener: (...args: unknown[]) => void) => this);

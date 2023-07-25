@@ -144,6 +144,8 @@ export interface ClusterEvents {
     message: [message: ProcessMessage];
     death: [cluster: Cluster, thread: ChildProcess | Worker | undefined | null];
     spawn: [thread: ChildProcess | Worker | undefined | null];
+    ready: [cluster: Cluster];
+    debug: [message: string];
     error: [error: Error];
 }
 export interface ClusterClientEvents {

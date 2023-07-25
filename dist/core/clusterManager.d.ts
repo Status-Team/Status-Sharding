@@ -34,17 +34,17 @@ export declare class ClusterManager extends EventEmitter {
         result: Serialized<T> | undefined;
         error: Error | undefined;
     }>;
-    broadcastEval<T, P>(script: string | ((client: ShardingClient, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]>;
-    broadcastEvalWithCustomInstances<T, P>(script: string | ((client: ShardingClient, context: Serialized<P>) => Awaitable<T>), options?: {
+    broadcastEval<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]>;
+    broadcastEvalWithCustomInstances<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }, customInstances?: DiscordClient[]): Promise<{
         isCustomInstance: boolean;
         result: T extends never ? unknown : Serialized<T>;
     }[]>;
-    evalOnClusterClient<T, P>(cluster: number, script: string | ((client: ShardingClient, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>>;
+    evalOnClusterClient<T, P, C = ShardingClient>(cluster: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>>;
     evalOnCluster<T, P>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>>;
-    evalOnGuild<T, P>(guildId: string, script: string | ((client: ShardingClient, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: {
+    evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }): Promise<T extends never ? unknown : Serialized<T>>;
@@ -52,7 +52,7 @@ export declare class ClusterManager extends EventEmitter {
     triggerMaintenance(reason: string): void;
     _debug(message: string): string;
 }
-export interface ClusterManager {
+export declare interface ClusterManager {
     emit: (<K extends keyof ClusterManagerEvents>(event: K, ...args: ClusterManagerEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterManagerEvents>, ...args: unknown[]) => boolean);
     off: (<K extends keyof ClusterManagerEvents>(event: K, listener: (...args: ClusterManagerEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterManagerEvents>, listener: (...args: unknown[]) => void) => this);
     on: (<K extends keyof ClusterManagerEvents>(event: K, listener: (...args: ClusterManagerEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterManagerEvents>, listener: (...args: unknown[]) => void) => this);

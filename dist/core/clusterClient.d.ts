@@ -19,7 +19,6 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
     private messageHandler;
     constructor(client: InternalClient);
     get id(): number;
-    get shards(): import("@discordjs/collection").Collection<number, import("discord.js").WebSocketShard>;
     get totalShards(): number;
     get totalClusters(): number;
     get info(): import("../types").ClusterClientData;
@@ -29,12 +28,12 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
         context?: P;
         timeout?: number;
     }): Promise<T extends never ? unknown : Serialized<T>>;
-    broadcastEval<T, P>(script: string | ((client: InternalClient, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]>;
-    evalOnGuild<T, P>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: {
+    broadcastEval<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]>;
+    evalOnGuild<T, P, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }): Promise<T extends never ? unknown : Serialized<T>>;
-    evalOnClient<T, P>(script: string | ((client: InternalClient, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<T extends never ? unknown : Serialized<T>>;
+    evalOnClient<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<T extends never ? unknown : Serialized<T>>;
     request<O>(message: Serializable, options?: {
         timeout?: number;
     }): Promise<Serialized<O>>;
@@ -49,7 +48,7 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
     triggerMaintenance(maintenance: string, all?: boolean): string;
     spawnNextCluster(): Promise<void> | undefined;
 }
-export interface ClusterClient {
+export declare interface ClusterClient {
     emit: (<K extends keyof ClusterClientEvents>(event: K, ...args: ClusterClientEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, ...args: unknown[]) => boolean);
     off: (<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this);
     on: (<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this);

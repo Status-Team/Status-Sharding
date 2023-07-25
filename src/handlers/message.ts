@@ -16,7 +16,7 @@ export class ClusterHandler {
 				this.cluster.ready = true;
 
 				// Emitted upon the cluster's ready event.
-				this.cluster.emit('ready');
+				this.cluster.emit('ready', this.cluster);
 				this.cluster.manager._debug(`[Cluster ${this.cluster.id}] Cluster is ready.`);
 
 				if (this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {

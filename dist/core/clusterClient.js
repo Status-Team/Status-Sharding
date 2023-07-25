@@ -46,23 +46,20 @@ class ClusterClient extends events_1.default {
         this.process?.ipc?.on('message', this._handleMessage.bind(this));
         this.promise = new promise_1.PromiseHandler();
         // Login the Client.
-        if (this.info.AutoLogin)
+        if (this.info.AutoLogin && client?.login)
             client.login(this.info.Token);
-        client?.once?.('ready', () => {
-            this.triggerReady();
-        });
+        if (client?.once)
+            client.once('ready', () => {
+                this.triggerReady();
+            });
     }
     // Cluster's id.
     get id() {
         return this.info.ClusterId;
     }
-    // Array of shard Id's of this client.
-    get shards() {
-        return this.client.ws.shards;
-    }
     // Total number of shards.
     get totalShards() {
-        return this.client.ws.shards.size;
+        return this.info.TotalShards;
     }
     // Total number of clusters.
     get totalClusters() {
@@ -115,7 +112,7 @@ class ClusterClient extends events_1.default {
         const nonce = shardingUtils_1.ShardingUtils.generateNonce();
         this.process?.send({
             data: {
-                script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}') || (() => { return Promise.reject(new Error('CLUSTERING_GUILD_NOT_FOUND | Guild with ID ${guildId} not found.')); })())`,
+                script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}')())`,
                 options: {
                     ...options,
                     guildId,

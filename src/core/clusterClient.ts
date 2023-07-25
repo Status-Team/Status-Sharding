@@ -48,9 +48,9 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		this.promise = new PromiseHandler();
 
 		// Login the Client.
-		if (this.info.AutoLogin) client.login(this.info.Token);
+		if (this.info.AutoLogin && client?.login) client.login(this.info.Token);
 
-		client?.once?.('ready', () => {
+		if (client?.once) client.once('ready', () => {
 			this.triggerReady();
 		});
 	}
@@ -60,14 +60,9 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		return this.info.ClusterId;
 	}
 
-	// Array of shard Id's of this client.
-	public get shards() {
-		return this.client.ws.shards;
-	}
-
 	// Total number of shards.
 	public get totalShards() {
-		return this.client.ws.shards.size;
+		return this.info.TotalShards;
 	}
 
 	// Total number of clusters.
@@ -113,7 +108,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		return this.promise.create(nonce, options?.timeout);
 	}
 
-	public async broadcastEval<T, P>(script: string | ((client: InternalClient, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]> {
+	public async broadcastEval<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]> {
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process?.send({
@@ -128,12 +123,12 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		return this.promise.create(nonce, options?.timeout);
 	}
 
-	public async evalOnGuild<T, P>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnGuild<T, P, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<T extends never ? unknown : Serialized<T>> {
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process?.send({
 			data: {
-				script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}') || (() => { return Promise.reject(new Error('CLUSTERING_GUILD_NOT_FOUND | Guild with ID ${guildId} not found.')); })())`,
+				script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}')())`,
 				options: {
 					...options,
 					guildId,
@@ -146,7 +141,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		return this.promise.create(nonce, options?.timeout).then((data) => (data as unknown as T[])?.[0]) as unknown as T extends never ? unknown : Serialized<T>;
 	}
 
-	public async evalOnClient<T, P>(script: string | ((client: InternalClient, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnClient<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<T extends never ? unknown : Serialized<T>> {
 		type EvalObject = { _eval: <T>(script: string) => T; };
 
 		if ((this.client as unknown as EvalObject)._eval) return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
@@ -234,7 +229,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 }
 
 // Credits for EventEmitter typings: https://github.com/discordjs/discord.js/blob/main/packages/rest/src/lib/RequestManager.ts#L159
-export interface ClusterClient {
+export declare interface ClusterClient {
 	emit: (<K extends keyof ClusterClientEvents>(event: K, ...args: ClusterClientEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, ...args: unknown[]) => boolean);
     off: (<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this);
     on: (<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this);
