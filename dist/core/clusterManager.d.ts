@@ -27,7 +27,7 @@ export declare class ClusterManager extends EventEmitter {
         respawnDelay?: number | undefined;
         timeout?: number | undefined;
     }): Promise<Map<number, Cluster>>;
-    eval<T, P>(script: string | ((manager: ClusterManager, context: Serialized<P>) => Awaitable<T>), options?: {
+    eval<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }): Promise<{

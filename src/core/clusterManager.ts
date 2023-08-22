@@ -166,7 +166,7 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Runs a method with given arguments on the Manager itself.
-	public async eval<T, P>(script: string | ((manager: ClusterManager, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<{
+	public async eval<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<{
 		result: Serialized<T> | undefined;
 		error: Error | undefined;
 	}> {

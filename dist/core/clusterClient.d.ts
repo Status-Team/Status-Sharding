@@ -24,7 +24,7 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
     get info(): import("../types").ClusterClientData;
     send(message: Serializable): Promise<void> | undefined;
     _sendInstance(message: BaseMessage<DataType>): Promise<void> | undefined;
-    evalOnManager<T, P>(script: string | ((manager: ClusterManager, context: Serialized<P>) => Awaitable<T>), options?: {
+    evalOnManager<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }): Promise<T extends never ? unknown : Serialized<T>>;

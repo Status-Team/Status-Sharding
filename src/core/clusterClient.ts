@@ -93,7 +93,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		return this.process?.send(message);
 	}
 
-	public async evalOnManager<T, P>(script: string | ((manager: ClusterManager, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnManager<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<T extends never ? unknown : Serialized<T>> {
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process?.send({
