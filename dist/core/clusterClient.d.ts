@@ -29,7 +29,7 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
         timeout?: number;
     }): Promise<T extends never ? unknown : Serialized<T>>;
     broadcastEval<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]>;
-    evalOnGuild<T, P, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: {
+    evalOnGuild<T, P, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }): Promise<T extends never ? unknown : Serialized<T>>;

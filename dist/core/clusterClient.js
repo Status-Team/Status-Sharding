@@ -112,7 +112,7 @@ class ClusterClient extends events_1.default {
         const nonce = shardingUtils_1.ShardingUtils.generateNonce();
         this.process?.send({
             data: {
-                script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}')())`,
+                script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}'))`,
                 options: {
                     ...options,
                     guildId,
