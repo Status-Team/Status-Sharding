@@ -137,8 +137,9 @@ class ClusterManager extends events_1.default {
         return this.clusterQueue.start();
     }
     // Sends a message to all clusters.
-    async broadcast(message) {
-        const promises = Array.from(this.clusters.values()).map((cluster) => cluster.send(message));
+    async broadcast(message, ignoreClusters) {
+        const clusters = Array.from(this.clusters.values()).filter((c) => !ignoreClusters?.includes(c.id));
+        const promises = Array.from(clusters).map((cluster) => cluster.send(message));
         return Promise.all(promises);
     }
     // Kills all running clusters and respawns them.

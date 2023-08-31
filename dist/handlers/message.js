@@ -42,6 +42,11 @@ class ClusterHandler {
                 });
                 break;
             }
+            case types_1.MessageTypes.ClientBroadcast: {
+                const data = message.data;
+                await this.cluster.manager.broadcast(data.message, data.ignore !== undefined ? [data.ignore] : undefined);
+                break;
+            }
             case types_1.MessageTypes.ClientManagerEvalRequest: {
                 const { script, options } = message.data;
                 const result = await this.cluster.manager.eval(script, options);

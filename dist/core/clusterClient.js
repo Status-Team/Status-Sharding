@@ -87,6 +87,16 @@ class ClusterClient extends events_1.default {
             _type: types_1.MessageTypes.CustomMessage,
         });
     }
+    broadcast(message, sendSelf = false) {
+        this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
+        return this.process?.send({
+            data: {
+                message,
+                ignore: sendSelf ? undefined : this.id,
+            },
+            _type: types_1.MessageTypes.ClientBroadcast,
+        });
+    }
     // This is not intended to be used by the user.
     _sendInstance(message) {
         if (!('_type' in message) || !('data' in message))

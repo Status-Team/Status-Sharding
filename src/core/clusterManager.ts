@@ -140,8 +140,10 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Sends a message to all clusters.
-	public async broadcast(message: Serializable) {
-		const promises = Array.from(this.clusters.values()).map((cluster) => cluster.send(message));
+	public async broadcast(message: Serializable, ignoreClusters?: number[]) {
+		const clusters = Array.from(this.clusters.values()).filter((c) => !ignoreClusters?.includes(c.id));
+		const promises = Array.from(clusters).map((cluster) => cluster.send(message));
+
 		return Promise.all(promises);
 	}
 

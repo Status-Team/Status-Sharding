@@ -111,6 +111,17 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		} as BaseMessage<'normal'>);
 	}
 
+	public broadcast(message: Serializable, sendSelf = false) {
+		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
+		return this.process?.send({
+			data: {
+				message,
+				ignore: sendSelf ? undefined : this.id,
+			},
+			_type: MessageTypes.ClientBroadcast,
+		} as BaseMessage<'normal'>);
+	}
+
 	// This is not intended to be used by the user.
 	public _sendInstance(message: BaseMessage<DataType>) {
 		if (!('_type' in message) || !('data' in message)) return Promise.reject(new Error('CLUSTERING_INVALID_MESSAGE | Invalid message object.' + JSON.stringify(message)));

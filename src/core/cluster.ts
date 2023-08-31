@@ -149,6 +149,10 @@ export class Cluster extends EventEmitter {
 		return this.manager.promise.create(nonce, options.timeout);
 	}
 
+	public async broadcast(message: Serializable, sendSelf = false) {
+		return await this.manager.broadcast(message, sendSelf ? undefined : [this.id]);
+	}
+
 	public async eval<T, P>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>> {
 		return eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
 	}

@@ -23,7 +23,7 @@ export declare class ClusterManager extends EventEmitter {
     readonly clusterQueue: Queue;
     constructor(file: string, options: ClusterManagerCreateOptions<ClusteringMode>);
     spawn(): Promise<Queue>;
-    broadcast(message: Serializable): Promise<void[]>;
+    broadcast(message: Serializable, ignoreClusters?: number[]): Promise<void[]>;
     respawnAll({ clusterDelay, respawnDelay, timeout }: {
         clusterDelay?: number | undefined;
         respawnDelay?: number | undefined;

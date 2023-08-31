@@ -28,6 +28,7 @@ export declare class Cluster extends EventEmitter {
     request<O>(message: Serializable, options?: {
         timeout?: number;
     }): Promise<Serialized<O>>;
+    broadcast(message: Serializable, sendSelf?: boolean): Promise<void[]>;
     eval<T, P>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>>;
     evalOnClient<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)>;
     evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: {

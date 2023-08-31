@@ -25,6 +25,7 @@ export enum MessageTypes {
     'CustomReply',
     'Heartbeat',
     'HeartbeatAck',
+    'ClientBroadcast',
     'ClientBroadcastRequest',
     'ClientBroadcastResponse',
     'ClientBroadcastResponseError',
@@ -42,8 +43,6 @@ export enum MessageTypes {
     'ClientManagerEvalRequest',
     'ClientManagerEvalResponse',
     'ClientManagerEvalResponseError',
-    'ManagerBroadcastRequest',
-    'ManagerBroadcastResponse',
 }
 
 export type Awaitable<T> = T | PromiseLike<T>;

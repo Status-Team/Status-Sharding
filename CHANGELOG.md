@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [1.3.1] - 2023-08-31
 
 ### Added
+- Added `ClusterClient#broadcast` which sends a message to all clusters, including/excluding the current cluster.
+
+## [1.3.1] - 2023-08-31
+
+### Added
 - Added `ClusterManager#on('message')` which is emitted when a message is received from a cluster.
 
 ## [1.3.0] - 2023-08-31

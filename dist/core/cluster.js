@@ -129,6 +129,9 @@ class Cluster extends events_1.default {
         });
         return this.manager.promise.create(nonce, options.timeout);
     }
+    async broadcast(message, sendSelf = false) {
+        return await this.manager.broadcast(message, sendSelf ? undefined : [this.id]);
+    }
     async eval(script, options) {
         return eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
     }

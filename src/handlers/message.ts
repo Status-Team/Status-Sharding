@@ -5,6 +5,7 @@ import { Worker } from '../classes/worker';
 import { Cluster } from '../core/cluster';
 import { Child } from '../classes/child';
 import { MessageTypes } from '../types';
+import { Serializable } from 'child_process';
 
 export class ClusterHandler {
 	constructor(private cluster: Cluster, private ipc: Worker | Child) {}
@@ -42,6 +43,12 @@ export class ClusterHandler {
 						data: ShardingUtils.makePlainError(err),
 					} as BaseMessage<'error'>);
 				});
+
+				break;
+			}
+			case MessageTypes.ClientBroadcast: {
+				const data = message.data as { message: Serializable; ignore?: number; };
+				await this.cluster.manager.broadcast(data.message, data.ignore !== undefined ? [data.ignore] : undefined);
 
 				break;
 			}
