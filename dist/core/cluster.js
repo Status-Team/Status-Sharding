@@ -64,8 +64,7 @@ class Cluster extends events_1.default {
         thread.on('error', this._handleError.bind(this));
         thread.on('exit', this._handleExit.bind(this));
         this.emit('spawn', this.thread.process);
-        if (spawnTimeout === -1 || spawnTimeout === Infinity)
-            return this.thread.process;
+        const shouldAbort = spawnTimeout > 0 && spawnTimeout !== Infinity;
         await new Promise((resolve, reject) => {
             const cleanup = () => {
                 clearTimeout(spawnTimeoutTimer);
@@ -85,9 +84,11 @@ class Cluster extends events_1.default {
                 cleanup();
                 reject(new Error('CLUSTERING_READY_TIMEOUT | Cluster ' + this.id + ' took too long to get ready.'));
             };
-            const spawnTimeoutTimer = setTimeout(onTimeout, spawnTimeout);
+            const spawnTimeoutTimer = shouldAbort ? setTimeout(onTimeout, spawnTimeout) : -1;
             this.once('ready', onReady);
             this.once('death', onDeath);
+            if (!shouldAbort)
+                resolve();
         });
         return this.thread.process;
     }

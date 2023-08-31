@@ -84,8 +84,8 @@ export class ClusterManager extends EventEmitter {
 
 		const cpuCores = os.cpus().length;
 		this.options.totalShards = this.options.totalShards !== -1 ? this.options.totalShards : this.options.token ? await ShardingUtils.getRecommendedShards(this.options.token) || 1 : 1;
-		this.options.totalClusters = this.options.totalShards === 1 ? 1 : (this.options.totalClusters === -1) ? (cpuCores > this.options.totalShards ? this.options.totalShards : cpuCores) : this.options.totalClusters;
-		this.options.shardsPerClusters = (this.options.shardsPerClusters === -1 || this.options.totalShards === 1) ? Math.ceil(this.options.totalShards / this.options.totalClusters) : this.options.shardsPerClusters;
+		this.options.totalClusters = (this.options.totalClusters === -1) ? (cpuCores > this.options.totalShards ? this.options.totalShards : cpuCores) : this.options.totalClusters;
+		this.options.shardsPerClusters = (this.options.shardsPerClusters === -1) ? Math.ceil(this.options.totalShards / this.options.totalClusters) : this.options.shardsPerClusters;
 
 		if (this.options.totalShards < 1) this.options.totalShards = 1;
 		if (this.options.totalClusters < 1) this.options.totalClusters = 1;

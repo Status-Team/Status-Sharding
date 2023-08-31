@@ -77,8 +77,8 @@ class ClusterManager extends events_1.default {
             this.options.token = this.options.token.slice(this.options.token.indexOf(' ') + 1);
         const cpuCores = os_1.default.cpus().length;
         this.options.totalShards = this.options.totalShards !== -1 ? this.options.totalShards : this.options.token ? await shardingUtils_1.ShardingUtils.getRecommendedShards(this.options.token) || 1 : 1;
-        this.options.totalClusters = this.options.totalShards === 1 ? 1 : (this.options.totalClusters === -1) ? (cpuCores > this.options.totalShards ? this.options.totalShards : cpuCores) : this.options.totalClusters;
-        this.options.shardsPerClusters = (this.options.shardsPerClusters === -1 || this.options.totalShards === 1) ? Math.ceil(this.options.totalShards / this.options.totalClusters) : this.options.shardsPerClusters;
+        this.options.totalClusters = (this.options.totalClusters === -1) ? (cpuCores > this.options.totalShards ? this.options.totalShards : cpuCores) : this.options.totalClusters;
+        this.options.shardsPerClusters = (this.options.shardsPerClusters === -1) ? Math.ceil(this.options.totalShards / this.options.totalClusters) : this.options.shardsPerClusters;
         if (this.options.totalShards < 1)
             this.options.totalShards = 1;
         if (this.options.totalClusters < 1)
