@@ -2,9 +2,11 @@
 import { ClusterClientEvents, EvalOptions, Serialized, Awaitable } from '../types';
 import { ClientOptions, Client as DiscordClient, Guild, ClientEvents } from 'discord.js';
 import { BaseMessage, DataType } from '../other/message';
+import { IPCBrokerClient } from '../handlers/broker';
 import { PromiseHandler } from '../handlers/promise';
 import { ClusterManager } from './clusterManager';
-import { IPCBroker } from '../handlers/broker';
+import { WorkerClient } from '../classes/worker';
+import { ChildClient } from '../classes/child';
 import { Serializable } from 'child_process';
 import EventEmitter from 'events';
 export type ClientEventsModifiable = Omit<ClientEvents, 'ready'> & {
@@ -27,8 +29,8 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
     ready: boolean;
     maintenance: string;
     promise: PromiseHandler;
-    readonly broker: IPCBroker;
-    private process;
+    readonly broker: IPCBrokerClient;
+    readonly process: ChildClient | WorkerClient | null;
     private messageHandler;
     constructor(client: InternalClient);
     get id(): number;

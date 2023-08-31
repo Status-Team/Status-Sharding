@@ -4,9 +4,9 @@ import { ChildProcess, Serializable } from 'child_process';
 import { HeartbeatManager } from '../plugins/heartbeat';
 import { ReClusterManager } from '../plugins/reCluster';
 import { ShardingUtils } from '../other/shardingUtils';
+import { IPCBrokerManager } from '../handlers/broker';
 import { PromiseHandler } from '../handlers/promise';
 import { ShardingClient } from './clusterClient';
-import { IPCBroker } from '../handlers/broker';
 import { Queue } from '../handlers/queue';
 import { Worker } from 'worker_threads';
 import { Cluster } from './cluster';
@@ -19,7 +19,7 @@ export class ClusterManager extends EventEmitter {
 	public ready: boolean; // Check if all clusters are ready.
 	public maintenance: string; // Maintenance mode reason.
 
-	readonly broker: IPCBroker; // IPC Broker for the ClusterManager.
+	readonly broker: IPCBrokerManager; // IPC Broker for the ClusterManager.
 	readonly options: ClusterManagerOptions<ClusteringMode>; // Options for the ClusterManager.
 	readonly promise: PromiseHandler; // Promise Handler for the ClusterManager.
 	readonly clusters: Map<number, Cluster>; // A collection of all clusters the manager spawned.
@@ -62,8 +62,8 @@ export class ClusterManager extends EventEmitter {
 		this.maintenance = '';
 		this.clusters = new Map();
 
-		this.broker = new IPCBroker(this);
 		this.promise = new PromiseHandler();
+		this.broker = new IPCBrokerManager(this);
 		this.reCluster = new ReClusterManager(this);
 		this.heartbeat = new HeartbeatManager(this);
 

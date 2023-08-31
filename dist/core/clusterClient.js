@@ -9,10 +9,10 @@ const discord_js_1 = require("discord.js");
 const message_1 = require("../other/message");
 const message_2 = require("../handlers/message");
 const shardingUtils_1 = require("../other/shardingUtils");
+const broker_1 = require("../handlers/broker");
 const promise_1 = require("../handlers/promise");
 const worker_1 = require("../classes/worker");
 const child_1 = require("../classes/child");
-const broker_1 = require("../handlers/broker");
 const data_1 = require("../other/data");
 const events_1 = __importDefault(require("events"));
 class ShardingClient extends discord_js_1.Client {
@@ -52,7 +52,7 @@ class ClusterClient extends events_1.default {
         this.client = client;
         this.ready = false;
         this.maintenance = '';
-        this.broker = new broker_1.IPCBroker(this);
+        this.broker = new broker_1.IPCBrokerClient(this);
         this.process = (this.info.ClusterManagerMode === 'process' ? new child_1.ChildClient() : this.info.ClusterManagerMode === 'worker' ? new worker_1.WorkerClient() : null);
         this.messageHandler = new message_2.ClusterClientHandler(this);
         // Handle messages from the ClusterManager.
@@ -60,7 +60,7 @@ class ClusterClient extends events_1.default {
         this.promise = new promise_1.PromiseHandler();
         if (client?.once)
             client.once('ready', () => {
-                this.triggerReady();
+                setTimeout(() => this.triggerReady(), 1500); // Allow main listener to be called first.
             });
     }
     // Cluster's id.

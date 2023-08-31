@@ -16,9 +16,9 @@ import path from 'path';
 // When its child process/worker exits for any reason, the cluster will spawn a new one to replace it as necessary.
 export class Cluster extends EventEmitter {
 	public ready: boolean;
+	public thread: null | Worker | Child;
 	public lastHeartbeatReceived: number;
 
-	private thread: null | Worker | Child;
 	private messageHandler?: ClusterHandler;
 
 	private envData: NodeJS.ProcessEnv & {
@@ -34,7 +34,6 @@ export class Cluster extends EventEmitter {
 		super();
 
 		this.lastHeartbeatReceived = Date.now();
-
 		this.ready = false; this.thread = null;
 
 		this.envData = Object.assign({}, process.env, {

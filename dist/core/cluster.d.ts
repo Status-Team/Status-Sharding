@@ -5,6 +5,8 @@ import { BaseMessage, DataType } from '../other/message';
 import { ClusterManager } from './clusterManager';
 import { ShardingClient } from './clusterClient';
 import { Serializable } from 'child_process';
+import { Worker } from '../classes/worker';
+import { Child } from '../classes/child';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 export declare class Cluster extends EventEmitter {
@@ -12,16 +14,16 @@ export declare class Cluster extends EventEmitter {
     id: number;
     shardList: number[];
     ready: boolean;
+    thread: null | Worker | Child;
     lastHeartbeatReceived: number;
-    private thread;
     private messageHandler?;
     private envData;
     constructor(manager: ClusterManager, id: number, shardList: number[]);
     get totalShards(): number;
     get totalClusters(): number;
-    spawn(spawnTimeout?: number): Promise<import("worker_threads").Worker | import("child_process").ChildProcess | null>;
+    spawn(spawnTimeout?: number): Promise<import("child_process").ChildProcess | import("worker_threads").Worker | null>;
     kill(options?: ClusterKillOptions): Promise<void>;
-    respawn(delay?: number, timeout?: number): Promise<import("worker_threads").Worker | import("child_process").ChildProcess | null>;
+    respawn(delay?: number, timeout?: number): Promise<import("child_process").ChildProcess | import("worker_threads").Worker | null>;
     send(message: Serializable): Promise<void>;
     request<O>(message: Serializable, options?: {
         timeout?: number;

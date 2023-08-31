@@ -3,11 +3,11 @@ import { ClientOptions, Client as DiscordClient, Guild, ClientEvents } from 'dis
 import { BaseMessage, DataType, ProcessMessage } from '../other/message';
 import { ClusterClientHandler } from '../handlers/message';
 import { ShardingUtils } from '../other/shardingUtils';
+import { IPCBrokerClient } from '../handlers/broker';
 import { PromiseHandler } from '../handlers/promise';
 import { ClusterManager } from './clusterManager';
 import { WorkerClient } from '../classes/worker';
 import { ChildClient } from '../classes/child';
-import { IPCBroker } from '../handlers/broker';
 import { Serializable } from 'child_process';
 import { getInfo } from '../other/data';
 import EventEmitter from 'events';
@@ -57,9 +57,9 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	public maintenance: string;
 	public promise: PromiseHandler;
 
-	readonly broker: IPCBroker; // IPC Broker for the ClusterManager.
+	readonly broker: IPCBrokerClient; // IPC Broker for the ClusterManager.
+	readonly process: ChildClient | WorkerClient | null;
 
-	private process: ChildClient | WorkerClient | null;
 	private messageHandler: ClusterClientHandler<InternalClient>;
 
 	constructor(public client: InternalClient) {
@@ -68,7 +68,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		this.ready = false;
 		this.maintenance = '';
 
-		this.broker = new IPCBroker(this);
+		this.broker = new IPCBrokerClient(this);
 		this.process = (this.info.ClusterManagerMode === 'process' ? new ChildClient() : this.info.ClusterManagerMode === 'worker' ? new WorkerClient() : null);
 		this.messageHandler = new ClusterClientHandler<InternalClient>(this);
 
@@ -77,7 +77,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		this.promise = new PromiseHandler();
 
 		if (client?.once) client.once('ready', () => {
-			this.triggerReady();
+			setTimeout(() => this.triggerReady(), 1500); // Allow main listener to be called first.
 		});
 	}
 
