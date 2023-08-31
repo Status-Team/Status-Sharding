@@ -134,6 +134,7 @@ export interface ClusterManagerEvents {
     clientRequest: [message: ProcessMessage];
     clusterCreate: [cluster: Cluster];
     clusterReady: [cluster: Cluster];
+    message: [message: ProcessMessage];
     debug: [debugMessage: string];
     ready: [manager: ClusterManager];
 }

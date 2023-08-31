@@ -196,6 +196,7 @@ export class Cluster extends EventEmitter {
 			if (message._type === MessageTypes.CustomRequest) this.manager.emit('clientRequest', ipcMessage);
 
 			this.emit('message', ipcMessage);
+			this.manager.emit('message', ipcMessage);
 		}
 	}
 

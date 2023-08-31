@@ -169,6 +169,7 @@ class Cluster extends events_1.default {
             if (message._type === types_1.MessageTypes.CustomRequest)
                 this.manager.emit('clientRequest', ipcMessage);
             this.emit('message', ipcMessage);
+            this.manager.emit('message', ipcMessage);
         }
     }
     _handleExit(exitCode) {
