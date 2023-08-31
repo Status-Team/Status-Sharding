@@ -49,7 +49,6 @@ export class ClusterManager extends EventEmitter {
 			},
 		};
 
-		process.env.AUTO_LOGIN = options.autoLogin ? 'true' : undefined;
 		process.env.TOTAL_SHARDS = String(options.totalShards);
 		process.env.CLUSTER_COUNT = String(options.totalClusters);
 		process.env.CLUSTER_MANAGER_MODE = options.mode;

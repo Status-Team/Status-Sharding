@@ -47,9 +47,6 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		this.process?.ipc?.on('message', this._handleMessage.bind(this));
 		this.promise = new PromiseHandler();
 
-		// Login the Client.
-		if (this.info.AutoLogin && client?.login) client.login(this.info.Token);
-
 		if (client?.once) client.once('ready', () => {
 			this.triggerReady();
 		});

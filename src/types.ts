@@ -54,7 +54,7 @@ export type Serialized<T> = T extends symbol | bigint | (() => unknown) ? never 
 
 export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
     mode?: T; // Which mode to use for clustering.
-    token: string; // The token of the discord bot.
+    token?: string; // The token of the discord bot.
     totalShards?: number; // Number of total internal shards or -1.
     totalClusters?: number; // Number of total Clusters\Process to spawn.
     shardsPerClusters?: number; // Number of shards per cluster.
@@ -66,7 +66,6 @@ export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
     spawnOptions?: ClusterSpawnOptions; // Options to pass to the spawn, respawn method.
     clusterData?: object; // Data, which is passed to the Cluster.
     clusterOptions?: T extends 'worker' ? WorkerThreadOptions : ChildProcessOptions; // Options, which is passed when forking a child or creating a thread.
-    autoLogin?: boolean; // Auto login.
 }
 
 export interface ClusterManagerOptions<T extends ClusteringMode> extends ClusterManagerCreateOptions<T> {
@@ -89,8 +88,6 @@ export interface ClusterClientData {
 	ClusterQueueMode?: 'auto' | 'manual';
 	FirstShardId: number;
 	LastShardId: number;
-	AutoLogin: boolean;
-	Token: string;
 	DebugFull?: boolean;
 }
 

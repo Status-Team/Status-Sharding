@@ -41,7 +41,5 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# dont ask
-test.js
 # vercel
 .vercel

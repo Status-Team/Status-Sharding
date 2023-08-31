@@ -28,8 +28,6 @@ export class Cluster extends EventEmitter {
 		CLUSTER_MANAGER_MODE: 'process' | 'worker';
 		CLUSTER_QUEUE_MODE: 'auto' | 'manual';
 		CLUSTER_COUNT: number;
-		DISCORD_TOKEN: string;
-		AUTO_LOGIN: boolean;
 	};
 
 	constructor(public manager: ClusterManager, public id: number, public shardList: number[]) {
@@ -46,8 +44,6 @@ export class Cluster extends EventEmitter {
 			CLUSTER_MANAGER_MODE: this.manager.options.mode,
 			CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
 			CLUSTER_COUNT: this.manager.options.totalClusters,
-			DISCORD_TOKEN: this.manager.options.token,
-			AUTO_LOGIN: this.manager.options.autoLogin ?? false,
 		});
 	}
 

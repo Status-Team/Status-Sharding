@@ -59,7 +59,7 @@ export type Serialized<T> = T extends symbol | bigint | (() => unknown) ? never 
 } : T;
 export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
     mode?: T;
-    token: string;
+    token?: string;
     totalShards?: number;
     totalClusters?: number;
     shardsPerClusters?: number;
@@ -71,7 +71,6 @@ export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
     spawnOptions?: ClusterSpawnOptions;
     clusterData?: object;
     clusterOptions?: T extends 'worker' ? WorkerThreadOptions : ChildProcessOptions;
-    autoLogin?: boolean;
 }
 export interface ClusterManagerOptions<T extends ClusteringMode> extends ClusterManagerCreateOptions<T> {
     mode: T;
@@ -92,8 +91,6 @@ export interface ClusterClientData {
     ClusterQueueMode?: 'auto' | 'manual';
     FirstShardId: number;
     LastShardId: number;
-    AutoLogin: boolean;
-    Token: string;
     DebugFull?: boolean;
 }
 export interface ClusterSpawnOptions {

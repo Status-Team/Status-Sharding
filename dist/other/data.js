@@ -21,8 +21,6 @@ function getInfo() {
             ClusterQueueMode: process.env.CLUSTER_QUEUE_MODE,
             FirstShardId: shardList[0],
             LastShardId: shardList[shardList.length - 1],
-            AutoLogin: process.env.AUTO_LOGIN === 'true',
-            Token: process.env.DISCORD_TOKEN,
         };
     }
     else {
@@ -35,8 +33,6 @@ function getInfo() {
             ClusterQueueMode: worker_threads_1.workerData.CLUSTER_QUEUE_MODE,
             FirstShardId: worker_threads_1.workerData.SHARD_LIST[0],
             LastShardId: worker_threads_1.workerData.SHARD_LIST[worker_threads_1.workerData.SHARD_LIST.length - 1],
-            AutoLogin: worker_threads_1.workerData.AUTO_LOGIN,
-            Token: worker_threads_1.workerData.DISCORD_TOKEN,
         };
     }
     return data;

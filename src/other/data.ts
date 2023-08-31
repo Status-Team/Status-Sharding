@@ -23,8 +23,6 @@ export function getInfo() {
 			ClusterQueueMode: process.env.CLUSTER_QUEUE_MODE as 'auto' | 'manual',
 			FirstShardId: shardList[0],
 			LastShardId: shardList[shardList.length - 1],
-			AutoLogin: process.env.AUTO_LOGIN === 'true',
-			Token: process.env.DISCORD_TOKEN as string,
 		};
 	} else {
 		data = {
@@ -36,8 +34,6 @@ export function getInfo() {
 			ClusterQueueMode: workerData.CLUSTER_QUEUE_MODE,
 			FirstShardId: workerData.SHARD_LIST[0],
 			LastShardId: workerData.SHARD_LIST[workerData.SHARD_LIST.length - 1],
-			AutoLogin: workerData.AUTO_LOGIN,
-			Token: workerData.DISCORD_TOKEN,
 		};
 	}
 

@@ -45,9 +45,6 @@ class ClusterClient extends events_1.default {
         // Handle messages from the ClusterManager.
         this.process?.ipc?.on('message', this._handleMessage.bind(this));
         this.promise = new promise_1.PromiseHandler();
-        // Login the Client.
-        if (this.info.AutoLogin && client?.login)
-            client.login(this.info.Token);
         if (client?.once)
             client.once('ready', () => {
                 this.triggerReady();

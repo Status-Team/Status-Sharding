@@ -39,8 +39,6 @@ class Cluster extends events_1.default {
             CLUSTER_MANAGER_MODE: this.manager.options.mode,
             CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
             CLUSTER_COUNT: this.manager.options.totalClusters,
-            DISCORD_TOKEN: this.manager.options.token,
-            AUTO_LOGIN: this.manager.options.autoLogin ?? false,
         });
     }
     get totalShards() {
