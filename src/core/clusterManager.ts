@@ -32,7 +32,7 @@ export class ClusterManager extends EventEmitter {
 		this.file = path.isAbsolute(file) ? file : path.resolve(process.cwd(), file);
 		if (!fs.statSync(this.file)?.isFile()) throw new Error('CLIENT_INVALID_OPTION | Provided is file is not type of file.');
 
-		if (options.mode !== 'worker' && options.mode !== 'process') throw new RangeError('CLIENT_INVALID_OPTION | Cluster mode must be "worker" or "process".');
+		if (options.mode && options.mode !== 'worker' && options.mode !== 'process') throw new RangeError('CLIENT_INVALID_OPTION | Cluster mode must be "worker" or "process".');
 
 		this.options = {
 			...options,
@@ -76,13 +76,12 @@ export class ClusterManager extends EventEmitter {
 			code: 'SHARDING_DELAY',
 		});
 
-		if (!this.options.token) throw new Error('CLIENT_INVALID_OPTION | No Token specified.');
-		if (this.options.token?.includes('Bot ') || this.options.token?.includes('Bearer ')) this.options.token = this.options.token.slice(this.options.token.indexOf(' ') + 1);
+		if (this.options.token && this.options.token?.includes('Bot ') || this.options.token?.includes('Bearer ')) this.options.token = this.options.token.slice(this.options.token.indexOf(' ') + 1);
 
 		const cpuCores = os.cpus().length;
-		this.options.totalShards = this.options.totalShards !== -1 ? this.options.totalShards : await ShardingUtils.getRecommendedShards(this.options.token) || 1;
-		this.options.totalClusters = (this.options.totalClusters === -1) ? (cpuCores > this.options.totalShards ? this.options.totalShards : cpuCores) : this.options.totalClusters;
-		this.options.shardsPerClusters = (this.options.shardsPerClusters === -1) ? Math.ceil(this.options.totalShards / this.options.totalClusters) : this.options.shardsPerClusters;
+		this.options.totalShards = this.options.totalShards !== -1 ? this.options.totalShards : this.options.token ? await ShardingUtils.getRecommendedShards(this.options.token) || 1 : 1;
+		this.options.totalClusters = this.options.totalShards === 1 ? 1 : (this.options.totalClusters === -1) ? (cpuCores > this.options.totalShards ? this.options.totalShards : cpuCores) : this.options.totalClusters;
+		this.options.shardsPerClusters = (this.options.shardsPerClusters === -1 || this.options.totalShards === 1) ? Math.ceil(this.options.totalShards / this.options.totalClusters) : this.options.shardsPerClusters;
 
 		if (this.options.totalShards < 1) this.options.totalShards = 1;
 		if (this.options.totalClusters < 1) this.options.totalClusters = 1;

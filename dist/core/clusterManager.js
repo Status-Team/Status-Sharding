@@ -32,7 +32,7 @@ class ClusterManager extends events_1.default {
         this.file = path_1.default.isAbsolute(file) ? file : path_1.default.resolve(process.cwd(), file);
         if (!fs_1.default.statSync(this.file)?.isFile())
             throw new Error('CLIENT_INVALID_OPTION | Provided is file is not type of file.');
-        if (options.mode !== 'worker' && options.mode !== 'process')
+        if (options.mode && options.mode !== 'worker' && options.mode !== 'process')
             throw new RangeError('CLIENT_INVALID_OPTION | Cluster mode must be "worker" or "process".');
         this.options = {
             ...options,
@@ -70,14 +70,12 @@ class ClusterManager extends events_1.default {
             process.emitWarning('Spawn Delay is smaller than 8s, this can cause global rate limits on /gateway/bot', {
                 code: 'SHARDING_DELAY',
             });
-        if (!this.options.token)
-            throw new Error('CLIENT_INVALID_OPTION | No Token specified.');
-        if (this.options.token?.includes('Bot ') || this.options.token?.includes('Bearer '))
+        if (this.options.token && this.options.token?.includes('Bot ') || this.options.token?.includes('Bearer '))
             this.options.token = this.options.token.slice(this.options.token.indexOf(' ') + 1);
         const cpuCores = os_1.default.cpus().length;
-        this.options.totalShards = this.options.totalShards !== -1 ? this.options.totalShards : await shardingUtils_1.ShardingUtils.getRecommendedShards(this.options.token) || 1;
-        this.options.totalClusters = (this.options.totalClusters === -1) ? (cpuCores > this.options.totalShards ? this.options.totalShards : cpuCores) : this.options.totalClusters;
-        this.options.shardsPerClusters = (this.options.shardsPerClusters === -1) ? Math.ceil(this.options.totalShards / this.options.totalClusters) : this.options.shardsPerClusters;
+        this.options.totalShards = this.options.totalShards !== -1 ? this.options.totalShards : this.options.token ? await shardingUtils_1.ShardingUtils.getRecommendedShards(this.options.token) || 1 : 1;
+        this.options.totalClusters = this.options.totalShards === 1 ? 1 : (this.options.totalClusters === -1) ? (cpuCores > this.options.totalShards ? this.options.totalShards : cpuCores) : this.options.totalClusters;
+        this.options.shardsPerClusters = (this.options.shardsPerClusters === -1 || this.options.totalShards === 1) ? Math.ceil(this.options.totalShards / this.options.totalClusters) : this.options.shardsPerClusters;
         if (this.options.totalShards < 1)
             this.options.totalShards = 1;
         if (this.options.totalClusters < 1)
