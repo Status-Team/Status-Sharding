@@ -159,8 +159,8 @@ class Cluster extends events_1.default {
         return this.thread?.send(message);
     }
     _handleMessage(message) {
-        if (!message)
-            return;
+        if (!message || '_data' in message)
+            return this.manager.broker.handleMessage(message);
         this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);
         this.messageHandler?.handleMessage(message);
         if ([types_1.MessageTypes.CustomMessage, types_1.MessageTypes.CustomRequest].includes(message._type)) {

@@ -1,20 +1,33 @@
 /// <reference types="node" />
 import { ClusterClientEvents, EvalOptions, Serialized, Awaitable } from '../types';
-import { ClientOptions, Client as DiscordClient, Guild } from 'discord.js';
+import { ClientOptions, Client as DiscordClient, Guild, ClientEvents } from 'discord.js';
 import { BaseMessage, DataType } from '../other/message';
 import { PromiseHandler } from '../handlers/promise';
 import { ClusterManager } from './clusterManager';
+import { IPCBroker } from '../handlers/broker';
 import { Serializable } from 'child_process';
 import EventEmitter from 'events';
+export type ClientEventsModifiable = Omit<ClientEvents, 'ready'> & {
+    ready: [client: ShardingClient];
+};
 export declare class ShardingClient extends DiscordClient {
     cluster: ClusterClient<this>;
     constructor(options: ClientOptions);
+    on<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+    on<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+    once<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+    once<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+    off<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+    off<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+    emit<K extends keyof ClientEventsModifiable>(event: K, ...args: ClientEventsModifiable[K]): boolean;
+    emit<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, ...args: unknown[]): boolean;
 }
 export declare class ClusterClient<InternalClient extends ShardingClient = ShardingClient> extends EventEmitter {
     client: InternalClient;
     ready: boolean;
     maintenance: string;
     promise: PromiseHandler;
+    readonly broker: IPCBroker;
     private process;
     private messageHandler;
     constructor(client: InternalClient);

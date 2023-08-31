@@ -1,5 +1,5 @@
 import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable } from '../types';
-import { ClientOptions, Client as DiscordClient, Guild } from 'discord.js';
+import { ClientOptions, Client as DiscordClient, Guild, ClientEvents } from 'discord.js';
 import { BaseMessage, DataType, ProcessMessage } from '../other/message';
 import { ClusterClientHandler } from '../handlers/message';
 import { ShardingUtils } from '../other/shardingUtils';
@@ -7,9 +7,12 @@ import { PromiseHandler } from '../handlers/promise';
 import { ClusterManager } from './clusterManager';
 import { WorkerClient } from '../classes/worker';
 import { ChildClient } from '../classes/child';
+import { IPCBroker } from '../handlers/broker';
 import { Serializable } from 'child_process';
 import { getInfo } from '../other/data';
 import EventEmitter from 'events';
+
+export type ClientEventsModifiable = Omit<ClientEvents, 'ready'> & { ready: [client: ShardingClient] };
 
 export class ShardingClient extends DiscordClient {
 	cluster: ClusterClient<this>;
@@ -23,23 +26,49 @@ export class ShardingClient extends DiscordClient {
 
 		this.cluster = new ClusterClient<this>(this);
 	}
+
+	on<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	on<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+	on(event: string | symbol, listener: (...args: unknown[]) => void): this {
+		return super.on(event, listener);
+	}
+
+	once<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	once<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+	once(event: string | symbol, listener: (...args: unknown[]) => void): this {
+		return super.once(event, listener);
+	}
+
+	off<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	off<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+	off(event: string | symbol, listener: (...args: unknown[]) => void): this {
+		return super.off(event, listener);
+	}
+
+	emit<K extends keyof ClientEventsModifiable>(event: K, ...args: ClientEventsModifiable[K]): boolean;
+	emit<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, ...args: unknown[]): boolean;
+	emit(event: string | symbol, ...args: unknown[]): boolean {
+		return super.emit(event, ...args);
+	}
 }
 
 export class ClusterClient<InternalClient extends ShardingClient = ShardingClient> extends EventEmitter {
 	public ready: boolean;
 	public maintenance: string;
 	public promise: PromiseHandler;
+
+	readonly broker: IPCBroker; // IPC Broker for the ClusterManager.
+
 	private process: ChildClient | WorkerClient | null;
 	private messageHandler: ClusterClientHandler<InternalClient>;
 
 	constructor(public client: InternalClient) {
 		super();
 
-		// If the Cluster is under maintenance.
+		this.ready = false;
 		this.maintenance = '';
 
-		// Wait 100ms so listener can be added.
-		this.ready = false;
+		this.broker = new IPCBroker(this);
 		this.process = (this.info.ClusterManagerMode === 'process' ? new ChildClient() : this.info.ClusterManagerMode === 'worker' ? new WorkerClient() : null);
 		this.messageHandler = new ClusterClientHandler<InternalClient>(this);
 
@@ -173,8 +202,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	}
 
 	// Handles an IPC message.
-	private _handleMessage(message: BaseMessage<'normal'>) {
-		if (!message) return;
+	private _handleMessage(message: BaseMessage<'normal'> | { _data: unknown; broker: string; }) {
+		if (!message || '_data' in message) return this.broker.handleMessage(message);
 
 		// Debug.
 		this.emit('debug', `[IPC] [Child ${this.id}] Received message from cluster.`);

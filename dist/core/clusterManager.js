@@ -8,6 +8,7 @@ const heartbeat_1 = require("../plugins/heartbeat");
 const reCluster_1 = require("../plugins/reCluster");
 const shardingUtils_1 = require("../other/shardingUtils");
 const promise_1 = require("../handlers/promise");
+const broker_1 = require("../handlers/broker");
 const queue_1 = require("../handlers/queue");
 const cluster_1 = require("./cluster");
 const events_1 = __importDefault(require("events"));
@@ -18,6 +19,7 @@ class ClusterManager extends events_1.default {
     file;
     ready; // Check if all clusters are ready.
     maintenance; // Maintenance mode reason.
+    broker; // IPC Broker for the ClusterManager.
     options; // Options for the ClusterManager.
     promise; // Promise Handler for the ClusterManager.
     clusters; // A collection of all clusters the manager spawned.
@@ -54,8 +56,9 @@ class ClusterManager extends events_1.default {
         process.env.DISCORD_TOKEN = String(options.token) || undefined;
         process.env.CLUSTER_QUEUE_MODE = options.queueOptions?.mode ?? 'auto';
         this.ready = false;
-        this.clusters = new Map();
         this.maintenance = '';
+        this.clusters = new Map();
+        this.broker = new broker_1.IPCBroker(this);
         this.promise = new promise_1.PromiseHandler();
         this.reCluster = new reCluster_1.ReClusterManager(this);
         this.heartbeat = new heartbeat_1.HeartbeatManager(this);

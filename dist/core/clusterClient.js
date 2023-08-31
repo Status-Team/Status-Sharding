@@ -12,6 +12,7 @@ const shardingUtils_1 = require("../other/shardingUtils");
 const promise_1 = require("../handlers/promise");
 const worker_1 = require("../classes/worker");
 const child_1 = require("../classes/child");
+const broker_1 = require("../handlers/broker");
 const data_1 = require("../other/data");
 const events_1 = __importDefault(require("events"));
 class ShardingClient extends discord_js_1.Client {
@@ -24,6 +25,18 @@ class ShardingClient extends discord_js_1.Client {
         });
         this.cluster = new ClusterClient(this);
     }
+    on(event, listener) {
+        return super.on(event, listener);
+    }
+    once(event, listener) {
+        return super.once(event, listener);
+    }
+    off(event, listener) {
+        return super.off(event, listener);
+    }
+    emit(event, ...args) {
+        return super.emit(event, ...args);
+    }
 }
 exports.ShardingClient = ShardingClient;
 class ClusterClient extends events_1.default {
@@ -31,15 +44,15 @@ class ClusterClient extends events_1.default {
     ready;
     maintenance;
     promise;
+    broker; // IPC Broker for the ClusterManager.
     process;
     messageHandler;
     constructor(client) {
         super();
         this.client = client;
-        // If the Cluster is under maintenance.
-        this.maintenance = '';
-        // Wait 100ms so listener can be added.
         this.ready = false;
+        this.maintenance = '';
+        this.broker = new broker_1.IPCBroker(this);
         this.process = (this.info.ClusterManagerMode === 'process' ? new child_1.ChildClient() : this.info.ClusterManagerMode === 'worker' ? new worker_1.WorkerClient() : null);
         this.messageHandler = new message_2.ClusterClientHandler(this);
         // Handle messages from the ClusterManager.
@@ -149,8 +162,8 @@ class ClusterClient extends events_1.default {
     }
     // Handles an IPC message.
     _handleMessage(message) {
-        if (!message)
-            return;
+        if (!message || '_data' in message)
+            return this.broker.handleMessage(message);
         // Debug.
         this.emit('debug', `[IPC] [Child ${this.id}] Received message from cluster.`);
         this.messageHandler?.handleMessage(message);

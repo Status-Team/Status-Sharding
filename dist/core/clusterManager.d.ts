@@ -6,6 +6,7 @@ import { HeartbeatManager } from '../plugins/heartbeat';
 import { ReClusterManager } from '../plugins/reCluster';
 import { PromiseHandler } from '../handlers/promise';
 import { ShardingClient } from './clusterClient';
+import { IPCBroker } from '../handlers/broker';
 import { Queue } from '../handlers/queue';
 import { Cluster } from './cluster';
 import EventEmitter from 'events';
@@ -13,6 +14,7 @@ export declare class ClusterManager extends EventEmitter {
     file: string;
     ready: boolean;
     maintenance: string;
+    readonly broker: IPCBroker;
     readonly options: ClusterManagerOptions<ClusteringMode>;
     readonly promise: PromiseHandler;
     readonly clusters: Map<number, Cluster>;

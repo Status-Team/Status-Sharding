@@ -184,8 +184,8 @@ export class Cluster extends EventEmitter {
 		return this.thread?.send(message);
 	}
 
-	private _handleMessage(message: BaseMessage<'normal'>) {
-		if (!message) return;
+	private _handleMessage(message: BaseMessage<'normal'> | { _data: unknown; broker: string; }) {
+		if (!message || '_data' in message) return this.manager.broker.handleMessage(message);
 
 		this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);
 		this.messageHandler?.handleMessage(message);
