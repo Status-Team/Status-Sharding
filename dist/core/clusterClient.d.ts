@@ -9,6 +9,7 @@ import EventEmitter from 'events';
 export declare class ShardingClient extends DiscordClient {
     cluster: ClusterClient<this>;
     constructor(options: ClientOptions);
+    on(event: 'ready', listener: (...args: [client: this]) => Awaitable<void>): this;
 }
 export declare class ClusterClient<InternalClient extends ShardingClient = ShardingClient> extends EventEmitter {
     client: InternalClient;

@@ -24,6 +24,9 @@ class ShardingClient extends discord_js_1.Client {
         });
         this.cluster = new ClusterClient(this);
     }
+    on(event, listener) {
+        return super.on(event, listener);
+    }
 }
 exports.ShardingClient = ShardingClient;
 class ClusterClient extends events_1.default {

@@ -19,9 +19,9 @@ export declare class Cluster extends EventEmitter {
     constructor(manager: ClusterManager, id: number, shardList: number[]);
     get totalShards(): number;
     get totalClusters(): number;
-    spawn(spawnTimeout?: number): Promise<import("child_process").ChildProcess | import("worker_threads").Worker | null>;
+    spawn(spawnTimeout?: number): Promise<import("worker_threads").Worker | import("child_process").ChildProcess | null>;
     kill(options?: ClusterKillOptions): Promise<void>;
-    respawn(delay?: number, timeout?: number): Promise<import("child_process").ChildProcess | import("worker_threads").Worker | null>;
+    respawn(delay?: number, timeout?: number): Promise<import("worker_threads").Worker | import("child_process").ChildProcess | null>;
     send(message: Serializable): Promise<void>;
     request<O>(message: Serializable, options?: {
         timeout?: number;
