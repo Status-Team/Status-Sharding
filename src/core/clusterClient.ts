@@ -23,10 +23,6 @@ export class ShardingClient extends DiscordClient {
 
 		this.cluster = new ClusterClient<this>(this);
 	}
-
-	public on(event: 'ready', listener: (...args: [client: this]) => Awaitable<void>): this {
-		return super.on(event, listener as (...args: unknown[]) => Awaitable<void>);
-	}
 }
 
 export class ClusterClient<InternalClient extends ShardingClient = ShardingClient> extends EventEmitter {
