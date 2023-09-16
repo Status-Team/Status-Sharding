@@ -1,4 +1,4 @@
-import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialized, Awaitable } from '../types';
+import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable } from '../types';
 import { ProcessMessage, BaseMessage, DataType } from '../other/message';
 import { ShardingUtils } from '../other/shardingUtils';
 import { ClusterHandler } from '../handlers/message';
@@ -22,12 +22,12 @@ export class Cluster extends EventEmitter {
 	private messageHandler?: ClusterHandler;
 
 	private envData: NodeJS.ProcessEnv & {
+		CLUSTER: number;
 		SHARD_LIST: number[];
 		TOTAL_SHARDS: number;
-		CLUSTER: number;
-		CLUSTER_MANAGER_MODE: 'process' | 'worker';
-		CLUSTER_QUEUE_MODE: 'auto' | 'manual';
 		CLUSTER_COUNT: number;
+		CLUSTER_QUEUE_MODE: 'auto' | 'manual';
+		CLUSTER_MANAGER_MODE: 'process' | 'worker';
 	};
 
 	constructor(public manager: ClusterManager, public id: number, public shardList: number[]) {
@@ -37,12 +37,12 @@ export class Cluster extends EventEmitter {
 		this.ready = false; this.thread = null;
 
 		this.envData = Object.assign({}, process.env, {
+			CLUSTER: this.id,
 			SHARD_LIST: this.shardList,
 			TOTAL_SHARDS: this.totalShards,
-			CLUSTER: this.id,
-			CLUSTER_MANAGER_MODE: this.manager.options.mode,
-			CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
 			CLUSTER_COUNT: this.manager.options.totalClusters,
+			CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
+			CLUSTER_MANAGER_MODE: this.manager.options.mode,
 		});
 	}
 
@@ -153,11 +153,11 @@ export class Cluster extends EventEmitter {
 		return await this.manager.broadcast(message, sendSelf ? undefined : [this.id]);
 	}
 
-	public async eval<T, P>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>> {
+	public async eval<T, P>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		return eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
 	}
 
-	public async evalOnClient<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)> {
+	public async evalOnClient<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
 		const nonce = ShardingUtils.generateNonce();
 
@@ -173,7 +173,7 @@ export class Cluster extends EventEmitter {
 		return this.manager.promise.create(nonce, options?.timeout);
 	}
 
-	public async evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
 		return this.manager.evalOnGuild(guildId, typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`, options);
 	}
 

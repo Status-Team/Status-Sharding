@@ -123,10 +123,14 @@ export class ClusterClientHandler<InternalClient extends ShardingClient = Shardi
 					if (!script) throw new Error('Eval Script not provided.');
 
 					const result = await this.clusterClient.evalOnClient(script);
+
 					this.clusterClient._respond('evalResult', {
 						_type: MessageTypes.ClientEvalResponse,
 						_nonce: message._nonce,
-						data: result,
+						data: ShardingUtils.returnIfNotSerializable(result) ? result : {
+							...ShardingUtils.makePlainError(new Error('Evaluated script returned an unserializable value.')),
+							script: script?.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, ''),
+						},
 					} as BaseMessage<'evalResult'>);
 				} catch (err) {
 					this.clusterClient._respond('error', {

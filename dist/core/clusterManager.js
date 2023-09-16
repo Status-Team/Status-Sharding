@@ -274,7 +274,7 @@ class ClusterManager extends events_1.default {
             return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Ids must be a string.'));
         return this.broadcastEval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}'))`, {
             ...options, guildId,
-        }).then((e) => e?.[0]);
+        }).then((e) => e?.find((r) => r !== undefined));
     }
     // Creates a new cluster. (Using this method is usually not necessary if you use the spawn method.)
     createCluster(id, shardsToSpawn, recluster = false) {

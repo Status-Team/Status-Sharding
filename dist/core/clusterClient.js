@@ -141,7 +141,7 @@ class ClusterClient extends events_1.default {
             _nonce: nonce,
             _type: types_1.MessageTypes.ClientBroadcastRequest,
         });
-        return this.promise.create(nonce, options?.timeout).then((data) => data?.[0]);
+        return this.promise.create(nonce, options?.timeout).then((data) => data?.find((v) => v !== undefined));
     }
     async evalOnClient(script, options) {
         if (this.client._eval)

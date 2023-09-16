@@ -122,7 +122,10 @@ class ClusterClientHandler {
                     this.clusterClient._respond('evalResult', {
                         _type: types_1.MessageTypes.ClientEvalResponse,
                         _nonce: message._nonce,
-                        data: result,
+                        data: shardingUtils_1.ShardingUtils.returnIfNotSerializable(result) ? result : {
+                            ...shardingUtils_1.ShardingUtils.makePlainError(new Error('Evaluated script returned an unserializable value.')),
+                            script: script?.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, ''),
+                        },
                     });
                 }
                 catch (err) {

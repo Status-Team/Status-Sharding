@@ -1,4 +1,4 @@
-import { DefaultOptions, Endpoints } from '../types';
+import { DefaultOptions, Endpoints, ValidIfSerializable } from '../types';
 
 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -29,11 +29,21 @@ export class ShardingUtils {
 		});
 	}
 
+	public static returnIfNotSerializable<T>(value: T): value is T & ValidIfSerializable<T> {
+		if (typeof value === 'object' && value !== null && value.constructor !== Object) return false;
+		if (typeof value === 'function') return false;
+		if (typeof value === 'symbol') return false;
+
+		return true;
+	}
+
 	public static makePlainError(err: Error) {
+		const removeStuff = <T extends string>(v: T) => v.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, '');
+
 		return {
-			name: err.name,
-			message: err.message,
-			stack: err.stack,
+			name: removeStuff(err.name),
+			message: removeStuff(err.message),
+			stack: removeStuff(err.stack?.replace(': ' + err.message, '') || ''),
 		};
 	}
 

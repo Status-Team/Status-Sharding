@@ -47,15 +47,18 @@ export enum MessageTypes {
 
 export type Awaitable<T> = T | PromiseLike<T>;
 export type ClusteringMode = 'worker' | 'process';
+export type UnknownFunction = (...args: unknown[]) => unknown;
 export type HeartbeatData = { restarts: number; missedBeats: number; };
 export type RequiredProps<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
-export type Serialized<T> = T extends symbol | bigint | (() => unknown) ? never : T extends number | string | boolean | undefined ? T : T extends { toJSON(): infer R } ? R : T extends ReadonlyArray<infer V> ? Serialized<V>[] : T extends ReadonlyMap<unknown, unknown> | ReadonlySet<unknown> ? object : T extends object ? { [K in keyof T]: Serialized<T[K]> } : T;
+export type ValidIfSerializable<T> = T extends NonNullable<Serializable> ? (T | undefined) : never;
+export type Serializable = string | number | boolean | null | undefined | Serializable[] | { [key: string]: Serializable };
+export type Serialized<T> = T extends symbol | bigint | UnknownFunction ? never : T extends ValidIfSerializable<T> ? T : (T extends { toJSON(): infer R } ? R : T extends ReadonlyArray<infer V> ? Serialized<V>[] : (T extends ReadonlyMap<unknown, unknown> | ReadonlySet<unknown> ? object : (T extends object ? { [K in keyof T]: Serialized<T[K]> } : T)));
 
 export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
     mode?: T; // Which mode to use for clustering.
     token?: string; // The token of the discord bot.
     totalShards?: number; // Number of total internal shards or -1.
-    totalClusters?: number; // Number of total Clusters\Process to spawn.
+    totalClusters?: number; // Number of total Clusters/Process to spawn.
     shardsPerClusters?: number; // Number of shards per cluster.
     shardArgs?: string[]; // Arguments to pass to the clustered script when spawning (only available when using the `process` mode).
     execArgv?: string[]; // Arguments to pass to the clustered script executable when spawning.
@@ -70,7 +73,7 @@ export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
 export interface ClusterManagerOptions<T extends ClusteringMode> extends ClusterManagerCreateOptions<T> {
     mode: T; // Which mode to use for clustering.
     totalShards: number; // Number of total internal shards or -1.
-    totalClusters: number; // Number of total Clusters\Process to spawn.
+    totalClusters: number; // Number of total Clusters/Process to spawn.
     shardsPerClusters: number; // Number of shards per cluster.
     shardList: number[]; // An Array of Internal Shards Ids, which should get spawned.
     clusterList: number[]; // An Array of Ids to assign to the spawned Clusters, when the default id scheme is not wanted.
@@ -87,7 +90,6 @@ export interface ClusterClientData {
 	ClusterQueueMode?: 'auto' | 'manual';
 	FirstShardId: number;
 	LastShardId: number;
-	DebugFull?: boolean;
 }
 
 export interface ClusterSpawnOptions {
@@ -119,7 +121,6 @@ export interface EvalOptions<T = object> {
     guildId?: string;
     context?: T;
     timeout?: number;
-    // _type?: MessageTypes;
 }
 
 // ReCluster.

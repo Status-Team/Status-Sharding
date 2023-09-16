@@ -1,4 +1,4 @@
-import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable } from '../types';
+import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable } from '../types';
 import { ClientOptions, Client as DiscordClient, Guild, ClientEvents } from 'discord.js';
 import { BaseMessage, DataType, ProcessMessage } from '../other/message';
 import { ClusterClientHandler } from '../handlers/message';
@@ -130,7 +130,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		return this.process?.send(message);
 	}
 
-	public async evalOnManager<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnManager<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<ValidIfSerializable<T>> {
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process?.send({
@@ -145,7 +145,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		return this.promise.create(nonce, options?.timeout);
 	}
 
-	public async broadcastEval<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]> {
+	public async broadcastEval<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process?.send({
@@ -160,7 +160,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		return this.promise.create(nonce, options?.timeout);
 	}
 
-	public async evalOnGuild<T, P, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnGuild<T, P, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process?.send({
@@ -175,10 +175,10 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 			_type: MessageTypes.ClientBroadcastRequest,
 		} as BaseMessage<'eval'>);
 
-		return this.promise.create(nonce, options?.timeout).then((data) => (data as unknown as T[])?.[0]) as unknown as T extends never ? unknown : Serialized<T>;
+		return this.promise.create(nonce, options?.timeout).then((data) => (data as unknown as T[])?.find((v) => v !== undefined)) as Promise<ValidIfSerializable<T>>;
 	}
 
-	public async evalOnClient<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnClient<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		type EvalObject = { _eval: <T>(script: string) => T; };
 
 		if ((this.client as unknown as EvalObject)._eval) return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);

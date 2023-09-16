@@ -1,4 +1,4 @@
-import { Awaitable, ClusterHeartbeatOptions, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized } from '../types';
+import { Awaitable, ClusterHeartbeatOptions, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized, ValidIfSerializable } from '../types';
 import { Guild, Client as DiscordClient } from 'discord.js';
 import { ChildProcess, Serializable } from 'child_process';
 import { HeartbeatManager } from '../plugins/heartbeat';
@@ -188,7 +188,7 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Evaluates a script on all clusters, or a given cluster, in the context of the Clients.
-	public async broadcastEval<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]> {
+	public async broadcastEval<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if ((options?.cluster !== undefined || options?.shard !== undefined) && options?.guildId !== undefined) return Promise.reject(new Error('CLUSTERING_INVALID_OPTION | Cannot use both guildId and cluster/shard options.'));
 
@@ -213,7 +213,7 @@ export class ClusterManager extends EventEmitter {
 			else options.cluster = Array.from(clusterIds);
 		}
 
-		const promises: Promise<(T extends never ? unknown : Serialized<T>)>[] = [];
+		const promises: Promise<ValidIfSerializable<T>>[] = [];
 		if (typeof options?.cluster === 'number') {
 			const cluster = this.clusters.get(options.cluster);
 			if (!cluster) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | No cluster was found with the given Id.'));
@@ -235,12 +235,12 @@ export class ClusterManager extends EventEmitter {
 		return Promise.all(promises);
 	}
 
-	public async broadcastEvalWithCustomInstances<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }, customInstances?: DiscordClient[]): Promise<{ isCustomInstance: boolean; result: T extends never ? unknown : Serialized<T>; }[]> {
+	public async broadcastEvalWithCustomInstances<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }, customInstances?: DiscordClient[]): Promise<{ isCustomInstance: boolean; result: ValidIfSerializable<T>; }[]> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 
 		const promises: {
 			isCustomInstance: boolean;
-			result: T extends never ? unknown : Serialized<T>;
+			result: ValidIfSerializable<T>;
 		}[] = [];
 
 		for (const cluster of this.clusters.values()) {
@@ -265,7 +265,7 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Runs a method with given arguments on a given Cluster's Client.
-	public async evalOnClusterClient<T, P, C = ShardingClient>(cluster: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnClusterClient<T, P, C = ShardingClient>(cluster: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
@@ -276,7 +276,7 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Runs a method with given arguments on a given Cluster's process.
-	public async evalOnCluster<T, P>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnCluster<T, P>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
@@ -287,13 +287,13 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Runs a method with given arguments on a given Cluster's process and Guild.
-	public async evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<T extends never ? unknown : Serialized<T>> {
+	public async evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Ids must be a string.'));
 
 		return this.broadcastEval<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}'))`, {
 			...options, guildId,
-		}).then((e) => e?.[0]);
+		}).then((e) => e?.find((r) => r !== undefined)) as Promise<ValidIfSerializable<T>>;
 	}
 
 	// Creates a new cluster. (Using this method is usually not necessary if you use the spawn method.)

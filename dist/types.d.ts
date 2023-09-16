@@ -46,16 +46,21 @@ export declare enum MessageTypes {
 }
 export type Awaitable<T> = T | PromiseLike<T>;
 export type ClusteringMode = 'worker' | 'process';
+export type UnknownFunction = (...args: unknown[]) => unknown;
 export type HeartbeatData = {
     restarts: number;
     missedBeats: number;
 };
 export type RequiredProps<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
-export type Serialized<T> = T extends symbol | bigint | (() => unknown) ? never : T extends number | string | boolean | undefined ? T : T extends {
+export type ValidIfSerializable<T> = T extends NonNullable<Serializable> ? (T | undefined) : never;
+export type Serializable = string | number | boolean | null | undefined | Serializable[] | {
+    [key: string]: Serializable;
+};
+export type Serialized<T> = T extends symbol | bigint | UnknownFunction ? never : T extends ValidIfSerializable<T> ? T : (T extends {
     toJSON(): infer R;
-} ? R : T extends ReadonlyArray<infer V> ? Serialized<V>[] : T extends ReadonlyMap<unknown, unknown> | ReadonlySet<unknown> ? object : T extends object ? {
+} ? R : T extends ReadonlyArray<infer V> ? Serialized<V>[] : (T extends ReadonlyMap<unknown, unknown> | ReadonlySet<unknown> ? object : (T extends object ? {
     [K in keyof T]: Serialized<T[K]>;
-} : T;
+} : T)));
 export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
     mode?: T;
     token?: string;
@@ -90,7 +95,6 @@ export interface ClusterClientData {
     ClusterQueueMode?: 'auto' | 'manual';
     FirstShardId: number;
     LastShardId: number;
-    DebugFull?: boolean;
 }
 export interface ClusterSpawnOptions {
     delay?: number;

@@ -33,12 +33,12 @@ class Cluster extends events_1.default {
         this.ready = false;
         this.thread = null;
         this.envData = Object.assign({}, process.env, {
+            CLUSTER: this.id,
             SHARD_LIST: this.shardList,
             TOTAL_SHARDS: this.totalShards,
-            CLUSTER: this.id,
-            CLUSTER_MANAGER_MODE: this.manager.options.mode,
-            CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
             CLUSTER_COUNT: this.manager.options.totalClusters,
+            CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
+            CLUSTER_MANAGER_MODE: this.manager.options.mode,
         });
     }
     get totalShards() {

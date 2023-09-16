@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { Awaitable, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized } from '../types';
+import { Awaitable, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized, ValidIfSerializable } from '../types';
 import { Guild, Client as DiscordClient } from 'discord.js';
 import { Serializable } from 'child_process';
 import { HeartbeatManager } from '../plugins/heartbeat';
@@ -36,20 +36,20 @@ export declare class ClusterManager extends EventEmitter {
         result: Serialized<T> | undefined;
         error: Error | undefined;
     }>;
-    broadcastEval<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]>;
+    broadcastEval<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]>;
     broadcastEvalWithCustomInstances<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }, customInstances?: DiscordClient[]): Promise<{
         isCustomInstance: boolean;
-        result: T extends never ? unknown : Serialized<T>;
+        result: ValidIfSerializable<T>;
     }[]>;
-    evalOnClusterClient<T, P, C = ShardingClient>(cluster: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>>;
-    evalOnCluster<T, P>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<T extends never ? unknown : Serialized<T>>;
+    evalOnClusterClient<T, P, C = ShardingClient>(cluster: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>>;
+    evalOnCluster<T, P>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>>;
     evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
-    }): Promise<T extends never ? unknown : Serialized<T>>;
+    }): Promise<ValidIfSerializable<T>>;
     createCluster(id: number, shardsToSpawn: number[], recluster?: boolean): Cluster;
     triggerMaintenance(reason: string): void;
     _debug(message: string): string;

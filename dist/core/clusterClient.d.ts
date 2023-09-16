@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { ClusterClientEvents, EvalOptions, Serialized, Awaitable } from '../types';
+import { ClusterClientEvents, EvalOptions, Serialized, Awaitable, ValidIfSerializable } from '../types';
 import { ClientOptions, Client as DiscordClient, Guild, ClientEvents } from 'discord.js';
 import { BaseMessage, DataType } from '../other/message';
 import { IPCBrokerClient } from '../handlers/broker';
@@ -43,13 +43,13 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
     evalOnManager<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
-    }): Promise<T extends never ? unknown : Serialized<T>>;
-    broadcastEval<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<(T extends never ? unknown : Serialized<T>)[]>;
+    }): Promise<ValidIfSerializable<T>>;
+    broadcastEval<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]>;
     evalOnGuild<T, P, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
-    }): Promise<T extends never ? unknown : Serialized<T>>;
-    evalOnClient<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<T extends never ? unknown : Serialized<T>>;
+    }): Promise<ValidIfSerializable<T>>;
+    evalOnClient<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
     request<O>(message: Serializable, options?: {
         timeout?: number;
     }): Promise<Serialized<O>>;

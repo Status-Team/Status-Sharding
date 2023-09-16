@@ -23,11 +23,21 @@ class ShardingUtils {
             setTimeout(resolve, ms);
         });
     }
+    static returnIfNotSerializable(value) {
+        if (typeof value === 'object' && value !== null && value.constructor !== Object)
+            return false;
+        if (typeof value === 'function')
+            return false;
+        if (typeof value === 'symbol')
+            return false;
+        return true;
+    }
     static makePlainError(err) {
+        const removeStuff = (v) => v.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, '');
         return {
-            name: err.name,
-            message: err.message,
-            stack: err.stack,
+            name: removeStuff(err.name),
+            message: removeStuff(err.message),
+            stack: removeStuff(err.stack?.replace(': ' + err.message, '') || ''),
         };
     }
     static mergeObjects(main, toMerge) {

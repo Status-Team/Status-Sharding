@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.3] - 2023-08-31
+- Improved types for non-sterilized variables.
+
 ## [1.3.1] - 2023-08-31
 
 ### Added
