@@ -2,7 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.3] - 2023-08-31
+## [1.3.4] - 2023-09-16
+- Added `ShardingUtils#removeNonExisting` which removes undefined or null values from an array.
+
+## [1.3.3] - 2023-09-16
 - Improved types for non-sterilized variables.
 
 ## [1.3.1] - 2023-08-31

@@ -37,6 +37,13 @@ export class ShardingUtils {
 		return true;
 	}
 
+	public static removeNonExisting<T>(array: (T | undefined)[]): T[] {
+		return array.reduce((acc: T[], item: T | undefined) => {
+			if (item !== undefined && item !== null) acc.push(item);
+			return acc;
+		}, []);
+	}
+
 	public static makePlainError(err: Error) {
 		const removeStuff = <T extends string>(v: T) => v.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, '');
 
