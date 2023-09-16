@@ -4,6 +4,7 @@ export declare class ShardingUtils {
     static chunkArray<T>(array: T[], chunkSize: number): T[][];
     static delayFor(ms: number): Promise<void>;
     static returnIfNotSerializable<T>(value: T): value is T & ValidIfSerializable<T>;
+    static removeNonExisting<T>(array: (T | undefined)[]): T[];
     static makePlainError(err: Error): {
         name: string;
         message: string;

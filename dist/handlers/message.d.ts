@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { BaseMessage, DataType } from '../other/message';
 import { ClusterClient, ShardingClient } from '../core/clusterClient';
 import { Worker } from '../classes/worker';
