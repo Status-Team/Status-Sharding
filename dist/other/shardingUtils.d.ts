@@ -3,7 +3,7 @@ export declare class ShardingUtils {
     static generateNonce(): string;
     static chunkArray<T>(array: T[], chunkSize: number): T[][];
     static delayFor(ms: number): Promise<void>;
-    static returnIfNotSerializable<T>(value: T): value is T & ValidIfSerializable<T>;
+    static isSerializable<T>(value: T): value is T & ValidIfSerializable<T>;
     static removeNonExisting<T>(array: (T | undefined)[]): T[];
     static makePlainError(err: Error): {
         name: string;

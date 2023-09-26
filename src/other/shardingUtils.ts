@@ -29,8 +29,8 @@ export class ShardingUtils {
 		});
 	}
 
-	public static returnIfNotSerializable<T>(value: T): value is T & ValidIfSerializable<T> {
-		if (typeof value === 'object' && value !== null && value.constructor !== Object) return false;
+	public static isSerializable<T>(value: T): value is T & ValidIfSerializable<T> {
+		if (typeof value === 'object' && value !== null && value.constructor !== Object && value.constructor !== Array) return false;
 		if (typeof value === 'function') return false;
 		if (typeof value === 'symbol') return false;
 

@@ -23,8 +23,8 @@ class ShardingUtils {
             setTimeout(resolve, ms);
         });
     }
-    static returnIfNotSerializable(value) {
-        if (typeof value === 'object' && value !== null && value.constructor !== Object)
+    static isSerializable(value) {
+        if (typeof value === 'object' && value !== null && value.constructor !== Object && value.constructor !== Array)
             return false;
         if (typeof value === 'function')
             return false;

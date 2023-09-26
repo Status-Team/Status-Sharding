@@ -127,7 +127,7 @@ export class ClusterClientHandler<InternalClient extends ShardingClient = Shardi
 					this.clusterClient._respond('evalResult', {
 						_type: MessageTypes.ClientEvalResponse,
 						_nonce: message._nonce,
-						data: ShardingUtils.returnIfNotSerializable(result) ? result : {
+						data: ShardingUtils.isSerializable(result) ? result : {
 							...ShardingUtils.makePlainError(new Error('Evaluated script returned an unserializable value.')),
 							script: script?.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, ''),
 						},
