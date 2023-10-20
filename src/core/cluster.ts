@@ -1,10 +1,10 @@
-import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable } from '../types';
+import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, Serializable } from '../types';
 import { ProcessMessage, BaseMessage, DataType } from '../other/message';
 import { ShardingUtils } from '../other/shardingUtils';
 import { ClusterHandler } from '../handlers/message';
+import { BrokerMessage } from '../handlers/broker';
 import { ClusterManager } from './clusterManager';
 import { ShardingClient } from './clusterClient';
-import { Serializable } from 'child_process';
 import { Worker } from '../classes/worker';
 import { Child } from '../classes/child';
 import { Guild } from 'discord.js';
@@ -126,7 +126,7 @@ export class Cluster extends EventEmitter {
 		return this.spawn(timeout);
 	}
 
-	public async send(message: Serializable) {
+	public async send<T extends Serializable>(message: SerializableInput<T>) {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
 		this.manager._debug(`[IPC] [Cluster ${this.id}] Sending message to child.`);
 
@@ -136,44 +136,44 @@ export class Cluster extends EventEmitter {
 		} as BaseMessage<'normal'>);
 	}
 
-	public async request<O>(message: Serializable, options: { timeout?: number; } = {}): Promise<Serialized<O>> {
+	public async request<T extends Serializable, O>(message: SerializableInput<T>, options: { timeout?: number; } = {}): Promise<Serialized<O>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
 		const nonce = ShardingUtils.generateNonce();
 
-		this.thread?.send({
+		this.thread?.send<BaseMessage<'reply'>>({
 			_type: MessageTypes.CustomRequest,
 			_nonce: nonce,
 			data: message,
-		} as BaseMessage<'reply'>);
+		});
 
 		return this.manager.promise.create(nonce, options.timeout);
 	}
 
-	public async broadcast(message: Serializable, sendSelf = false) {
+	public async broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf = false): Promise<void> {
 		return await this.manager.broadcast(message, sendSelf ? undefined : [this.id]);
 	}
 
-	public async eval<T, P>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
+	public async eval<T, P extends object>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		return eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
 	}
 
-	public async evalOnClient<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+	public async evalOnClient<T, P extends object, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
 		const nonce = ShardingUtils.generateNonce();
 
-		this.thread?.send({
+		this.thread?.send<BaseMessage<'eval'>>({
 			_type: MessageTypes.ClientEvalRequest,
 			_nonce: nonce,
 			data: {
 				script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`,
 				options: options,
 			},
-		} as BaseMessage<'eval'>);
+		});
 
 		return this.manager.promise.create(nonce, options?.timeout);
 	}
 
-	public async evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
+	public async evalOnGuild<T, P extends object, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
 		return this.manager.evalOnGuild(guildId, typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`, options);
 	}
 
@@ -189,7 +189,7 @@ export class Cluster extends EventEmitter {
 		return this.thread?.send(message);
 	}
 
-	private _handleMessage(message: BaseMessage<'normal'> | { _data: unknown; broker: string; }) {
+	private _handleMessage(message: BaseMessage<'normal'> | BrokerMessage) {
 		if (!message || '_data' in message) return this.manager.broker.handleMessage(message);
 
 		this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);

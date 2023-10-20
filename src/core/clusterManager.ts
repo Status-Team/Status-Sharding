@@ -1,15 +1,15 @@
-import { Awaitable, ClusterHeartbeatOptions, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized, ValidIfSerializable } from '../types';
-import { Guild, Client as DiscordClient } from 'discord.js';
-import { ChildProcess, Serializable } from 'child_process';
+import { Awaitable, ClusterHeartbeatOptions, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized, ValidIfSerializable, Serializable, SerializableInput } from '../types';
 import { HeartbeatManager } from '../plugins/heartbeat';
 import { ReClusterManager } from '../plugins/reCluster';
 import { ShardingUtils } from '../other/shardingUtils';
 import { IPCBrokerManager } from '../handlers/broker';
 import { PromiseHandler } from '../handlers/promise';
 import { ShardingClient } from './clusterClient';
+import { ChildProcess } from 'child_process';
 import { Queue } from '../handlers/queue';
 import { Worker } from 'worker_threads';
 import { Cluster } from './cluster';
+import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 import path from 'path';
 import os from 'os';
@@ -140,11 +140,12 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Sends a message to all clusters.
-	public async broadcast(message: Serializable, ignoreClusters?: number[]) {
+	public async broadcast<T extends Serializable>(message: SerializableInput<T>, ignoreClusters?: number[]) {
 		const clusters = Array.from(this.clusters.values()).filter((c) => !ignoreClusters?.includes(c.id));
 		const promises = Array.from(clusters).map((cluster) => cluster.send(message));
 
-		return Promise.all(promises);
+		await Promise.allSettled(promises);
+		return;
 	}
 
 	// Kills all running clusters and respawns them.
@@ -165,12 +166,12 @@ export class ClusterManager extends EventEmitter {
 			i++;
 		}
 
-		await Promise.all(promises);
+		await Promise.allSettled(promises);
 		return this.clusters;
 	}
 
 	// Runs a method with given arguments on the Manager itself.
-	public async eval<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<{
+	public async eval<T, P extends object, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<{
 		result: Serialized<T> | undefined;
 		error: Error | undefined;
 	}> {
@@ -188,7 +189,7 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Evaluates a script on all clusters, or a given cluster, in the context of the Clients.
-	public async broadcastEval<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
+	public async broadcastEval<T, P extends object, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if ((options?.cluster !== undefined || options?.shard !== undefined) && options?.guildId !== undefined) return Promise.reject(new Error('CLUSTERING_INVALID_OPTION | Cannot use both guildId and cluster/shard options.'));
 
@@ -232,40 +233,11 @@ export class ClusterManager extends EventEmitter {
 			}
 		}
 
-		return Promise.all(promises);
-	}
-
-	public async broadcastEvalWithCustomInstances<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }, customInstances?: DiscordClient[]): Promise<{ isCustomInstance: boolean; result: ValidIfSerializable<T>; }[]> {
-		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
-
-		const promises: {
-			isCustomInstance: boolean;
-			result: ValidIfSerializable<T>;
-		}[] = [];
-
-		for (const cluster of this.clusters.values()) {
-			promises.push({
-				isCustomInstance: false,
-				result: await cluster.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`),
-			});
-		}
-
-		for (const customInstance of customInstances || []) {
-			type EvalObject = { _eval: <T>(script: string) => T; };
-
-			if ((!customInstance as unknown as EvalObject)._eval) (customInstance as unknown as EvalObject)._eval = function (_: string) { return eval(_); }.bind(customInstance);
-
-			promises.push({
-				isCustomInstance: true,
-				result: await (customInstance as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`),
-			});
-		}
-
-		return (await Promise.all(promises.map((p) => p.result))).map((result, i) => ({ isCustomInstance: promises[i].isCustomInstance, result: result }));
+		return Promise.allSettled(promises).then((e) => e.filter((r) => r !== undefined)) as Promise<ValidIfSerializable<T>[]>;
 	}
 
 	// Runs a method with given arguments on a given Cluster's Client.
-	public async evalOnClusterClient<T, P, C = ShardingClient>(cluster: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
+	public async evalOnClusterClient<T, P extends object, C = ShardingClient>(cluster: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
@@ -276,7 +248,7 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Runs a method with given arguments on a given Cluster's process.
-	public async evalOnCluster<T, P>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
+	public async evalOnCluster<T, P extends object>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
@@ -287,7 +259,7 @@ export class ClusterManager extends EventEmitter {
 	}
 
 	// Runs a method with given arguments on a given Cluster's process and Guild.
-	public async evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
+	public async evalOnGuild<T, P extends object, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Ids must be a string.'));
 

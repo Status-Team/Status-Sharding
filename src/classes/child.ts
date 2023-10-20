@@ -1,4 +1,5 @@
-import { ChildProcess, fork, ForkOptions, Serializable } from 'child_process';
+import { ChildProcess, fork, ForkOptions } from 'child_process';
+import { SerializableInput, Serializable } from '../types';
 
 export interface ChildProcessOptions extends ForkOptions {
 	clusterData: NodeJS.ProcessEnv | undefined;
@@ -47,9 +48,9 @@ export class Child {
 		return this.process?.kill();
 	}
 
-	public send(message: Serializable): Promise<void> {
+	public send<T extends Serializable>(message: SerializableInput<T, true>): Promise<void> {
 		return new Promise<void>((resolve, reject) => {
-			this.process?.send(message, (err) => {
+			this.process?.send(message as object, (err) => {
 				if (err) reject(err);
 				else resolve();
 			});
@@ -64,7 +65,7 @@ export class ChildClient {
 		this.ipc = process;
 	}
 
-	public send(message: Serializable): Promise<void> {
+	public send<T extends Serializable>(message: SerializableInput<T, true>): Promise<void> {
 		return new Promise<void>((resolve, reject) => {
 			this.ipc.send?.(message, (err: Error | null) => {
 				if (err) reject(err);

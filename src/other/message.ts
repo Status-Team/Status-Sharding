@@ -1,9 +1,8 @@
+import { EvalOptions, MessageTypes, SerializableInput, Serializable } from '../types';
 import { ClusterClient } from '../core/clusterClient';
-import { EvalOptions, MessageTypes } from '../types';
-import { Serializable } from 'child_process';
 import { Cluster } from '../core/cluster';
 
-export type EvalMessage<P = object> = {
+export type EvalMessage<P extends object = object> = {
 	options?: EvalOptions<P>;
 	script: string;
 };
@@ -18,15 +17,15 @@ export type EvalResultMessage = unknown;
 export type MaintenanceMessage = string;
 export type DataType = 'normal' | 'eval' | 'respawn' | 'maintenance' | 'evalResult' | 'readyOrSpawn' | 'heartbeat' | 'error' | 'reply';
 
-export type DataTypes<A = object> = {
+export type DataTypes<A = object, P extends object = object> = {
 	normal: A extends never ? Serializable : A;
-	reply: DataTypes<A>['normal'];
-	eval: EvalMessage<A>;
+	reply: DataTypes<A, P>['normal'];
+	eval: EvalMessage<P>;
 	readyOrSpawn: undefined;
 	heartbeat: undefined;
 	respawn: RespawnMessage;
 	maintenance: MaintenanceMessage;
-	evalResult: unknown;
+	evalResult: EvalResultMessage;
 	error: {
 		message: string;
 		stack?: string;
@@ -34,16 +33,18 @@ export type DataTypes<A = object> = {
 	};
 };
 
-export interface BaseMessage<D extends DataType, A extends (Serializable | unknown) = Serializable> {
+export type BaseMessage<D extends DataType, A extends (Serializable | unknown) = Serializable, P extends object = object> = {
 	_type: MessageTypes;
 	_nonce: string;
-	data: DataTypes<A>[D];
+	data: DataTypes<A, P>[D];
 }
+
+export type BaseMessageInput<D extends DataType, A extends Serializable = Serializable> = Omit<BaseMessage<D, A>, '_nonce'>;
 
 export class ProcessMessage<T extends DataType = 'normal', A extends Serializable = Serializable> {
 	private _instance: ClusterClient | Cluster;
 	private _nonce: string;
-	public data: DataTypes<A>[T];
+	public data: DataTypes<A, object>[T];
 
 	constructor(instance: ClusterClient | Cluster, data: BaseMessage<T, A>) {
 		this.data = data.data;
@@ -51,11 +52,7 @@ export class ProcessMessage<T extends DataType = 'normal', A extends Serializabl
 		this._instance = instance;
 	}
 
-	public send(message: Serializable) {
-		return this._instance.send(message);
-	}
-
-	public async reply(message: Serializable): Promise<void> {
+	public async reply<T extends Serializable>(message: SerializableInput<T>): Promise<void> {
 		return this._instance._sendInstance({
 			data: message,
 			_type: MessageTypes.CustomReply,

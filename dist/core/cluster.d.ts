@@ -1,10 +1,9 @@
 /// <reference types="node" />
 /// <reference types="node" />
-import { ClusterEvents, ClusterKillOptions, EvalOptions, Serialized, Awaitable, ValidIfSerializable } from '../types';
+import { ClusterEvents, ClusterKillOptions, EvalOptions, Serialized, Awaitable, ValidIfSerializable, SerializableInput, Serializable } from '../types';
 import { BaseMessage, DataType } from '../other/message';
 import { ClusterManager } from './clusterManager';
 import { ShardingClient } from './clusterClient';
-import { Serializable } from 'child_process';
 import { Worker } from '../classes/worker';
 import { Child } from '../classes/child';
 import { Guild } from 'discord.js';
@@ -24,14 +23,14 @@ export declare class Cluster extends EventEmitter {
     spawn(spawnTimeout?: number): Promise<import("child_process").ChildProcess | import("worker_threads").Worker | null>;
     kill(options?: ClusterKillOptions): Promise<void>;
     respawn(delay?: number, timeout?: number): Promise<import("child_process").ChildProcess | import("worker_threads").Worker | null>;
-    send(message: Serializable): Promise<void>;
-    request<O>(message: Serializable, options?: {
+    send<T extends Serializable>(message: SerializableInput<T>): Promise<void>;
+    request<T extends Serializable, O>(message: SerializableInput<T>, options?: {
         timeout?: number;
     }): Promise<Serialized<O>>;
-    broadcast(message: Serializable, sendSelf?: boolean): Promise<void[]>;
-    eval<T, P>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>>;
-    evalOnClient<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
-    evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: {
+    broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf?: boolean): Promise<void>;
+    eval<T, P extends object>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>>;
+    evalOnClient<T, P extends object, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+    evalOnGuild<T, P extends object, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }): Promise<ValidIfSerializable<T>>;

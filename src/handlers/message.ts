@@ -1,11 +1,10 @@
 import { BaseMessage, DataType, DataTypes, EvalMessage } from '../other/message';
 import { ClusterClient, ShardingClient } from '../core/clusterClient';
 import { ShardingUtils } from '../other/shardingUtils';
+import { MessageTypes, Serializable } from '../types';
 import { Worker } from '../classes/worker';
 import { Cluster } from '../core/cluster';
 import { Child } from '../classes/child';
-import { MessageTypes } from '../types';
-import { Serializable } from 'child_process';
 
 export class ClusterHandler {
 	constructor(private cluster: Cluster, private ipc: Worker | Child) {}

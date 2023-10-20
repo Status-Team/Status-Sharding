@@ -1,6 +1,8 @@
+import { Serializable, SerializableInput } from '../types';
 import { ClusterManager } from '../core/clusterManager';
 import { ClusterClient } from '../core/clusterClient';
 
+export type BrokerMessage = { _data: unknown; broker: string; };
 export type BrokerMessageHandler<T = unknown> = (message: T) => void;
 
 abstract class IPCBrokerAbstract {
@@ -14,7 +16,7 @@ abstract class IPCBrokerAbstract {
 	}
 
 	// Not meant to be used by the user.
-	public handleMessage({ _data, broker }: { _data: unknown; broker: string; }): void {
+	public handleMessage({ _data, broker }: BrokerMessage): void {
 		if (!_data || !broker) return;
 
 		const listeners = this.listeners.get(broker);
@@ -27,7 +29,7 @@ abstract class IPCBrokerAbstract {
 }
 
 export class IPCBrokerManager extends IPCBrokerAbstract {
-	public async send<T>(channelName: string, message: T, clusterId?: number): Promise<void> {
+	public async send<T extends Serializable>(channelName: string, message: SerializableInput<T>, clusterId?: number): Promise<void> {
 		if (this.instance instanceof ClusterManager) {
 			if (clusterId === undefined) {
 				for (const cluster of this.instance.clusters.values()) {
@@ -50,7 +52,7 @@ export class IPCBrokerManager extends IPCBrokerAbstract {
 }
 
 export class IPCBrokerClient extends IPCBrokerAbstract {
-	public async send<T>(channelName: string, message: T): Promise<void> {
+	public async send<T extends Serializable>(channelName: string, message: SerializableInput<T>): Promise<void> {
 		if (this.instance instanceof ClusterClient) {
 			return this.instance.process?.send({
 				_data: message,

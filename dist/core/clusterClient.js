@@ -5,11 +5,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClusterClient = exports.ShardingClient = void 0;
 const types_1 = require("../types");
-const discord_js_1 = require("discord.js");
 const message_1 = require("../other/message");
+const discord_js_1 = require("discord.js");
+const broker_1 = require("../handlers/broker");
 const message_2 = require("../handlers/message");
 const shardingUtils_1 = require("../other/shardingUtils");
-const broker_1 = require("../handlers/broker");
 const promise_1 = require("../handlers/promise");
 const worker_1 = require("../classes/worker");
 const child_1 = require("../classes/child");

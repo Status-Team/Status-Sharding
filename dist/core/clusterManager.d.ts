@@ -1,7 +1,4 @@
-/// <reference types="node" />
-import { Awaitable, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized, ValidIfSerializable } from '../types';
-import { Guild, Client as DiscordClient } from 'discord.js';
-import { Serializable } from 'child_process';
+import { Awaitable, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized, ValidIfSerializable, Serializable, SerializableInput } from '../types';
 import { HeartbeatManager } from '../plugins/heartbeat';
 import { ReClusterManager } from '../plugins/reCluster';
 import { IPCBrokerManager } from '../handlers/broker';
@@ -9,6 +6,7 @@ import { PromiseHandler } from '../handlers/promise';
 import { ShardingClient } from './clusterClient';
 import { Queue } from '../handlers/queue';
 import { Cluster } from './cluster';
+import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 export declare class ClusterManager extends EventEmitter {
     file: string;
@@ -23,30 +21,23 @@ export declare class ClusterManager extends EventEmitter {
     readonly clusterQueue: Queue;
     constructor(file: string, options: ClusterManagerCreateOptions<ClusteringMode>);
     spawn(): Promise<Queue>;
-    broadcast(message: Serializable, ignoreClusters?: number[]): Promise<void[]>;
+    broadcast<T extends Serializable>(message: SerializableInput<T>, ignoreClusters?: number[]): Promise<void>;
     respawnAll({ clusterDelay, respawnDelay, timeout }: {
         clusterDelay?: number | undefined;
         respawnDelay?: number | undefined;
         timeout?: number | undefined;
     }): Promise<Map<number, Cluster>>;
-    eval<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: {
+    eval<T, P extends object, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }): Promise<{
         result: Serialized<T> | undefined;
         error: Error | undefined;
     }>;
-    broadcastEval<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]>;
-    broadcastEvalWithCustomInstances<T, P, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: {
-        context?: P;
-        timeout?: number;
-    }, customInstances?: DiscordClient[]): Promise<{
-        isCustomInstance: boolean;
-        result: ValidIfSerializable<T>;
-    }[]>;
-    evalOnClusterClient<T, P, C = ShardingClient>(cluster: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>>;
-    evalOnCluster<T, P>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>>;
-    evalOnGuild<T, P, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: {
+    broadcastEval<T, P extends object, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]>;
+    evalOnClusterClient<T, P extends object, C = ShardingClient>(cluster: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>>;
+    evalOnCluster<T, P extends object>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>>;
+    evalOnGuild<T, P extends object, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }): Promise<ValidIfSerializable<T>>;

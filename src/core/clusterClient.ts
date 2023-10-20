@@ -1,9 +1,9 @@
-import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable } from '../types';
+import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput } from '../types';
+import { BaseMessage, BaseMessageInput, DataType, ProcessMessage } from '../other/message';
 import { ClientOptions, Client as DiscordClient, Guild, ClientEvents } from 'discord.js';
-import { BaseMessage, DataType, ProcessMessage } from '../other/message';
+import { BrokerMessage, IPCBrokerClient } from '../handlers/broker';
 import { ClusterClientHandler } from '../handlers/message';
 import { ShardingUtils } from '../other/shardingUtils';
-import { IPCBrokerClient } from '../handlers/broker';
 import { PromiseHandler } from '../handlers/promise';
 import { ClusterManager } from './clusterManager';
 import { WorkerClient } from '../classes/worker';
@@ -102,50 +102,51 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	}
 
 	// Sends a message to the Cluster as child. (Cluster, _handleMessage).
-	public send(message: Serializable) {
+	public send<T extends Serializable>(message: SerializableInput<T, true> | unknown): Promise<void> {
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
 
 		return this.process?.send({
 			data: message,
 			_type: MessageTypes.CustomMessage,
-		} as BaseMessage<'normal'>);
+		} as BaseMessage<'normal'>) as Promise<void>;
 	}
 
-	public broadcast(message: Serializable, sendSelf = false) {
+	public broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf = false): Promise<void> {
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
-		return this.process?.send({
+
+		return this.process?.send<BaseMessageInput<'normal'>>({
 			data: {
 				message,
 				ignore: sendSelf ? undefined : this.id,
 			},
 			_type: MessageTypes.ClientBroadcast,
-		} as BaseMessage<'normal'>);
+		}) as Promise<void>;
 	}
 
 	// This is not intended to be used by the user.
-	public _sendInstance(message: BaseMessage<DataType>) {
+	public _sendInstance(message: BaseMessage<DataType>): Promise<void> {
 		if (!('_type' in message) || !('data' in message)) return Promise.reject(new Error('CLUSTERING_INVALID_MESSAGE | Invalid message object.' + JSON.stringify(message)));
 
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
-		return this.process?.send(message);
+		return this.process?.send(message) as Promise<void>;
 	}
 
-	public async evalOnManager<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<ValidIfSerializable<T>> {
+	public async evalOnManager<T, P extends object, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<ValidIfSerializable<T>> {
 		const nonce = ShardingUtils.generateNonce();
 
-		this.process?.send({
+		this.process?.send<BaseMessage<'eval'>>({
 			data: {
 				options,
 				script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`,
 			},
 			_nonce: nonce,
 			_type: MessageTypes.ClientManagerEvalRequest,
-		} as BaseMessage<'eval'>);
+		});
 
 		return this.promise.create(nonce, options?.timeout);
 	}
 
-	public async broadcastEval<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
+	public async broadcastEval<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process?.send({
@@ -160,7 +161,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		return this.promise.create(nonce, options?.timeout);
 	}
 
-	public async evalOnGuild<T, P, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
+	public async evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process?.send({
@@ -178,7 +179,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		return this.promise.create(nonce, options?.timeout).then((data) => (data as unknown as T[])?.find((v) => v !== undefined)) as Promise<ValidIfSerializable<T>>;
 	}
 
-	public async evalOnClient<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+	public async evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		type EvalObject = { _eval: <T>(script: string) => T; };
 
 		if ((this.client as unknown as EvalObject)._eval) return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
@@ -188,16 +189,16 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	}
 
 	// Sends a Request to the ParentCluster and returns the reply.
-	public request<O>(message: Serializable, options: { timeout?: number } = {}): Promise<Serialized<O>> {
+	public request<T extends Serializable>(message: SerializableInput<T>, options: { timeout?: number } = {}): Promise<ValidIfSerializable<T>> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
 
 		const nonce = ShardingUtils.generateNonce();
 
-		this.process?.send({
+		this.process?.send<BaseMessage<'normal'>>({
 			data: message,
 			_type: MessageTypes.CustomRequest,
 			_nonce: nonce,
-		} as BaseMessage<'normal'>);
+		});
 
 		return this.promise.create(nonce, options.timeout);
 	}
@@ -213,7 +214,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	}
 
 	// Handles an IPC message.
-	private _handleMessage(message: BaseMessage<'normal'> | { _data: unknown; broker: string; }) {
+	private _handleMessage(message: BaseMessage<'normal'> | BrokerMessage) {
 		if (!message || '_data' in message) return this.broker.handleMessage(message);
 
 		// Debug.

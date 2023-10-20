@@ -1,9 +1,7 @@
-/// <reference types="node" />
+import { EvalOptions, MessageTypes, SerializableInput, Serializable } from '../types';
 import { ClusterClient } from '../core/clusterClient';
-import { EvalOptions, MessageTypes } from '../types';
-import { Serializable } from 'child_process';
 import { Cluster } from '../core/cluster';
-export type EvalMessage<P = object> = {
+export type EvalMessage<P extends object = object> = {
     options?: EvalOptions<P>;
     script: string;
 };
@@ -15,31 +13,31 @@ export type RespawnMessage = {
 export type EvalResultMessage = unknown;
 export type MaintenanceMessage = string;
 export type DataType = 'normal' | 'eval' | 'respawn' | 'maintenance' | 'evalResult' | 'readyOrSpawn' | 'heartbeat' | 'error' | 'reply';
-export type DataTypes<A = object> = {
+export type DataTypes<A = object, P extends object = object> = {
     normal: A extends never ? Serializable : A;
-    reply: DataTypes<A>['normal'];
-    eval: EvalMessage<A>;
+    reply: DataTypes<A, P>['normal'];
+    eval: EvalMessage<P>;
     readyOrSpawn: undefined;
     heartbeat: undefined;
     respawn: RespawnMessage;
     maintenance: MaintenanceMessage;
-    evalResult: unknown;
+    evalResult: EvalResultMessage;
     error: {
         message: string;
         stack?: string;
         name: string;
     };
 };
-export interface BaseMessage<D extends DataType, A extends (Serializable | unknown) = Serializable> {
+export type BaseMessage<D extends DataType, A extends (Serializable | unknown) = Serializable, P extends object = object> = {
     _type: MessageTypes;
     _nonce: string;
-    data: DataTypes<A>[D];
-}
+    data: DataTypes<A, P>[D];
+};
+export type BaseMessageInput<D extends DataType, A extends Serializable = Serializable> = Omit<BaseMessage<D, A>, '_nonce'>;
 export declare class ProcessMessage<T extends DataType = 'normal', A extends Serializable = Serializable> {
     private _instance;
     private _nonce;
-    data: DataTypes<A>[T];
+    data: DataTypes<A, object>[T];
     constructor(instance: ClusterClient | Cluster, data: BaseMessage<T, A>);
-    send(message: Serializable): Promise<void> | undefined;
-    reply(message: Serializable): Promise<void>;
+    reply<T extends Serializable>(message: SerializableInput<T>): Promise<void>;
 }

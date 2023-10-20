@@ -11,9 +11,6 @@ class ProcessMessage {
         this._nonce = data._nonce;
         this._instance = instance;
     }
-    send(message) {
-        return this._instance.send(message);
-    }
     async reply(message) {
         return this._instance._sendInstance({
             data: message,

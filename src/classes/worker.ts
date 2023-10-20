@@ -1,5 +1,5 @@
 import { Worker as WorkerThread, WorkerOptions, parentPort, workerData, MessagePort } from 'worker_threads';
-import { Serializable } from 'child_process';
+import { SerializableInput, Serializable } from '../types';
 
 export interface WorkerThreadOptions extends WorkerOptions {
 	clusterData: NodeJS.ProcessEnv | undefined;
@@ -30,7 +30,7 @@ export class Worker {
 		return this.process?.terminate();
 	}
 
-	public send(message: Serializable): Promise<void> {
+	public send<T extends Serializable>(message: SerializableInput<T, true> | unknown): Promise<void> {
 		return new Promise<void>((resolve) => {
 			this.process?.postMessage(message);
 			resolve();
@@ -45,7 +45,7 @@ export class WorkerClient {
 		this.ipc = parentPort;
 	}
 
-	public send(message: Serializable): Promise<void> {
+	public send<T extends Serializable>(message: SerializableInput<T, true> | unknown): Promise<void> {
 		return new Promise<void>((resolve) => {
 			this.ipc?.postMessage(message);
 			resolve();

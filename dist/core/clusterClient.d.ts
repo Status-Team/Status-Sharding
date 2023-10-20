@@ -1,7 +1,7 @@
 /// <reference types="node" />
-import { ClusterClientEvents, EvalOptions, Serialized, Awaitable, ValidIfSerializable } from '../types';
-import { ClientOptions, Client as DiscordClient, Guild, ClientEvents } from 'discord.js';
+import { ClusterClientEvents, EvalOptions, Serialized, Awaitable, ValidIfSerializable, SerializableInput } from '../types';
 import { BaseMessage, DataType } from '../other/message';
+import { ClientOptions, Client as DiscordClient, Guild, ClientEvents } from 'discord.js';
 import { IPCBrokerClient } from '../handlers/broker';
 import { PromiseHandler } from '../handlers/promise';
 import { ClusterManager } from './clusterManager';
@@ -37,22 +37,22 @@ export declare class ClusterClient<InternalClient extends ShardingClient = Shard
     get totalShards(): number;
     get totalClusters(): number;
     get info(): import("../types").ClusterClientData;
-    send(message: Serializable): Promise<void> | undefined;
-    broadcast(message: Serializable, sendSelf?: boolean): Promise<void> | undefined;
-    _sendInstance(message: BaseMessage<DataType>): Promise<void> | undefined;
-    evalOnManager<T, P, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: {
+    send<T extends Serializable>(message: SerializableInput<T, true> | unknown): Promise<void>;
+    broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf?: boolean): Promise<void>;
+    _sendInstance(message: BaseMessage<DataType>): Promise<void>;
+    evalOnManager<T, P extends object, M = ClusterManager>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }): Promise<ValidIfSerializable<T>>;
-    broadcastEval<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]>;
-    evalOnGuild<T, P, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: {
+    broadcastEval<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]>;
+    evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: {
         context?: P;
         timeout?: number;
     }): Promise<ValidIfSerializable<T>>;
-    evalOnClient<T, P, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
-    request<O>(message: Serializable, options?: {
+    evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+    request<T extends Serializable>(message: SerializableInput<T>, options?: {
         timeout?: number;
-    }): Promise<Serialized<O>>;
+    }): Promise<ValidIfSerializable<T>>;
     respawnAll(options?: {
         clusterDelay?: number;
         respawnDelay?: number;
