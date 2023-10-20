@@ -13,6 +13,7 @@ abstract class IPCBrokerAbstract {
 		this.listeners.set(channelName, listeners);
 	}
 
+	// Not meant to be used by the user.
 	public handleMessage({ _data, broker }: { _data: unknown; broker: string; }): void {
 		if (!_data || !broker) return;
 

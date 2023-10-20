@@ -14,6 +14,7 @@ class IPCBrokerAbstract {
         listeners.push(callback);
         this.listeners.set(channelName, listeners);
     }
+    // Not meant to be used by the user.
     handleMessage({ _data, broker }) {
         if (!_data || !broker)
             return;
