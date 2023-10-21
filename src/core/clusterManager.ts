@@ -233,7 +233,12 @@ export class ClusterManager extends EventEmitter {
 			}
 		}
 
-		return Promise.allSettled(promises).then((e) => e.filter((r) => r !== undefined)) as Promise<ValidIfSerializable<T>[]>;
+		if (options?.useAllSettled) {
+			const results = (await Promise.allSettled(promises)).filter((r) => r.status === 'fulfilled') as PromiseFulfilledResult<ValidIfSerializable<T>>[];
+			return results.map((r) => r.value);
+		} else {
+			return Promise.all(promises);
+		}
 	}
 
 	// Runs a method with given arguments on a given Cluster's Client.

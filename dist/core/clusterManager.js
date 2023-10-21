@@ -223,7 +223,13 @@ class ClusterManager extends events_1.default {
                 promises.push(cluster.evalOnClient(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`));
             }
         }
-        return Promise.allSettled(promises).then((e) => e.filter((r) => r !== undefined));
+        if (options?.useAllSettled) {
+            const results = (await Promise.allSettled(promises)).filter((r) => r.status === 'fulfilled');
+            return results.map((r) => r.value);
+        }
+        else {
+            return Promise.all(promises);
+        }
     }
     // Runs a method with given arguments on a given Cluster's Client.
     async evalOnClusterClient(cluster, script, options) {

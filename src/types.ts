@@ -123,6 +123,7 @@ export interface EvalOptions<T extends object = object> {
     guildId?: string;
     context?: T;
     timeout?: number;
+    useAllSettled?: boolean;
 }
 
 // ReCluster.
