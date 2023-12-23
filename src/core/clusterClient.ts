@@ -137,7 +137,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		this.process?.send<BaseMessage<'eval'>>({
 			data: {
 				options,
-				script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`,
+				script: typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`,
 			},
 			_nonce: nonce,
 			_type: MessageTypes.ClientManagerEvalRequest,
@@ -152,7 +152,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		this.process?.send({
 			data: {
 				options,
-				script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`,
+				script: typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`,
 			},
 			_nonce: nonce,
 			_type: MessageTypes.ClientBroadcastRequest,
@@ -166,7 +166,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 
 		this.process?.send({
 			data: {
-				script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}'))`,
+				script: typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`,
 				options: {
 					...options,
 					guildId,
@@ -182,10 +182,10 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	public async evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		type EvalObject = { _eval: <T>(script: string) => T; };
 
-		if ((this.client as unknown as EvalObject)._eval) return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+		if ((this.client as unknown as EvalObject)._eval) return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
 		(this.client as unknown as EvalObject)._eval = function (_: string) { return eval(_); }.bind(this.client);
 
-		return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+		return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
 	}
 
 	// Sends a Request to the ParentCluster and returns the reply.

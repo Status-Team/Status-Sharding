@@ -180,7 +180,7 @@ export class ClusterManager extends EventEmitter {
 
 		// Manager is not allowed to crash.
 		try {
-			result = await eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+			result = await eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
 		} catch (err) {
 			error = err as Error;
 		}
@@ -219,17 +219,17 @@ export class ClusterManager extends EventEmitter {
 			const cluster = this.clusters.get(options.cluster);
 			if (!cluster) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | No cluster was found with the given Id.'));
 
-			promises.push(cluster.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`));
+			promises.push(cluster.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`));
 		} else if (Array.isArray(options?.cluster)) {
 			const clusters = Array.from(this.clusters.values()).filter((c) => (options?.cluster as number[])?.includes(c.id));
 			if (clusters.length === 0) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | No clusters were found with the given Ids.'));
 
 			for (const cluster of clusters) {
-				promises.push(cluster.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`));
+				promises.push(cluster.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`));
 			}
 		} else {
 			for (const cluster of this.clusters.values()) {
-				promises.push(cluster.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`));
+				promises.push(cluster.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`));
 			}
 		}
 
@@ -249,7 +249,7 @@ export class ClusterManager extends EventEmitter {
 		const cl = this.clusters.get(cluster);
 
 		if (!cl) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found.'));
-		return cl.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+		return cl.evalOnClient<T, P>(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
 	}
 
 	// Runs a method with given arguments on a given Cluster's process.
@@ -260,7 +260,7 @@ export class ClusterManager extends EventEmitter {
 		const cl = this.clusters.get(cluster);
 
 		if (!cl) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found.'));
-		return cl.eval<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+		return cl.eval<T, P>(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
 	}
 
 	// Runs a method with given arguments on a given Cluster's process and Guild.
@@ -268,7 +268,7 @@ export class ClusterManager extends EventEmitter {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Ids must be a string.'));
 
-		return this.broadcastEval<T, P>(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}'))`, {
+		return this.broadcastEval<T, P>(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`, {
 			...options, guildId,
 		}).then((e) => e?.find((r) => r !== undefined)) as Promise<ValidIfSerializable<T>>;
 	}

@@ -167,7 +167,7 @@ class ClusterManager extends events_1.default {
         let error;
         // Manager is not allowed to crash.
         try {
-            result = await eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+            result = await eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
         }
         catch (err) {
             error = err;
@@ -208,19 +208,19 @@ class ClusterManager extends events_1.default {
             const cluster = this.clusters.get(options.cluster);
             if (!cluster)
                 return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | No cluster was found with the given Id.'));
-            promises.push(cluster.evalOnClient(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`));
+            promises.push(cluster.evalOnClient(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`));
         }
         else if (Array.isArray(options?.cluster)) {
             const clusters = Array.from(this.clusters.values()).filter((c) => options?.cluster?.includes(c.id));
             if (clusters.length === 0)
                 return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | No clusters were found with the given Ids.'));
             for (const cluster of clusters) {
-                promises.push(cluster.evalOnClient(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`));
+                promises.push(cluster.evalOnClient(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`));
             }
         }
         else {
             for (const cluster of this.clusters.values()) {
-                promises.push(cluster.evalOnClient(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`));
+                promises.push(cluster.evalOnClient(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`));
             }
         }
         if (options?.useAllSettled) {
@@ -240,7 +240,7 @@ class ClusterManager extends events_1.default {
         const cl = this.clusters.get(cluster);
         if (!cl)
             return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found.'));
-        return cl.evalOnClient(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+        return cl.evalOnClient(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
     }
     // Runs a method with given arguments on a given Cluster's process.
     async evalOnCluster(cluster, script, options) {
@@ -251,7 +251,7 @@ class ClusterManager extends events_1.default {
         const cl = this.clusters.get(cluster);
         if (!cl)
             return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found.'));
-        return cl.eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+        return cl.eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
     }
     // Runs a method with given arguments on a given Cluster's process and Guild.
     async evalOnGuild(guildId, script, options) {
@@ -259,7 +259,7 @@ class ClusterManager extends events_1.default {
             return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
         if (typeof guildId !== 'string')
             return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Ids must be a string.'));
-        return this.broadcastEval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}'))`, {
+        return this.broadcastEval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`, {
             ...options, guildId,
         }).then((e) => e?.find((r) => r !== undefined));
     }

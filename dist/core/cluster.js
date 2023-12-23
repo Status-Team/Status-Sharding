@@ -133,7 +133,7 @@ class Cluster extends events_1.default {
         return await this.manager.broadcast(message, sendSelf ? undefined : [this.id]);
     }
     async eval(script, options) {
-        return eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+        return eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
     }
     async evalOnClient(script, options) {
         if (!this.thread)
@@ -143,14 +143,14 @@ class Cluster extends events_1.default {
             _type: types_1.MessageTypes.ClientEvalRequest,
             _nonce: nonce,
             data: {
-                script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`,
+                script: typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`,
                 options: options,
             },
         });
         return this.manager.promise.create(nonce, options?.timeout);
     }
     async evalOnGuild(guildId, script, options) {
-        return this.manager.evalOnGuild(guildId, typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`, options);
+        return this.manager.evalOnGuild(guildId, typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`, options);
     }
     triggerMaintenance(reason) {
         return this.send({

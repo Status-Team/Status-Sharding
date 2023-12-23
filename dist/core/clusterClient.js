@@ -109,7 +109,7 @@ class ClusterClient extends events_1.default {
         this.process?.send({
             data: {
                 options,
-                script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`,
+                script: typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`,
             },
             _nonce: nonce,
             _type: types_1.MessageTypes.ClientManagerEvalRequest,
@@ -121,7 +121,7 @@ class ClusterClient extends events_1.default {
         this.process?.send({
             data: {
                 options,
-                script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`,
+                script: typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`,
             },
             _nonce: nonce,
             _type: types_1.MessageTypes.ClientBroadcastRequest,
@@ -132,7 +132,7 @@ class ClusterClient extends events_1.default {
         const nonce = shardingUtils_1.ShardingUtils.generateNonce();
         this.process?.send({
             data: {
-                script: typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''}, this?.guilds?.cache?.get('${guildId}'))`,
+                script: typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`,
                 options: {
                     ...options,
                     guildId,
@@ -145,9 +145,9 @@ class ClusterClient extends events_1.default {
     }
     async evalOnClient(script, options) {
         if (this.client._eval)
-            return await this.client._eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+            return await this.client._eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
         this.client._eval = function (_) { return eval(_); }.bind(this.client);
-        return await this.client._eval(typeof script === 'string' ? script : `(${script})(this${options?.context ? ', ' + JSON.stringify(options.context) : ''})`);
+        return await this.client._eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
     }
     // Sends a Request to the ParentCluster and returns the reply.
     request(message, options = {}) {
