@@ -37,7 +37,7 @@ export class ShardingUtils {
 		return true;
 	}
 
-	public static removeNonExisting<T>(array: (T | undefined)[]): T[] {
+	public static removeNonExisting<T>(array: (T | undefined)[]): T[] | undefined {
 		return array.reduce((acc: T[], item: T | undefined) => {
 			if (item !== undefined && item !== null) acc.push(item);
 			return acc;
