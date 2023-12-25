@@ -180,7 +180,7 @@ export class ClusterManager extends EventEmitter {
 
 		// Manager is not allowed to crash.
 		try {
-			result = await eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
+			result = await (0, eval)(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
 		} catch (err) {
 			error = err as Error;
 		}

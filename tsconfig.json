@@ -11,16 +11,10 @@
 		"strictNullChecks": true,
 		"esModuleInterop": true,
 		"baseUrl": "./",
-		"plugins": [
-			{
-				"transform": "typia/lib/transform"
-			}
-		]
+		"plugins": [{
+			"transform": "typia/lib/transform"
+		}]
 	},
-	"include": [
-		"src/**/*",
-	],
-	"exclude": [
-		"node_modules"
-	]
+	"include": ["src/**/*"],
+	"exclude": ["node_modules"]
 }

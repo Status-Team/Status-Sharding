@@ -1,5 +1,5 @@
 {
-	"version": "1.5.1",
+	"version": "1.5.2",
 	"name": "status-sharding",
 	"author": "Digital39999",
 	"scripts": {
@@ -7,10 +7,12 @@
 		"init": "yarn install && yarn run build && yarn run start",
 		"start": "node dist/index.js",
 		"build": "tsc --build",
-		"watch": "tsc --watch"
+		"watch": "tsc --watch",
+		"lint": "eslint . --ext .ts",
+		"tsup": "tsup"
 	},
-	"repository": "https://github.com/Status-Team/Status-Sharding",
 	"main": "dist/index.js",
+	"repository": "https://github.com/Status-Team/Status-Sharding",
 	"license": "MIT",
 	"keywords": [
 		"discord",

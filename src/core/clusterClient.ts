@@ -183,7 +183,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		type EvalObject = { _eval: <T>(script: string) => T; };
 
 		if ((this.client as unknown as EvalObject)._eval) return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
-		(this.client as unknown as EvalObject)._eval = function (_: string) { return eval(_); }.bind(this.client);
+		(this.client as unknown as EvalObject)._eval = function (_: string) { return (0, eval)(_); }.bind(this.client);
 
 		return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
 	}
