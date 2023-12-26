@@ -2,6 +2,9 @@
 
 # source
 /src
+tsconfig.json
+.eslintrc.json
+.npmignore
 
 # dependencies
 .env
