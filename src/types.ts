@@ -51,8 +51,9 @@ export type UnknownFunction = (...args: unknown[]) => unknown;
 export type HeartbeatData = { restarts: number; missedBeats: number; };
 export type RequiredProps<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
 export type DeepNonNullable<T> = T extends NonNullable<T> ? T : DeepNonNullable<NonNullable<T>>;
-export type SerializableInput<T, U = false> = T extends Serializable ? T : T extends unknown ? U : never;
 export type ValidIfSerializable<T> = T extends NonNullable<Serializable> ? (T | undefined) : never;
+export type SerializableInput<T, U = false> = T extends Serializable ? T : T extends unknown ? U : never;
+export type DeconstructedFunction = { args: string[], body: string, wrapScope: boolean, wrapArgs: boolean };
 export type Serializable = string | number | boolean | null | undefined | Serializable[] | { [key: string]: Serializable } | object | ChildSerializable;
 export type Serialized<T> = T extends symbol | bigint | UnknownFunction ? never : T extends ValidIfSerializable<T> ? T : (T extends { toJSON(): infer R } ? R : T extends ReadonlyArray<infer V> ? Serialized<V>[] : (T extends ReadonlyMap<unknown, unknown> | ReadonlySet<unknown> ? object : (T extends object ? { [K in keyof T]: Serialized<T[K]> } : T)));
 

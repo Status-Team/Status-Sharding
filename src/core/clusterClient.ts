@@ -166,7 +166,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 
 		this.process?.send({
 			data: {
-				script: typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`,
+				script: ShardingUtils.guildEvalParser(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`),
 				options: {
 					...options,
 					guildId,

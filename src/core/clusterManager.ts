@@ -268,7 +268,7 @@ export class ClusterManager extends EventEmitter {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
 		if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Ids must be a string.'));
 
-		return this.broadcastEval<T, P>(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`, {
+		return this.broadcastEval<T, P>(ShardingUtils.guildEvalParser(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`), {
 			...options, guildId,
 		}).then((e) => e?.find((r) => r !== undefined)) as Promise<ValidIfSerializable<T>>;
 	}

@@ -1,4 +1,4 @@
-import { DefaultOptions, Endpoints, ValidIfSerializable } from '../types';
+import { DeconstructedFunction, DefaultOptions, Endpoints, ValidIfSerializable } from '../types';
 
 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -109,5 +109,68 @@ export class ShardingUtils {
 		});
 
 		return response.shards * (1000 / guildsPerShard);
+	}
+
+	public static guildEvalParser(func: string) {
+		const type: 'function' | 'arrow' = func.includes('=>') ? 'arrow' : 'function';
+		if (type === 'function') func = func.replace(/function\s+\w+\s*/, 'function ');
+
+		const data = getStuff({ func, type });
+		return reconstruct({ ...data, ...insertBodyCheck(data) });
+
+		function getStuff({ func, type }: { func: string, type: 'function' | 'arrow' }) {
+			switch (type) {
+				case 'arrow': {
+					let [args, body] = func.split('=>').map((x) => x.trim());
+					let [wrapScope, wrapArgs] = [false, false];
+
+					if (args.startsWith('(')) { args = args.slice(1, -1); wrapArgs = true; }
+					if (body.startsWith('{')) { body = body.slice(1, -1); wrapScope = true; }
+
+					return {
+						args: args.split(',').map((x) => x.trim()).filter((x) => x),
+						body: body.trim(),
+						wrapScope,
+						wrapArgs,
+					};
+				}
+				case 'function': {
+					let [args, body] = func.split(') {').map((x, i) => { x = x.trim(); return i === 0 ? x.slice(x.indexOf('(') + 1) : x.slice(0, -1); });
+					let [wrapScope] = [true, true];
+
+					if (args.startsWith('(')) { args = args.slice(1, -1); }
+					if (body.startsWith('{')) { body = body.slice(1, -1); wrapScope = false; }
+
+					return {
+						args: args.split(',').map((x) => x.trim()).filter((x) => x),
+						body: body.trim(),
+						wrapScope,
+						wrapArgs: true,
+					};
+				}
+			}
+		}
+
+		function reconstruct({ args, body, wrapScope, wrapArgs }: DeconstructedFunction) {
+			let argsStr = args.join(', ');
+
+			switch (type) {
+				case 'arrow': {
+					if (wrapArgs) argsStr = `(${argsStr})`;
+					if (wrapScope) body = `{ ${body} }`;
+					return `${argsStr} => ${body}`;
+				}
+				case 'function': {
+					if (wrapArgs) argsStr = `(${argsStr})`;
+					if (wrapScope) body = `{ ${body} }`;
+					return `function ${argsStr} ${body}`;
+				}
+			}
+		}
+
+		function insertBodyCheck({ args, body, wrapScope }: Omit<DeconstructedFunction, 'wrapArgs'>) {
+			if (args.length < 3) return { body: body };
+			return { wrapScope: true, body: `if (!${args[2]}) return; ${wrapScope ? body : `return ${body};`}` };
+		}
 	}
 }
