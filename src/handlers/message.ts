@@ -6,10 +6,30 @@ import { Worker } from '../classes/worker';
 import { Cluster } from '../core/cluster';
 import { Child } from '../classes/child';
 
+/**
+ * Handles messages for the cluster.
+ * @export
+ * @class ClusterHandler
+ * @typedef {ClusterHandler}
+ */
 export class ClusterHandler {
+	/**
+	 * Creates an instance of ClusterHandler.
+	 * @constructor
+	 * @param {Cluster} cluster - The cluster.
+	 * @param {(Worker | Child)} ipc - The IPC process.
+	 */
 	constructor(private cluster: Cluster, private ipc: Worker | Child) {}
 
-	handleMessage = async <D extends DataType>(message: BaseMessage<D>): Promise<void> => {
+	/**
+	 * Handles the message received, and executes the callback. (Not meant to be used by the user.)
+	 * @template {DataType} D - The type of the message.
+	 * @template {Serializable} A - The type of the message data.
+	 * @template {object} P - The type of the message options.
+	 * @param {BaseMessage<D, A, P>} message - The message received.
+	 * @returns {Promise<void>} The promise.
+	 */
+	public handleMessage = async <D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> => {
 		switch (message._type) {
 			case MessageTypes.ClientReady: {
 				if (this.cluster.ready) throw new Error('Cluster already ready, if autoLogin is enabled, check if you are not using .login() in your code.');
@@ -79,7 +99,7 @@ export class ClusterHandler {
 			}
 			case MessageTypes.ClientRespawnAll: {
 				const { clusterDelay, respawnDelay, timeout } = message.data as DataTypes['respawn'];
-				this.cluster.manager.respawnAll({ clusterDelay, respawnDelay, timeout });
+				this.cluster.manager.respawnAll(clusterDelay, respawnDelay, timeout);
 				break;
 			}
 			case MessageTypes.ClientRespawn: {
@@ -111,19 +131,43 @@ export class ClusterHandler {
 	};
 }
 
+/**
+ * Handles messages for the cluster client.
+ * @export
+ * @class ClusterClientHandler
+ * @typedef {ClusterClientHandler}
+ * @template {ShardingClient} [InternalClient=ShardingClient] - The type of the internal client.
+ */
 export class ClusterClientHandler<InternalClient extends ShardingClient = ShardingClient> {
+	/**
+	 * Creates an instance of ClusterClientHandler.
+	 * @constructor
+	 * @param {ClusterClient<InternalClient>} clusterClient - The cluster client.
+	 */
 	constructor(private clusterClient: ClusterClient<InternalClient>) {}
 
-	handleMessage = async (message: BaseMessage<DataType, unknown>): Promise<void> => {
+	/**
+	 * Handles the message received, and executes the callback. (Not meant to be used by the user.)
+	 * @template {DataType} D - The type of the message.
+	 * @template {Serializable} A - The type of the message data.
+	 * @template {object} P - The type of the message options.
+	 * @param {BaseMessage<D, A, P>} message - The message received.
+	 * @returns {Promise<void>} The promise.
+	 */
+	public handleMessage = async <D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> => {
 		switch (message._type) {
 			case MessageTypes.ClientEvalRequest: {
 				const { script } = message.data as EvalMessage;
 				try {
-					if (!script) throw new Error('Eval Script not provided.');
+					if (!script) return this.clusterClient._respond({
+						_type: MessageTypes.ClientEvalResponseError,
+						_nonce: message._nonce,
+						data: ShardingUtils.makePlainError(new Error('No script provided.')),
+					} as BaseMessage<'error'>);
 
 					const result = await this.clusterClient.evalOnClient(script);
 
-					this.clusterClient._respond('evalResult', {
+					this.clusterClient._respond({
 						_type: MessageTypes.ClientEvalResponse,
 						_nonce: message._nonce,
 						data: ShardingUtils.isSerializable(result) ? result : {
@@ -132,7 +176,7 @@ export class ClusterClientHandler<InternalClient extends ShardingClient = Shardi
 						},
 					} as BaseMessage<'evalResult'>);
 				} catch (err) {
-					this.clusterClient._respond('error', {
+					this.clusterClient._respond({
 						_type: MessageTypes.ClientEvalResponseError,
 						_nonce: message._nonce,
 						data: ShardingUtils.makePlainError(err as Error),
@@ -159,7 +203,7 @@ export class ClusterClientHandler<InternalClient extends ShardingClient = Shardi
 				break;
 			}
 			case MessageTypes.Heartbeat: {
-				this.clusterClient._respond('heartbeat', { _type: MessageTypes.HeartbeatAck } as BaseMessage<'heartbeat'>);
+				this.clusterClient._respond({ _type: MessageTypes.HeartbeatAck } as BaseMessage<'heartbeat'>);
 				break;
 			}
 		}

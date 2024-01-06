@@ -1,26 +1,60 @@
 import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, Serializable } from '../types';
 import { ProcessMessage, BaseMessage, DataType } from '../other/message';
+import { Worker as WorkerThread } from 'worker_threads';
 import { ShardingUtils } from '../other/shardingUtils';
 import { ClusterHandler } from '../handlers/message';
 import { BrokerMessage } from '../handlers/broker';
 import { ClusterManager } from './clusterManager';
 import { ShardingClient } from './clusterClient';
+import { ChildProcess } from 'child_process';
 import { Worker } from '../classes/worker';
 import { Child } from '../classes/child';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 import path from 'path';
 
-// A self-contained cluster created by the ClusterManager.
-// Each one has a Child that contains an instance of the bot and its Client.
-// When its child process/worker exits for any reason, the cluster will spawn a new one to replace it as necessary.
+/**
+ * A self-contained cluster created by the ClusterManager.
+ * Each one has a Child that contains an instance of the bot and its Client.
+ * When its child process/worker exits for any reason, the cluster will spawn a new one to replace it as necessary.
+ * @export
+ * @class Cluster
+ * @typedef {Cluster}
+ * @extends {EventEmitter}
+ */
 export class Cluster extends EventEmitter {
+	/**
+	 * Represents whether the cluster is ready.
+	 */
 	public ready: boolean;
+	/**
+	 * Represents the child process/worker of the cluster.
+	 */
 	public thread: null | Worker | Child;
+	/**
+	 * Represents the last time the cluster received a heartbeat.
+	 */
 	public lastHeartbeatReceived: number;
 
+	/**
+	 * Message processor that handles messages from the child process/worker/manager.
+	 * @private
+	 * @type {?ClusterHandler}
+	 */
 	private messageHandler?: ClusterHandler;
 
+	/**
+	 * Represents the environment data of the cluster.
+	 * @private
+	 * @type {NodeJS.ProcessEnv & {
+	 * 		CLUSTER: number;
+	 * 		SHARD_LIST: number[];
+	 * 		TOTAL_SHARDS: number;
+	 * 		CLUSTER_COUNT: number;
+	 * 		CLUSTER_QUEUE_MODE: 'auto' | 'manual';
+	 * 		CLUSTER_MANAGER_MODE: 'process' | 'worker';
+	 * 	}}
+	 */
 	private envData: NodeJS.ProcessEnv & {
 		CLUSTER: number;
 		SHARD_LIST: number[];
@@ -30,6 +64,13 @@ export class Cluster extends EventEmitter {
 		CLUSTER_MANAGER_MODE: 'process' | 'worker';
 	};
 
+	/**
+	 * Creates an instance of Cluster.
+	 * @constructor
+	 * @param {ClusterManager} manager - The ClusterManager instance that manages this cluster.
+	 * @param {number} id - The ID of the cluster.
+	 * @param {number[]} shardList - The list of shards assigned to this cluster.
+	 */
 	constructor(public manager: ClusterManager, public id: number, public shardList: number[]) {
 		super();
 
@@ -46,16 +87,34 @@ export class Cluster extends EventEmitter {
 		});
 	}
 
+	/**
+	 * Count of shards assigned to this cluster.
+	 * @readonly
+	 * @type {number}
+	 */
 	get totalShards(): number {
 		return this.manager.options.totalShards;
 	}
 
+	/**
+	 * Count of clusters managed by the manager.
+	 * @readonly
+	 * @type {number}
+	 */
 	get totalClusters(): number {
 		return this.manager.options.totalClusters;
 	}
 
-	public async spawn(spawnTimeout = 30000) {
+	/**
+	 * Spawn function that spawns the cluster's child process/worker.
+	 * @param {number} [spawnTimeout=30000] - The amount of time to wait for the cluster to become ready before killing it.
+	 * @returns {Promise<ChildProcess | WorkerThread>} The child process/worker of the cluster.
+	 * @throws {Error} - If the cluster has already been spawned.
+	 * @throws {Error} - If the cluster does not have a file provided.
+	 */
+	public async spawn(spawnTimeout: number = 30000): Promise<ChildProcess | WorkerThread> {
 		if (this.thread) throw new Error('CLUSTER ALREADY SPAWNED | Cluster ' + this.id + ' has already been spawned.');
+		if (!this.manager.file) throw new Error('NO FILE PROVIDED | Cluster ' + this.id + ' does not have a file provided.');
 
 		const options = {
 			...this.manager.options.clusterOptions,
@@ -103,11 +162,19 @@ export class Cluster extends EventEmitter {
 			if (!shouldAbort) resolve();
 		});
 
-		return this.thread.process;
+		return this.thread.process as ChildProcess | WorkerThread;
 	}
 
-	public async kill(options?: ClusterKillOptions) {
-		this.thread?.kill();
+	/**
+	 * Kill function that kills the cluster's child process/worker.
+	 * @param {?ClusterKillOptions} [options] - The options for killing the cluster.
+	 * @returns {Promise<void>} The promise that resolves once the cluster has been killed.
+	 * @throws {Error} - If the cluster does not have a child process/worker.
+	 */
+	public async kill(options?: ClusterKillOptions): Promise<void> {
+		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
+
+		this.thread.kill();
 		if (this.thread) this.thread = null;
 
 		this.ready = false;
@@ -116,31 +183,55 @@ export class Cluster extends EventEmitter {
 		this.manager._debug('[KILL] Cluster killed with reason: ' + (options?.reason || 'Unknown reason.'));
 	}
 
-	public async respawn(delay = this.manager.options.spawnOptions.delay || 800, timeout = this.manager.options.spawnOptions.timeout || 30000) {
-		if (this.thread) await this.kill({ force: true });
+	/**
+	 * Respawn function that respawns the cluster's child process/worker.
+	 * @param {number} [delay=this.manager.options.spawnOptions.delay || 800] - The amount of time to wait before respawning the cluster.
+	 * @param {number} [timeout=this.manager.options.spawnOptions.timeout || 30000] - The amount of time to wait for the cluster to become ready before killing it.
+	 * @returns {Promise<ChildProcess | WorkerThread>} The child process/worker of the cluster.
+	 * @throws {Error} - If the cluster does not have a child process/worker.
+	 */
+	public async respawn(delay: number = this.manager.options.spawnOptions.delay || 800, timeout: number = this.manager.options.spawnOptions.timeout || 30000): Promise<ChildProcess | WorkerThread> {
+		if (this.thread) await this.kill();
 		if (delay > 0) await ShardingUtils.delayFor(delay);
-
-		// const heartbeat = this.manager.heartbeat;
-		// if (heartbeat) heartbeat.clusters.get(this.id)?.stop();
 
 		return this.spawn(timeout);
 	}
 
-	public async send<T extends Serializable>(message: SerializableInput<T>) {
+	/**
+	 * Send function that sends a message to the cluster's child process/worker.
+	 * @template {Serializable} T - The type of the message to send.
+	 * @param {SerializableInput<T>} message - The message to send.
+	 * @returns {Promise<void>} The promise that resolves once the message has been sent.
+	 * @throws {Error} - If the cluster does not have a child process/worker.
+	 * @example
+	 * cluster.send({ id: '797012765352001557', username: 'Digital', discriminator: '3999' });
+	 */
+	public async send<T extends Serializable>(message: SerializableInput<T>): Promise<void> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
 		this.manager._debug(`[IPC] [Cluster ${this.id}] Sending message to child.`);
 
-		return this.thread?.send({
+		return this.thread.send({
 			_type: MessageTypes.CustomMessage,
 			data: message,
 		} as BaseMessage<'normal'>);
 	}
 
+	/**
+	 * Request function that sends a message to the cluster's child process/worker and waits for a response.
+	 * @template {Serializable} T - The type of the message to send.
+	 * @template {unknown} O - The type of the response to the message.
+	 * @param {SerializableInput<T>} message - The message to send.
+	 * @param {{ timeout?: number; }} [options={}] - The options for the request.
+	 * @returns {Promise<Serialized<O>>} The promise that resolves with the response to the message.
+	 * @throws {Error} - If the cluster does not have a child process/worker.
+	 * @example
+	 * cluster.request({ customMessage: 'Hello world!' });
+	 */
 	public async request<T extends Serializable, O>(message: SerializableInput<T>, options: { timeout?: number; } = {}): Promise<Serialized<O>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
 		const nonce = ShardingUtils.generateNonce();
 
-		this.thread?.send<BaseMessage<'reply'>>({
+		this.thread.send<BaseMessage<'reply'>>({
 			_type: MessageTypes.CustomRequest,
 			_nonce: nonce,
 			data: message,
@@ -149,19 +240,53 @@ export class Cluster extends EventEmitter {
 		return this.manager.promise.create(nonce, options.timeout);
 	}
 
-	public async broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf = false): Promise<void> {
+	/**
+	 * Broadcast function that sends a message to all clusters.
+	 * @template {Serializable} T - The type of the message to send.
+	 * @param {SerializableInput<T>} message - The message to send.
+	 * @param {boolean} [sendSelf=false] - Whether to send the message to the current cluster.
+	 * @returns {Promise<void>} The promise that resolves once the message has been sent.
+	 * @example
+	 * cluster.broadcast({ customMessage: 'Hello world!' });
+	 */
+	public async broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf: boolean = false): Promise<void> {
 		return await this.manager.broadcast(message, sendSelf ? undefined : [this.id]);
 	}
 
+	/**
+	 * Eval function that evaluates a script on the current cluster.
+	 * @template {unknown} T - The type of the result of the script.
+	 * @template {object} P - The type of the context of the script.
+	 * @param {(string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
+	 * @param {?Exclude<EvalOptions<P>, 'cluster'>} [options] - The options for the eval.
+	 * @returns {Promise<ValidIfSerializable<T>>} The promise that resolves with the result of the script.
+	 * @example
+	 * cluster.eval('this.manager.clusters.size'); // 1
+	*/
 	public async eval<T, P extends object>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		return (0, eval)(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
 	}
 
+	/**
+	 * EvalOnClient function that evaluates a script on a specific cluster.
+	 * @template {unknown} T - The type of the result of the script.
+	 * @template {object} P - The type of the context of the script.
+	 * @template {unknown} [C=ShardingClient] - The type of the client to use.
+	 * @param {(string | ((client: C, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
+	 * @param {?EvalOptions<P>} [options] - The options for the eval.
+	 * @returns {Promise<ValidIfSerializable<T>>} The promise that resolves with the result of the script.
+	 * @throws {Error} - If the cluster does not have a child process/worker.
+	 * @example
+	 * cluster.evalOnClient((client) => client.cluster.id); // 0
+	 * cluster.evalOnClient((client, context) => client.cluster.id + context, { context: 1 }); // 0 + 1
+	 */
 	public async evalOnClient<T, P extends object, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
+		else if (typeof script !== 'string' && typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_TYPE | Cluster ' + this.id + ' eval script must be a string or function.'));
+
 		const nonce = ShardingUtils.generateNonce();
 
-		this.thread?.send<BaseMessage<'eval'>>({
+		this.thread.send<BaseMessage<'eval'>>({
 			_type: MessageTypes.ClientEvalRequest,
 			_nonce: nonce,
 			data: {
@@ -173,27 +298,74 @@ export class Cluster extends EventEmitter {
 		return this.manager.promise.create(nonce, options?.timeout);
 	}
 
-	public async evalOnGuild<T, P extends object, C = ShardingClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild?: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
-		return this.manager.evalOnGuild(guildId, typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`, options);
+	/**
+	 * EvalOnCluster function that evaluates a script on a specific cluster.
+	 * @template {unknown} T - The type of the result of the script.
+	 * @template {object} P - The type of the context of the script.
+	 * @template {unknown} [C=ShardingClient] - The type of the client to use.
+	 * @param {string} guildId - The ID of the guild to use.
+	 * @param {((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>)} script - The script to evaluate.
+	 * @param {?{ context?: P; timeout?: number; }} [options] - The options for the eval.
+	 * @returns {Promise<ValidIfSerializable<T>>} The promise that resolves with the result of the script.
+	 * @throws {Error} - If the cluster does not have a child process/worker.
+	 * @throws {Error} - If script is not a function.
+	 * @example
+	 * cluster.evalOnGuild('945340723425837066', (client, context, guild) => guild.name); // Digital's Basement
+	 * cluster.evalOnGuild('945340723425837066', (client, context, guild) => guild.name + context, { context: ' is cool!' }); // Digital's Basement is cool!
+	 */
+	public async evalOnGuild<T, P extends object, C = ShardingClient>(guildId: string, script: ((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
+		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
+		else if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_TYPE | Cluster ' + this.id + ' eval script must be a function.'));
+
+		return this.manager.evalOnGuild(guildId, script, options);
 	}
 
-	public triggerMaintenance(reason?: string) {
-		return this.send({
+	/**
+	 * Function that enables maintenance mode on the cluster.
+	 * @param {string} [reason] - The reason for enabling maintenance mode.
+	 * @returns {Promise<void>} The promise that resolves once maintenance mode has been enabled.
+	 * @throws {Error} - If the cluster does not have a child process/worker.
+	 * @example
+	 * cluster.triggerMaintenance('Updating dependencies...');
+	 * cluster.triggerMaintenance();
+	 */
+	public triggerMaintenance(reason?: string): Promise<void> {
+		return this._sendInstance({
 			_type: reason ? MessageTypes.ClientMaintenanceEnable : MessageTypes.ClientMaintenanceDisable,
 			data: reason || 'Unknown reason.',
 		} as BaseMessage<'maintenance'>);
 	}
 
-	public _sendInstance(message: BaseMessage<DataType>) {
+	/**
+	 * Function that allows you to constuct you'r own BaseMessage and send it to the cluster.
+	 * @template {DataType} D - The type of the message to send.
+	 * @template {Serializable} A - The type of the data to send.
+	 * @template {object} P - The type of the data to send.
+	 * @param {BaseMessage<D, A, P>} message - The message to send.
+	 * @returns {Promise<void>} The promise that resolves once the message has been sent.
+	 * @throws {Error} - If the cluster does not have a child process/worker.
+	 * @example
+	 * cluster.sendInstance({ _type: MessageTypes.CustomMessage, _nonce: '1234567890', data: { id: '797012765352001557', username: 'Digital', discriminator: '3999' } });
+	 */
+	public _sendInstance<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
+		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
+
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
-		return this.thread?.send(message);
+		return this.thread.send(message);
 	}
 
-	private _handleMessage(message: BaseMessage<'normal'> | BrokerMessage) {
+	/**
+	 * Message handler function that handles messages from the cluster's child process/worker/manager.
+	 * @private
+	 * @param {(BaseMessage<'normal'> | BrokerMessage)} message - The message to handle.
+	 * @returns {void} The void promise.
+	 */
+	private _handleMessage(message: BaseMessage<'normal'> | BrokerMessage): void {
 		if (!message || '_data' in message) return this.manager.broker.handleMessage(message);
 
+		if (!this.messageHandler) throw new Error('CLUSTERING_NO_MESSAGE_HANDLER | Cluster ' + this.id + ' does not have a message handler.');
 		this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);
-		this.messageHandler?.handleMessage(message);
+		this.messageHandler.handleMessage(message);
 
 		if ([MessageTypes.CustomMessage, MessageTypes.CustomRequest].includes(message._type)) {
 			const ipcMessage = new ProcessMessage(this, message);
@@ -204,7 +376,13 @@ export class Cluster extends EventEmitter {
 		}
 	}
 
-	private _handleExit(exitCode: number) {
+	/**
+	 * Exit handler function that handles the cluster's child process/worker exiting.
+	 * @private
+	 * @param {number} exitCode - The exit code of the cluster's child process/worker.
+	 * @returns {void} The void promise.
+	 */
+	private _handleExit(exitCode: number): void {
 		this.manager.heartbeat.removeCluster(this.id, true);
 		this.emit('death', this, this.thread?.process);
 
@@ -214,16 +392,50 @@ export class Cluster extends EventEmitter {
 		this.thread = null;
 	}
 
-	private _handleError(error: Error) {
+	/**
+	 * Error handler function that handles errors from the cluster's child process/worker/manager.
+	 * @private
+	 * @param {Error} error - The error to handle.
+	 * @returns {void} The void promise.
+	 */
+	private _handleError(error: Error): void {
 		this.manager.emit('error', error);
 	}
 }
 
 // Credits for EventEmitter typings: https://github.com/discordjs/discord.js/blob/main/packages/rest/src/lib/RequestManager.ts#L159
+/**
+ * A self-contained cluster created by the ClusterManager.
+ * Each one has a Child that contains an instance of the bot and its Client.
+ * When its child process/worker exits for any reason, the cluster will spawn a new one to replace it as necessary.
+ * @export
+ * @interface Cluster - The Cluster interface.
+ * @typedef {Cluster} - The Cluster type.
+ */
 export declare interface Cluster {
+	/**
+	 * Emit an event.
+	 * @type {(<K extends keyof ClusterEvents>(event: K, ...args: ClusterEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, ...args: unknown[]) => boolean)}
+	 */
 	emit: (<K extends keyof ClusterEvents>(event: K, ...args: ClusterEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, ...args: unknown[]) => boolean);
+	/**
+	 * Remove an event listener.
+	 * @type {(<K extends keyof ClusterEvents>(event: K, listener: (...args: ClusterEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, listener: (...args: unknown[]) => void) => this)}
+	 */
 	off: (<K extends keyof ClusterEvents>(event: K, listener: (...args: ClusterEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, listener: (...args: unknown[]) => void) => this);
+	/**
+	 * Listen for an event.
+	 * @type {(<K extends keyof ClusterEvents>(event: K, listener: (...args: ClusterEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, listener: (...args: unknown[]) => void) => this)}
+	 */
 	on: (<K extends keyof ClusterEvents>(event: K, listener: (...args: ClusterEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, listener: (...args: unknown[]) => void) => this);
+	/**
+	 * Listen for an event once.
+	 * @type {(<K extends keyof ClusterEvents>(event: K, listener: (...args: ClusterEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, listener: (...args: unknown[]) => void) => this)}
+	 */
 	once: (<K extends keyof ClusterEvents>(event: K, listener: (...args: ClusterEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, listener: (...args: unknown[]) => void) => this);
+	/**
+	 * Remove all listeners for an event.
+	 * @type {(<K extends keyof ClusterEvents>(event?: K) => this) & (<S extends string | symbol>(event?: Exclude<S, keyof ClusterEvents>) => this)}
+	 */
 	removeAllListeners: (<K extends keyof ClusterEvents>(event?: K) => this) & (<S extends string | symbol>(event?: Exclude<S, keyof ClusterEvents>) => this);
 }

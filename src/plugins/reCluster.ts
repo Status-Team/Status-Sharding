@@ -3,11 +3,33 @@ import { ShardingUtils } from '../other/shardingUtils';
 import { ReClusterOptions } from '../types';
 import { Cluster } from '../core/cluster';
 
+/**
+ * Handles re-clustering for the cluster manager.
+ * @export
+ * @class ReClusterManager
+ * @typedef {ReClusterManager}
+ */
 export class ReClusterManager {
-	private inProgress = false;
+	/**
+	 * If re-clustering is in progress.
+	 * @private
+	 * @type {boolean}
+	 */
+	private inProgress: boolean = false;
 
+	/**
+	 * Creates an instance of ReClusterManager.
+	 * @constructor
+	 * @param {ClusterManager} manager - The cluster manager.
+	 */
 	constructor(private readonly manager: ClusterManager) {}
 
+	/**
+	 * Starts re-clustering.
+	 * @async
+	 * @param {ReClusterOptions} options - The options for re-clustering.
+	 * @returns {Promise<boolean>} If re-clustering was successful.
+	 */
 	public async start(options: ReClusterOptions): Promise<boolean> {
 		if (this.inProgress) throw new Error('RECLUSTER_IN_PROGRESS | ReClustering is already in progress.');
 		if (!this.manager.ready) throw new Error('CLUSTER_MANAGER_NOT_READY | All clusters must be ready before re-clustering.');
@@ -46,7 +68,7 @@ export class ReClusterManager {
 					if (options.restartMode === 'rolling') {
 						const oldCluster = this.manager.clusters.get(clusterId);
 						if (oldCluster) {
-							oldCluster.kill({ force: true, reason: 'reClustering' });
+							oldCluster.kill({ reason: 'reClustering' });
 							oldClusters.delete(clusterId);
 						}
 
@@ -66,7 +88,7 @@ export class ReClusterManager {
 			this.manager._debug('[ReClustering] Killing old clusters.');
 
 			for (const [id, cluster] of Array.from(oldClusters)) {
-				cluster.kill({ force: true, reason: 'ReClustering is in progress.' });
+				cluster.kill({ reason: 'ReClustering is in progress.' });
 
 				this.manager._debug(`[ReClustering] [Cluster ${id}] Killed old cluster.`);
 				this.manager.clusters.delete(id);
@@ -85,7 +107,7 @@ export class ReClusterManager {
 
 				if (!cluster) continue;
 				if (oldCluster) {
-					oldCluster.kill({ force: true, reason: 'reClustering' });
+					oldCluster.kill({ reason: 'reClustering' });
 					oldClusters.delete(clusterId);
 				}
 

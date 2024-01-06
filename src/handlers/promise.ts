@@ -1,12 +1,39 @@
-import { MessageTypes, StoredPromise } from '../types';
+import { MessageTypes, Serializable, StoredPromise } from '../types';
 import { BaseMessage, DataType } from '../other/message';
+import { ClusterManager } from 'src/core/clusterManager';
+import { ClusterClient } from 'src/core/clusterClient';
 
+/**
+ * Handles promises by storing them in a map and resolving them when the response is received.
+ * @export
+ * @class PromiseHandler
+ * @typedef {PromiseHandler}
+ */
 export class PromiseHandler {
+	/**
+	 * List of promises and their unique identifiers.
+	 * @type {Map<string, StoredPromise>}
+	 */
 	nonces: Map<string, StoredPromise> = new Map();
 
-	public resolve(message: BaseMessage<DataType, unknown>) {
+	/**
+	 * Creates an instance of PromiseHandler.
+	 * @constructor
+	 * @param {(ClusterManager | ClusterClient)} instance - The instance of the Promise Handler.
+	 */
+	constructor(private instance: ClusterManager | ClusterClient) {}
+
+	/**
+	 * Resolves the promise with the data received.
+	 * @template {DataType} D - The type of the message.
+	 * @template {unknown} [A=Serializable] - The type of the message data.
+	 * @template {object} [P=object] - The type of the message options.
+	 * @param {BaseMessage<D, A, P>} message The message received.
+	 * @returns {void} Nothing.
+	 */
+	public resolve<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): void {
 		const promise = this.nonces.get(message._nonce);
-		if (!promise) throw new Error(`No promise found with nonce ${message._nonce}.`);
+		if (!promise) return this.instance._debug(`Received a message with an unknown nonce: ${message._nonce}`);
 
 		if (promise.timeout) clearTimeout(promise.timeout);
 		this.nonces.delete(message._nonce);
@@ -21,6 +48,14 @@ export class PromiseHandler {
 		}
 	}
 
+	/**
+	 * Creates a promise and stores it in the map.
+	 * @async
+	 * @template {unknown} T - The return type of the promise.
+	 * @param {string} nonce - The unique identifier of the promise.
+	 * @param {?number} [timeout] - How long to wait before rejecting the promise.
+	 * @returns {Promise<T>} The promise.
+	 */
 	public async create<T>(nonce: string, timeout?: number): Promise<T> {
 		return await new Promise<T>((resolve, reject) => {
 			if (!timeout) this.nonces.set(nonce, { resolve, reject });
