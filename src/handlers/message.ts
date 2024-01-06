@@ -23,13 +23,14 @@ export class ClusterHandler {
 
 	/**
 	 * Handles the message received, and executes the callback. (Not meant to be used by the user.)
+	 * @async
 	 * @template {DataType} D - The type of the message.
 	 * @template {Serializable} A - The type of the message data.
 	 * @template {object} P - The type of the message options.
 	 * @param {BaseMessage<D, A, P>} message - The message received.
 	 * @returns {Promise<void>} The promise.
 	 */
-	public handleMessage = async <D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> => {
+	public async handleMessage<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
 		switch (message._type) {
 			case MessageTypes.ClientReady: {
 				if (this.cluster.ready) throw new Error('Cluster already ready, if autoLogin is enabled, check if you are not using .login() in your code.');
@@ -128,7 +129,7 @@ export class ClusterHandler {
 				break;
 			}
 		}
-	};
+	}
 }
 
 /**
@@ -148,13 +149,14 @@ export class ClusterClientHandler<InternalClient extends ShardingClient = Shardi
 
 	/**
 	 * Handles the message received, and executes the callback. (Not meant to be used by the user.)
+	 * @async
 	 * @template {DataType} D - The type of the message.
 	 * @template {Serializable} A - The type of the message data.
 	 * @template {object} P - The type of the message options.
 	 * @param {BaseMessage<D, A, P>} message - The message received.
 	 * @returns {Promise<void>} The promise.
 	 */
-	public handleMessage = async <D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> => {
+	public async handleMessage<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
 		switch (message._type) {
 			case MessageTypes.ClientEvalRequest: {
 				const { script } = message.data as EvalMessage;
@@ -207,5 +209,5 @@ export class ClusterClientHandler<InternalClient extends ShardingClient = Shardi
 				break;
 			}
 		}
-	};
+	}
 }

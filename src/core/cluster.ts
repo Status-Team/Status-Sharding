@@ -107,6 +107,7 @@ export class Cluster extends EventEmitter {
 
 	/**
 	 * Spawn function that spawns the cluster's child process/worker.
+	 * @async
 	 * @param {number} [spawnTimeout=30000] - The amount of time to wait for the cluster to become ready before killing it.
 	 * @returns {Promise<ChildProcess | WorkerThread>} The child process/worker of the cluster.
 	 * @throws {Error} - If the cluster has already been spawned.
@@ -167,6 +168,7 @@ export class Cluster extends EventEmitter {
 
 	/**
 	 * Kill function that kills the cluster's child process/worker.
+	 * @async
 	 * @param {?ClusterKillOptions} [options] - The options for killing the cluster.
 	 * @returns {Promise<void>} The promise that resolves once the cluster has been killed.
 	 * @throws {Error} - If the cluster does not have a child process/worker.
@@ -185,6 +187,7 @@ export class Cluster extends EventEmitter {
 
 	/**
 	 * Respawn function that respawns the cluster's child process/worker.
+	 * @async
 	 * @param {number} [delay=this.manager.options.spawnOptions.delay || 800] - The amount of time to wait before respawning the cluster.
 	 * @param {number} [timeout=this.manager.options.spawnOptions.timeout || 30000] - The amount of time to wait for the cluster to become ready before killing it.
 	 * @returns {Promise<ChildProcess | WorkerThread>} The child process/worker of the cluster.
@@ -199,6 +202,7 @@ export class Cluster extends EventEmitter {
 
 	/**
 	 * Send function that sends a message to the cluster's child process/worker.
+	 * @async
 	 * @template {Serializable} T - The type of the message to send.
 	 * @param {SerializableInput<T>} message - The message to send.
 	 * @returns {Promise<void>} The promise that resolves once the message has been sent.
@@ -218,6 +222,7 @@ export class Cluster extends EventEmitter {
 
 	/**
 	 * Request function that sends a message to the cluster's child process/worker and waits for a response.
+	 * @async
 	 * @template {Serializable} T - The type of the message to send.
 	 * @template {unknown} O - The type of the response to the message.
 	 * @param {SerializableInput<T>} message - The message to send.
@@ -242,6 +247,7 @@ export class Cluster extends EventEmitter {
 
 	/**
 	 * Broadcast function that sends a message to all clusters.
+	 * @async
 	 * @template {Serializable} T - The type of the message to send.
 	 * @param {SerializableInput<T>} message - The message to send.
 	 * @param {boolean} [sendSelf=false] - Whether to send the message to the current cluster.
@@ -255,6 +261,7 @@ export class Cluster extends EventEmitter {
 
 	/**
 	 * Eval function that evaluates a script on the current cluster.
+	 * @async
 	 * @template {unknown} T - The type of the result of the script.
 	 * @template {object} P - The type of the context of the script.
 	 * @param {(string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
@@ -269,6 +276,7 @@ export class Cluster extends EventEmitter {
 
 	/**
 	 * EvalOnClient function that evaluates a script on a specific cluster.
+	 * @async
 	 * @template {unknown} T - The type of the result of the script.
 	 * @template {object} P - The type of the context of the script.
 	 * @template {unknown} [C=ShardingClient] - The type of the client to use.
@@ -300,6 +308,7 @@ export class Cluster extends EventEmitter {
 
 	/**
 	 * EvalOnCluster function that evaluates a script on a specific cluster.
+	 * @async
 	 * @template {unknown} T - The type of the result of the script.
 	 * @template {object} P - The type of the context of the script.
 	 * @template {unknown} [C=ShardingClient] - The type of the client to use.
