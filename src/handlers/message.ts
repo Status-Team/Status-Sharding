@@ -74,8 +74,9 @@ export class ClusterHandler {
 			}
 			case MessageTypes.ClientManagerEvalRequest: {
 				const { script, options } = message.data as EvalMessage;
+				console.log(JSON.stringify(script, null, 2), options);
 				const result = await this.cluster.manager.eval(script, options);
-
+				console.log(result);
 				if (result.error) {
 					this.ipc.send({
 						_type: MessageTypes.ClientManagerEvalResponseError,

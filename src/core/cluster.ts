@@ -271,7 +271,7 @@ export class Cluster extends EventEmitter {
 	 * cluster.eval('this.manager.clusters.size'); // 1
 	*/
 	public async eval<T, P extends object>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
-		return (0, eval)(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
+		return eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
 	}
 
 	/**
