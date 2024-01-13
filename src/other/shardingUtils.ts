@@ -202,36 +202,44 @@ export class ShardingUtils {
 		if (type === 'function') func = func.replace(/function\s+\w+\s*/, 'function ');
 
 		const data = getStuff({ func, type });
-		const finalData = reconstruct({ ...data, ...insertBodyCheck(data) });
-
-		return finalData;
+		return reconstruct({ ...data, ...insertBodyCheck(data) });
 
 		function getStuff({ func, type }: { func: string, type: 'function' | 'arrow' }) {
 			switch (type) {
 				case 'arrow': {
-					let [args, body] = func.split('=>').map((x) => x.trim());
 					let [wrapScope, wrapArgs] = [false, false];
 
+					const stuff = func.split('=>').map((x) => x.trim());
+					const body = stuff.slice(1);
+					let args = stuff[0];
+
+					let actualBody = body.join('=>').trim();
+
 					if (args.startsWith('(')) { args = args.slice(1, -1); wrapArgs = true; }
-					if (body.startsWith('{')) { body = body.slice(1, -1); wrapScope = true; }
+					if (actualBody.startsWith('{')) { actualBody = actualBody.slice(1, -1); wrapScope = true; }
 
 					return {
 						args: args.split(',').map((x) => x.trim()).filter((x) => x),
-						body: body.trim(),
+						body: actualBody.trim(),
 						wrapScope,
 						wrapArgs,
 					};
 				}
 				case 'function': {
-					let [args, body] = func.split(') {').map((x, i) => { x = x.trim(); return i === 0 ? x.slice(x.indexOf('(') + 1) : x.slice(0, -1); });
 					let [wrapScope] = [true, true];
 
+					const stuff = func.split(') {', 1).map((x, i) => { x = x.trim(); return i === 0 ? x.slice(x.indexOf('(') + 1) : x.slice(0, -1); });
+					const body = stuff.slice(1);
+					let args = stuff[0];
+
+					let actualBody = body.join(') {').trim();
+
 					if (args.startsWith('(')) { args = args.slice(1, -1); }
-					if (body.startsWith('{')) { body = body.slice(1, -1); wrapScope = false; }
+					if (actualBody.startsWith('{')) { actualBody = actualBody.slice(1, -1); wrapScope = false; }
 
 					return {
 						args: args.split(',').map((x) => x.trim()).filter((x) => x),
-						body: body.trim(),
+						body: actualBody.trim(),
 						wrapScope,
 						wrapArgs: true,
 					};
