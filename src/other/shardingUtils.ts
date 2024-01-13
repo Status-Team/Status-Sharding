@@ -202,7 +202,9 @@ export class ShardingUtils {
 		if (type === 'function') func = func.replace(/function\s+\w+\s*/, 'function ');
 
 		const data = getStuff({ func, type });
-		return reconstruct({ ...data, ...insertBodyCheck(data) });
+		const finalData = reconstruct({ ...data, ...insertBodyCheck(data) });
+
+		return finalData;
 
 		function getStuff({ func, type }: { func: string, type: 'function' | 'arrow' }) {
 			switch (type) {
