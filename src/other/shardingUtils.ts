@@ -198,7 +198,7 @@ export class ShardingUtils {
 	public static guildEvalParser<R, A extends never[]>(func: string | ((...args: A) => R)): string {
 		if (typeof func === 'function') func = func.toString();
 
-		const type: 'function' | 'arrow' = func.includes('=>') ? 'arrow' : 'function';
+		const type: 'function' | 'arrow' = (func.startsWith('function') || func.startsWith('async function')) ? 'function' : 'arrow';
 		if (type === 'function') func = func.replace(/function\s+\w+\s*/, 'function ');
 
 		const data = getStuff({ func, type });
@@ -207,13 +207,15 @@ export class ShardingUtils {
 		function getStuff({ func, type }: { func: string, type: 'function' | 'arrow' }) {
 			switch (type) {
 				case 'arrow': {
-					let [wrapScope, wrapArgs] = [false, false];
+					let [wrapScope, wrapArgs, isAsync] = [false, false, false];
+
+					func = func.startsWith('async') ? func.replace(/async\s*/, () => { isAsync = true; return ''; }) : func;
 
 					const stuff = func.split('=>').map((x) => x.trim());
 					const body = stuff.slice(1);
 					let args = stuff[0];
 
-					let actualBody = body.join('=>').trim();
+					let actualBody = body.join(' => ').trim();
 
 					if (args.startsWith('(')) { args = args.slice(1, -1); wrapArgs = true; }
 					if (actualBody.startsWith('{')) { actualBody = actualBody.slice(1, -1); wrapScope = true; }
@@ -221,14 +223,17 @@ export class ShardingUtils {
 					return {
 						args: args.split(',').map((x) => x.trim()).filter((x) => x),
 						body: actualBody.trim(),
+						isAsync,
 						wrapScope,
 						wrapArgs,
 					};
 				}
 				case 'function': {
-					let [wrapScope] = [true, true];
+					let [wrapScope, isAsync] = [true, false];
 
-					const stuff = func.split(') {', 1).map((x, i) => { x = x.trim(); return i === 0 ? x.slice(x.indexOf('(') + 1) : x.slice(0, -1); });
+					func = func.startsWith('async') ? func.replace(/async\s*/, () => { isAsync = true; return ''; }) : func;
+
+					const stuff = func.split(') {').map((x, i) => { x = x.trim(); return i === 0 ? x.slice(x.indexOf('(') + 1) : x.slice(0, -1); });
 					const body = stuff.slice(1);
 					let args = stuff[0];
 
@@ -242,18 +247,21 @@ export class ShardingUtils {
 						body: actualBody.trim(),
 						wrapScope,
 						wrapArgs: true,
+						isAsync,
 					};
 				}
 			}
 		}
 
-		function reconstruct({ args, body, wrapScope, wrapArgs }: DeconstructedFunction) {
+		function reconstruct({ args, body, wrapScope, wrapArgs, isAsync }: DeconstructedFunction) {
 			let argsStr = args.join(', ');
 
 			switch (type) {
 				case 'arrow': {
 					if (wrapArgs) argsStr = `(${argsStr})`;
 					if (wrapScope) body = `{ ${body} }`;
+					if (isAsync) argsStr = `async ${argsStr}`;
+
 					return `${argsStr} => ${body}`;
 				}
 				case 'function': {

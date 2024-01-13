@@ -110,7 +110,7 @@ export type SerializableInput<T, U = false> = T extends Serializable ? T : T ext
  * @export
  * @typedef {DeconstructedFunction}
  */
-export type DeconstructedFunction = { args: string[], body: string, wrapScope: boolean, wrapArgs: boolean };
+export type DeconstructedFunction = { args: string[], body: string, wrapScope: boolean, wrapArgs: boolean; isAsync: boolean; };
 /**
  * Any object or data.
  * @export
