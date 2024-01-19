@@ -59,6 +59,13 @@ export enum MessageTypes {
 }
 
 /**
+ * Recursive array of strings.
+ * @export
+ * @typedef {RecursiveStringArray}
+ */
+export type RecursiveStringArray = (RecursiveStringArray | string)[];
+
+/**
  * Awaitable type.
  * @export
  * @typedef {Awaitable}
@@ -110,7 +117,7 @@ export type SerializableInput<T, U = false> = T extends Serializable ? T : T ext
  * @export
  * @typedef {DeconstructedFunction}
  */
-export type DeconstructedFunction = { args: string[], body: string, wrapScope: boolean, wrapArgs: boolean; isAsync: boolean; };
+export type DeconstructedFunction = { args: (string | string[])[], body: string, wrapScope: boolean, wrapArgs: boolean; isAsync: boolean; };
 /**
  * Any object or data.
  * @export

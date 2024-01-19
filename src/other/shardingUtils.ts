@@ -1,4 +1,4 @@
-import { DeconstructedFunction, DefaultOptions, Endpoints, ValidIfSerializable } from '../types';
+import { DeconstructedFunction, DefaultOptions, Endpoints, RecursiveStringArray, ValidIfSerializable } from '../types';
 
 /**
  * All possible characters for nonce generation.
@@ -201,7 +201,7 @@ export class ShardingUtils {
 		const type: 'function' | 'arrow' = (func.startsWith('function') || func.startsWith('async function')) ? 'function' : 'arrow';
 		if (type === 'function') func = func.replace(/function\s+\w+\s*/, 'function ');
 
-		const data = getStuff({ func, type });
+		const data = getStuff({ func, type }); console.log(data, type);
 		return reconstruct({ ...data, ...insertBodyCheck(data) });
 
 		function getStuff({ func, type }: { func: string, type: 'function' | 'arrow' }) {
@@ -218,10 +218,20 @@ export class ShardingUtils {
 					let actualBody = body.join(' => ').trim();
 
 					if (args.startsWith('(')) { args = args.slice(1, -1); wrapArgs = true; }
-					if (actualBody.startsWith('{')) { actualBody = actualBody.slice(1, -1); wrapScope = true; }
-
+					if (actualBody.match(/^\{[\s\S]*\}$/)) {
+						wrapScope = false;
+						actualBody = actualBody.slice(1, -1).trim();
+						if (actualBody.endsWith(';')) actualBody = actualBody.slice(0, -1).trim();
+					}
 					return {
-						args: args.split(',').map((x) => x.trim()).filter((x) => x),
+						args: args.split(',').map((x) => {
+							x = x.trim();
+							if (x.includes('{')) {
+								const destructured = x.slice(x.indexOf('{') + 1, x.indexOf('}')).split(',').map((x) => x.trim().split(' ').pop() || '').filter((x) => x);
+								return destructured.length ? destructured : x;
+							} else return x.split(' ').pop() || '';
+
+						}).filter((x) => x),
 						body: actualBody.trim(),
 						isAsync,
 						wrapScope,
@@ -233,17 +243,28 @@ export class ShardingUtils {
 
 					func = func.startsWith('async') ? func.replace(/async\s*/, () => { isAsync = true; return ''; }) : func;
 
-					const stuff = func.split(') {').map((x, i) => { x = x.trim(); return i === 0 ? x.slice(x.indexOf('(') + 1) : x.slice(0, -1); });
+					const stuff = func.split(') {').map((x, i) => { x = x.trim(); return i === 0 ? x.slice(x.indexOf('(') + 1) : `{ ${x}`; });
 					const body = stuff.slice(1);
 					let args = stuff[0];
 
 					let actualBody = body.join(') {').trim();
 
 					if (args.startsWith('(')) { args = args.slice(1, -1); }
-					if (actualBody.startsWith('{')) { actualBody = actualBody.slice(1, -1); wrapScope = false; }
+					if (actualBody.match(/^\{[\s\S]*\}$/)) {
+						wrapScope = false;
+						actualBody = actualBody.slice(1, -1).trim();
+						if (actualBody.endsWith(';')) actualBody = actualBody.slice(0, -1).trim();
+					}
 
 					return {
-						args: args.split(',').map((x) => x.trim()).filter((x) => x),
+						args: args.split(',').map((x) => {
+							x = x.trim();
+							if (x.includes('{')) {
+								const destructured = x.slice(x.indexOf('{') + 1, x.indexOf('}')).split(',').map((x) => x.trim().split(' ').pop() || '').filter((x) => x);
+								return destructured.length ? destructured : x;
+							} else return x.split(' ').pop() || '';
+
+						}).filter((x) => x),
 						body: actualBody.trim(),
 						wrapScope,
 						wrapArgs: true,
@@ -254,7 +275,7 @@ export class ShardingUtils {
 		}
 
 		function reconstruct({ args, body, wrapScope, wrapArgs, isAsync }: DeconstructedFunction) {
-			let argsStr = args.join(', ');
+			let argsStr = makeArgs(args);
 
 			switch (type) {
 				case 'arrow': {
@@ -272,9 +293,16 @@ export class ShardingUtils {
 			}
 		}
 
+		function makeArgs(args: RecursiveStringArray): string {
+			return args.map((x) => {
+				if (typeof x === 'string') return x;
+				else return `{ ${makeArgs(x)} }`;
+			}).join(', ');
+		}
+
 		function insertBodyCheck({ args, body, wrapScope }: Omit<DeconstructedFunction, 'wrapArgs'>) {
 			if (args.length < 3) return { body: body };
-			return { wrapScope: true, body: `if (!${args[2]}) return; ${wrapScope ? body : `return ${body};`}` };
+			return { wrapScope: true, body: `if (!${args[2]}) return;\n ${wrapScope ? body : `return ${body};`}` };
 		}
 	}
 }
