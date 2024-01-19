@@ -63,8 +63,8 @@ export class ShardingUtils {
 	 */
 	public static isSerializable<T>(value: T): value is T & ValidIfSerializable<T> {
 		if (typeof value === 'object' && value !== null && value.constructor !== Object && value.constructor !== Array) return false;
-		if (typeof value === 'function') return false;
-		if (typeof value === 'symbol') return false;
+		else if (typeof value === 'function') return false;
+		else if (typeof value === 'symbol') return false;
 
 		return true;
 	}
@@ -125,7 +125,7 @@ export class ShardingUtils {
 	 */
 	public static shardIdForGuildId(guildId: string, totalShards: number): number {
 		if (!guildId?.match(/^[0-9]+$/)) throw new Error('No valid GuildId Provided.');
-		if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided.');
+		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided.');
 
 		const shard = Number(BigInt(guildId) >> BigInt(22)) % totalShards;
 		if (shard < 0) throw new Error('SHARD_MISCALCULATION_SHARDID_SMALLER_THAN_0 ' + `Calculated Shard: ${shard}, guildId: ${guildId}, totalShards: ${totalShards}`);
@@ -142,8 +142,8 @@ export class ShardingUtils {
 	 */
 	public static clusterIdForShardId(shardId: string, totalShards: number, totalClusters: number): number {
 		if (!shardId?.match(/^[0-9]+$/)) throw new Error('No valid Shard Id Provided.');
-		if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided.');
-		if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided.');
+		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided.');
+		else if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided.');
 
 		const middlePart = Number(shardId) === 0 ? 0 : Number(shardId) / Math.ceil(totalShards / totalClusters);
 		return Number(shardId) === 0 ? 0 : (Math.ceil(middlePart) - (middlePart % 1 !== 0 ? 1 : 0));
@@ -158,8 +158,8 @@ export class ShardingUtils {
 	 */
 	public static clusterIdForGuildId(guildId: string, totalShards: number, totalClusters: number): number {
 		if (!guildId?.match(/^[0-9]+$/)) throw new Error('No valid GuildId Provided.');
-		if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided.');
-		if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided.');
+		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided.');
+		else if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided.');
 
 		const shardId = this.shardIdForGuildId(guildId, totalShards);
 		return this.clusterIdForShardId(shardId.toString(), totalShards, totalClusters);
@@ -180,7 +180,7 @@ export class ShardingUtils {
 			headers: { Authorization: `Bot ${token.replace(/^Bot\s*/i, '')}` },
 		}).then((res) => {
 			if (res.ok) return res.json() as Promise<{ shards: number }>;
-			if (res.status === 401) throw new Error('DISCORD_TOKEN_INVALID | The provided token was invalid.');
+			else if (res.status === 401) throw new Error('DISCORD_TOKEN_INVALID | The provided token was invalid.');
 
 			throw res;
 		});

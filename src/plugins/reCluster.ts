@@ -32,7 +32,8 @@ export class ReClusterManager {
 	 */
 	public async start(options: ReClusterOptions): Promise<boolean> {
 		if (this.inProgress) throw new Error('RECLUSTER_IN_PROGRESS | ReClustering is already in progress.');
-		if (!this.manager.ready) throw new Error('CLUSTER_MANAGER_NOT_READY | All clusters must be ready before re-clustering.');
+		else if (!this.manager.ready) throw new Error('CLUSTER_MANAGER_NOT_READY | All clusters must be ready before re-clustering.');
+
 		if (!options.restartMode) options.restartMode = 'gracefulSwitch';
 
 		this.inProgress = true;

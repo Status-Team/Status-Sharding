@@ -115,7 +115,7 @@ export class Cluster extends EventEmitter {
 	 */
 	public async spawn(spawnTimeout: number = 30000): Promise<ChildProcess | WorkerThread> {
 		if (this.thread) throw new Error('CLUSTER ALREADY SPAWNED | Cluster ' + this.id + ' has already been spawned.');
-		if (!this.manager.file) throw new Error('NO FILE PROVIDED | Cluster ' + this.id + ' does not have a file provided.');
+		else if (!this.manager.file) throw new Error('NO FILE PROVIDED | Cluster ' + this.id + ' does not have a file provided.');
 
 		const options = {
 			...this.manager.options.clusterOptions,
@@ -371,8 +371,8 @@ export class Cluster extends EventEmitter {
 	 */
 	private _handleMessage(message: BaseMessage<'normal'> | BrokerMessage): void {
 		if (!message || '_data' in message) return this.manager.broker.handleMessage(message);
+		else if (!this.messageHandler) throw new Error('CLUSTERING_NO_MESSAGE_HANDLER | Cluster ' + this.id + ' does not have a message handler.');
 
-		if (!this.messageHandler) throw new Error('CLUSTERING_NO_MESSAGE_HANDLER | Cluster ' + this.id + ' does not have a message handler.');
 		this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);
 		this.messageHandler.handleMessage(message);
 

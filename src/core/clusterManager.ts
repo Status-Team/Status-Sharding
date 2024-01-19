@@ -87,11 +87,10 @@ export class ClusterManager extends EventEmitter {
 		super();
 
 		if (!file) throw new Error('CLIENT_INVALID_OPTION | No File specified.');
-
 		this.file = path.isAbsolute(file) ? file : path.resolve(process.cwd(), file);
-		if (!fs.statSync(this.file)?.isFile()) throw new Error('CLIENT_INVALID_OPTION | Provided is file is not type of file.');
 
-		if (options.mode && options.mode !== 'worker' && options.mode !== 'process') throw new RangeError('CLIENT_INVALID_OPTION | Cluster mode must be "worker" or "process".');
+		if (!fs.statSync(this.file)?.isFile()) throw new Error('CLIENT_INVALID_OPTION | Provided is file is not type of file.');
+		else if (options.mode && options.mode !== 'worker' && options.mode !== 'process') throw new RangeError('CLIENT_INVALID_OPTION | Cluster mode must be "worker" or "process".');
 
 		this.options = {
 			...options,
@@ -150,9 +149,9 @@ export class ClusterManager extends EventEmitter {
 		if (this.options.totalShards < 1) this.options.totalShards = 1;
 		if (this.options.totalClusters < 1) this.options.totalClusters = 1;
 
-		if (this.options.totalClusters > this.options.totalShards) throw new Error('CLIENT_INVALID_OPTION | Total Clusters cannot be more than Total Shards.');
-		if (this.options.shardsPerClusters > this.options.totalShards) throw new Error('CLIENT_INVALID_OPTION | Shards per Cluster cannot be more than Total Shards.');
-		if (this.options.shardsPerClusters > (this.options.totalShards / this.options.totalClusters)) throw new Error('CLIENT_INVALID_OPTION | Shards per Cluster cannot be more than Total Shards divided by Total Clusters.');
+		else if (this.options.totalClusters > this.options.totalShards) throw new Error('CLIENT_INVALID_OPTION | Total Clusters cannot be more than Total Shards.');
+		else if (this.options.shardsPerClusters > this.options.totalShards) throw new Error('CLIENT_INVALID_OPTION | Shards per Cluster cannot be more than Total Shards.');
+		else if (this.options.shardsPerClusters > (this.options.totalShards / this.options.totalClusters)) throw new Error('CLIENT_INVALID_OPTION | Shards per Cluster cannot be more than Total Shards divided by Total Clusters.');
 
 		if (!this.options.shardList?.length) this.options.shardList = new Array(this.options.totalShards).fill(0).map((_, i) => i);
 		if (this.options.shardsPerClusters) this.options.totalClusters = Math.ceil((this.options.shardList?.length || 0) / this.options.shardsPerClusters) || 1;
@@ -160,20 +159,12 @@ export class ClusterManager extends EventEmitter {
 		if (!this.options.clusterList?.length) this.options.clusterList = new Array(this.options.totalClusters).fill(0).map((_, i) => i);
 		if (this.options.clusterList.length !== this.options.totalClusters) this.options.totalClusters = this.options.clusterList.length;
 
-		if (this.options.totalShards < 1) throw new Error('CLIENT_INVALID_OPTION | Total Shards must be at least 1.');
-		if (this.options.totalClusters < 1) throw new Error('CLIENT_INVALID_OPTION | Total Clusters must be at least 1.');
-		if (this.options.shardsPerClusters < 1) throw new Error('CLIENT_INVALID_OPTION | Shards Per Cluster must be at least 1.');
+		else if (this.options.shardsPerClusters < 1) throw new Error('CLIENT_INVALID_OPTION | Shards Per Cluster must be at least 1.');
+		else if (this.options.totalShards < this.options.shardList.length) throw new Error('CLIENT_INVALID_OPTION | Shard List is bigger than Total Shards.');
+		else if (this.options.totalClusters < this.options.clusterList.length) throw new Error('CLIENT_INVALID_OPTION | Cluster List is bigger than Total Clusters.');
 
-		if (this.options.totalShards < this.options.shardList.length) throw new Error('CLIENT_INVALID_OPTION | Shard List is bigger than Total Shards.');
-		if (this.options.totalClusters < this.options.clusterList.length) throw new Error('CLIENT_INVALID_OPTION | Cluster List is bigger than Total Clusters.');
-
-		if (this.options.shardsPerClusters > this.options.totalShards) throw new Error('CLIENT_INVALID_OPTION | Shards Per Cluster is bigger than Total Shards.');
-
-		if (this.options.shardList.some((shard) => shard < 0)) throw new Error('CLIENT_INVALID_OPTION | Shard List has invalid shards.');
-		if (this.options.clusterList.some((cluster) => cluster < 0)) throw new Error('CLIENT_INVALID_OPTION | Cluster List has invalid clusters.');
-
-		if (this.options.shardList.some((shard) => shard < 0)) throw new Error('CLIENT_INVALID_OPTION | Shard List has invalid shards.');
-		if (this.options.clusterList.some((cluster) => cluster < 0)) throw new Error('CLIENT_INVALID_OPTION | Cluster List has invalid clusters.');
+		else if (this.options.shardList.some((shard) => shard < 0)) throw new Error('CLIENT_INVALID_OPTION | Shard List has invalid shards.');
+		else if (this.options.clusterList.some((cluster) => cluster < 0)) throw new Error('CLIENT_INVALID_OPTION | Cluster List has invalid clusters.');
 
 		this._debug(`[ClusterManager] Spawning ${this.options.totalClusters} Clusters with ${this.options.totalShards} Shards.`);
 
@@ -286,14 +277,14 @@ export class ClusterManager extends EventEmitter {
 	 */
 	public async broadcastEval<T, P extends object, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
-		if ((options?.cluster !== undefined || options?.shard !== undefined) && options?.guildId !== undefined) return Promise.reject(new Error('CLUSTERING_INVALID_OPTION | Cannot use both guildId and cluster/shard options.'));
+		else if ((options?.cluster !== undefined || options?.shard !== undefined) && options?.guildId !== undefined) return Promise.reject(new Error('CLUSTERING_INVALID_OPTION | Cannot use both guildId and cluster/shard options.'));
 
 		if (options?.cluster !== undefined) {
 			const clusterIds = Array.isArray(options.cluster) ? options.cluster : [options.cluster];
 			if (clusterIds.some((c) => c < 0)) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 		}
 
-		if (options?.guildId) options.cluster = ShardingUtils.clusterIdForGuildId(options.guildId, this.options.totalShards, this.options.totalClusters);
+		if (options?.guildId) options.cluster = await new Promise<number>((resolve) => resolve(ShardingUtils.clusterIdForGuildId(options.guildId!, this.options.totalShards, this.options.totalClusters))).catch(() => undefined);
 
 		if (options?.shard !== undefined) {
 			const shardIds = Array.isArray(options.shard) ? options.shard : [options.shard];
@@ -305,7 +296,8 @@ export class ClusterManager extends EventEmitter {
 			}
 
 			if (clusterIds.size === 0) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | No clusters found for the given shard Ids.'));
-			else if (clusterIds.size === 1) options.cluster = clusterIds.values().next().value;
+
+			if (clusterIds.size === 1) options.cluster = clusterIds.values().next().value;
 			else options.cluster = Array.from(clusterIds);
 		}
 
@@ -349,7 +341,7 @@ export class ClusterManager extends EventEmitter {
 	 */
 	public async evalOnClusterClient<T, P extends object, C = ShardingClient>(cluster: number, script: ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
-		if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
+		else if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
 		const cl = this.clusters.get(cluster);
 
@@ -369,7 +361,7 @@ export class ClusterManager extends EventEmitter {
 	 */
 	public async evalOnCluster<T, P extends object>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
-		if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
+		else if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
 		const cl = this.clusters.get(cluster);
 

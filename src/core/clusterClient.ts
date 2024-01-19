@@ -275,7 +275,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public send<T extends Serializable>(message: SerializableInput<T>): Promise<void> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
-		if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
 
 		return this.process.send({
@@ -301,7 +302,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf: boolean = false): Promise<void> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
-		if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
 
 		return this.process.send<BaseMessageInput<'normal'>>({
@@ -327,9 +329,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public _sendInstance<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
-		if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
-
-		if (!('_type' in message) || !('data' in message)) return Promise.reject(new Error('CLUSTERING_INVALID_MESSAGE | Invalid message object.' + JSON.stringify(message)));
+		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+		else if (!('_type' in message) || !('data' in message)) return Promise.reject(new Error('CLUSTERING_INVALID_MESSAGE | Invalid message object.' + JSON.stringify(message)));
 
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
 		return this.process.send(message) as Promise<void>;
@@ -354,8 +355,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public async evalOnManager<T, P extends object, M = ClusterManager>(script: ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<ValidIfSerializable<T>> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
-		if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
-		if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function.'));
+		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+		else if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function.'));
 
 		const nonce = ShardingUtils.generateNonce();
 
@@ -390,8 +391,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public async broadcastEval<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
-		if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
-		if (typeof script !== 'string' && typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function or string.'));
+		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+		else if (typeof script !== 'string' && typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function or string.'));
 
 		const nonce = ShardingUtils.generateNonce();
 
@@ -428,9 +429,9 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public async evalOnGuild<T, P extends object, C = InternalClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
-		if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
-		if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function.'));
-		if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Id must be a string.'));
+		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+		else if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function.'));
+		else if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Id must be a string.'));
 
 		const nonce = ShardingUtils.generateNonce();
 
@@ -487,7 +488,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public request<T extends Serializable>(message: SerializableInput<T>, options: { timeout?: number } = {}): Promise<ValidIfSerializable<T>> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
-		if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
 
 		const nonce = ShardingUtils.generateNonce();
@@ -508,7 +510,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public respawnAll(options: { clusterDelay?: number; respawnDelay?: number; timeout?: number } = {}): Promise<void> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
-		if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
 
 		return this.process.send({
@@ -556,7 +559,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public triggerReady(): boolean {
 		if (this.ready) return this.ready;
-		if (!this.process) throw new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.');
+		else if (!this.process) throw new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.');
 
 		this.ready = true;
 
@@ -577,7 +580,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public triggerMaintenance(maintenance: string, all: boolean = false): string {
 		if (this.maintenance === maintenance) return this.maintenance;
-		if (!this.process) throw new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.');
+		else if (!this.process) throw new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.');
+
 		this.maintenance = maintenance;
 
 		this.process.send({
@@ -600,8 +604,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 */
 	public spawnNextCluster(): Promise<void> {
 		if (this.info.ClusterQueueMode === 'auto') throw new Error('Next Cluster can just be spawned when the queue is not on auto mode.');
-		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
-		if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
+		else if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
+		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
 
 		return this.process.send({
 			_type: MessageTypes.ClientSpawnNextCluster,
