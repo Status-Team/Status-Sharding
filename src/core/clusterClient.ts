@@ -414,9 +414,10 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 * @template {unknown} T - The type of the result.
 	 * @template {object} P - The type of the context.
 	 * @template {unknown} [C=InternalClient] - The type of the client.
-	 * @param {string} guildId - The guild id to evaluate the script on.
+	 * @template {boolean} [E=false] - Whether to use experimental mode.
+	 * @param {string} guildId - The ID of the guild to use.
 	 * @param {((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>)} script - The script to evaluate.
-	 * @param {?{ context?: P; timeout?: number; }} [options] - The options for the eval.
+	 * @param {?{ context?: P; timeout?: number; experimental?: E; }} [options] - The options for the eval.
 	 * @returns {Promise<ValidIfSerializable<T>>} A promise that resolves with the result of the eval.
 	 * @throws {Error} - When there is no process to send the message to.
 	 * @throws {Error} - When the cluster is not ready yet.

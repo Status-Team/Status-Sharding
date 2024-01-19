@@ -375,9 +375,10 @@ export class ClusterManager extends EventEmitter {
 	 * @template {unknown} T - The type of the result.
 	 * @template {object} P - The type of the context.
 	 * @template {unknown} [C=ShardingClient] - The type of the client.
-	 * @param {string} guildId - The guild to run the method on.
+	 * @template {boolean} [E=false] - Whether to use experimental mode.
+	 * @param {string} guildId - The ID of the guild to use.
 	 * @param {((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>)} script - The script to evaluate.
-	 * @param {?{ context?: P; timeout?: number; }} [options] - The options for the evaluation.
+	 * @param {?{ context?: P; timeout?: number; experimental?: E; }} [options] - The options for the eval.
 	 * @returns {Promise<ValidIfSerializable<T>>} The result of the evaluation.
 	 */
 	public async evalOnGuild<T, P extends object, C = ShardingClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {

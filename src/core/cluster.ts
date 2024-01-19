@@ -312,9 +312,10 @@ export class Cluster extends EventEmitter {
 	 * @template {unknown} T - The type of the result of the script.
 	 * @template {object} P - The type of the context of the script.
 	 * @template {unknown} [C=ShardingClient] - The type of the client to use.
+	 * @template {boolean} [E=false] - Whether to use experimental mode.
 	 * @param {string} guildId - The ID of the guild to use.
 	 * @param {((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>)} script - The script to evaluate.
-	 * @param {?{ context?: P; timeout?: number; }} [options] - The options for the eval.
+	 * @param {?{ context?: P; timeout?: number; experimental?: E; }} [options] - The options for the eval.
 	 * @returns {Promise<ValidIfSerializable<T>>} The promise that resolves with the result of the script.
 	 * @throws {Error} - If the cluster does not have a child process/worker.
 	 * @throws {Error} - If script is not a function.
