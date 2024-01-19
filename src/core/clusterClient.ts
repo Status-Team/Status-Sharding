@@ -426,17 +426,17 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 *  return guild.name;
 	 * }); // Digital's Basement
 	 */
-	public async evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: ((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
+	public async evalOnGuild<T, P extends object, C = InternalClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to.'));
 		if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet.'));
 		if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function.'));
-		if (!guildId) return Promise.reject(new Error('CLUSTERING_NO_GUILD_ID | No guild id provided.'));
+		if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Id must be a string.'));
 
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process.send({
 			data: {
-				script: `(${ShardingUtils.guildEvalParser(script)})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`,
+				script: `(${options?.experimental ? ShardingUtils.guildEvalParser(script) : script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`,
 				options: {
 					...options,
 					guildId,

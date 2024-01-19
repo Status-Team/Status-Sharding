@@ -322,7 +322,7 @@ export class Cluster extends EventEmitter {
 	 * cluster.evalOnGuild('945340723425837066', (client, context, guild) => guild.name); // Digital's Basement
 	 * cluster.evalOnGuild('945340723425837066', (client, context, guild) => guild.name + context, { context: ' is cool!' }); // Digital's Basement is cool!
 	 */
-	public async evalOnGuild<T, P extends object, C = ShardingClient>(guildId: string, script: ((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>), options?: { context?: P; timeout?: number; }): Promise<ValidIfSerializable<T>> {
+	public async evalOnGuild<T, P extends object, C = ShardingClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
 		else if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_TYPE | Cluster ' + this.id + ' eval script must be a function.'));
 

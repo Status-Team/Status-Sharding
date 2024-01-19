@@ -141,7 +141,7 @@ export class ShardingUtils {
 	 * @returns {number} The cluster id.
 	 */
 	public static clusterIdForShardId(shardId: string, totalShards: number, totalClusters: number): number {
-		if (!shardId?.match(/^[0-9]+$/)) throw new Error('No valid ShardId Provided.');
+		if (!shardId?.match(/^[0-9]+$/)) throw new Error('No valid Shard Id Provided.');
 		if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided.');
 		if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided.');
 
