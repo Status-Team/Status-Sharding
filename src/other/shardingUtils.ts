@@ -201,7 +201,7 @@ export class ShardingUtils {
 		const type: 'function' | 'arrow' = (func.startsWith('function') || func.startsWith('async function')) ? 'function' : 'arrow';
 		if (type === 'function') func = func.replace(/function\s+\w+\s*/, 'function ');
 
-		const data = getStuff({ func, type }); console.log(data, type);
+		const data = getStuff({ func, type });
 		return reconstruct({ ...data, ...insertBodyCheck(data) });
 
 		function getStuff({ func, type }: { func: string, type: 'function' | 'arrow' }) {
