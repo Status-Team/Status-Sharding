@@ -302,7 +302,13 @@ export class ShardingUtils {
 
 		function insertBodyCheck({ args, body, wrapScope }: Omit<DeconstructedFunction, 'wrapArgs'>) {
 			if (args.length < 3) return { body: body };
-			return { wrapScope: true, body: `if (!${args[2]}) return;\n ${wrapScope ? body : `return ${body};`}` };
+
+			return {
+				wrapScope: true,
+				body: !body.match(new RegExp(`if\\s*\\(\\s*!\\s*${args[2]}\\s*\\)\\s*return`, 'g'))
+					? `if (!${args[2]}) return;\n ${wrapScope ? body : `return ${body};`}`
+					: body,
+			};
 		}
 	}
 }
