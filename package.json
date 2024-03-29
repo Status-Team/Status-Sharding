@@ -9,7 +9,7 @@
 		"build": "tsc --build",
 		"watch": "tsc --watch",
 		"lint": "eslint . --ext .ts",
-		"tsup": "tsup"
+		"docs": "typedoc --out docs src"
 	},
 	"main": "dist/index.js",
 	"repository": "https://github.com/Status-Team/Status-Sharding",
