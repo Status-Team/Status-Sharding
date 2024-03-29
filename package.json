@@ -1,10 +1,10 @@
 {
-	"version": "1.6.4",
+	"version": "1.6.5",
 	"name": "status-sharding",
 	"author": "Digital39999",
 	"scripts": {
-		"ts": "yarn install typescript --save-dev -g",
-		"init": "yarn install && yarn run build && yarn run start",
+		"ts": "pnpm install typescript --save-dev -g",
+		"init": "pnpm install && pnpm run build && pnpm run start",
 		"start": "node dist/index.js",
 		"build": "tsc --build",
 		"watch": "tsc --watch",
@@ -41,7 +41,6 @@
 		"eslint": "^8.45.0",
 		"typescript": "^5.1.6"
 	},
-	"packageManager": "yarn@3.2.4",
 	"engines": {
 		"node": ">=18.4.0"
 	}

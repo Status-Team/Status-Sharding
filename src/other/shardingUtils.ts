@@ -124,8 +124,8 @@ export class ShardingUtils {
 	 * @returns {number} The shard id.
 	 */
 	public static shardIdForGuildId(guildId: string, totalShards: number): number {
-		if (!guildId?.match(/^[0-9]+$/)) throw new Error('No valid GuildId Provided.');
-		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided.');
+		if (!guildId?.match(/^[0-9]+$/)) throw new Error('No valid GuildId Provided (#1).');
+		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided (#1).');
 
 		const shard = Number(BigInt(guildId) >> BigInt(22)) % totalShards;
 		if (shard < 0) throw new Error('SHARD_MISCALCULATION_SHARDID_SMALLER_THAN_0 ' + `Calculated Shard: ${shard}, guildId: ${guildId}, totalShards: ${totalShards}`);
@@ -142,8 +142,8 @@ export class ShardingUtils {
 	 */
 	public static clusterIdForShardId(shardId: string, totalShards: number, totalClusters: number): number {
 		if (!shardId?.match(/^[0-9]+$/)) throw new Error('No valid Shard Id Provided.');
-		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided.');
-		else if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided.');
+		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided (#2).');
+		else if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided (#1).');
 
 		const middlePart = Number(shardId) === 0 ? 0 : Number(shardId) / Math.ceil(totalShards / totalClusters);
 		return Number(shardId) === 0 ? 0 : (Math.ceil(middlePart) - (middlePart % 1 !== 0 ? 1 : 0));
@@ -157,9 +157,9 @@ export class ShardingUtils {
 	 * @returns {number} The cluster id.
 	 */
 	public static clusterIdForGuildId(guildId: string, totalShards: number, totalClusters: number): number {
-		if (!guildId?.match(/^[0-9]+$/)) throw new Error('No valid GuildId Provided.');
-		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided.');
-		else if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided.');
+		if (!guildId?.match(/^[0-9]+$/)) throw new Error('No valid GuildId Provided (#2).');
+		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided (#3).');
+		else if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided (#2).');
 
 		const shardId = this.shardIdForGuildId(guildId, totalShards);
 		return this.clusterIdForShardId(shardId.toString(), totalShards, totalClusters);

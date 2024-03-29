@@ -89,7 +89,7 @@ export class ClusterManager extends EventEmitter {
 		if (!file) throw new Error('CLIENT_INVALID_OPTION | No File specified.');
 		this.file = path.isAbsolute(file) ? file : path.resolve(process.cwd(), file);
 
-		if (!fs.statSync(this.file)?.isFile()) throw new Error('CLIENT_INVALID_OPTION | Provided is file is not type of file.');
+		if (!fs.statSync(this.file)?.isFile()) throw new Error('CLIENT_INVALID_OPTION | Provided file is not an actual file.');
 		else if (options.mode && options.mode !== 'worker' && options.mode !== 'process') throw new RangeError('CLIENT_INVALID_OPTION | Cluster mode must be "worker" or "process".');
 
 		this.options = {
@@ -276,7 +276,7 @@ export class ClusterManager extends EventEmitter {
 	 * @returns {Promise<ValidIfSerializable<T>[]>} The result of the evaluation.
 	 */
 	public async broadcastEval<T, P extends object, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
-		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
+		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned (#1).'));
 		else if ((options?.cluster !== undefined || options?.shard !== undefined) && options?.guildId !== undefined) return Promise.reject(new Error('CLUSTERING_INVALID_OPTION | Cannot use both guildId and cluster/shard options.'));
 
 		if (options?.cluster !== undefined) {
@@ -340,12 +340,12 @@ export class ClusterManager extends EventEmitter {
 	 * @returns {Promise<ValidIfSerializable<T>>} The result of the evaluation.
 	 */
 	public async evalOnClusterClient<T, P extends object, C = ShardingClient>(cluster: number, script: ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
-		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
+		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned (#2).'));
 		else if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
 		const cl = this.clusters.get(cluster);
 
-		if (!cl) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found.'));
+		if (!cl) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found (#1).'));
 		return cl.evalOnClient<T, P, C>(script, options);
 	}
 
@@ -360,12 +360,12 @@ export class ClusterManager extends EventEmitter {
 	 * @returns {Promise<ValidIfSerializable<T>>} The result of the evaluation.
 	 */
 	public async evalOnCluster<T, P extends object>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
-		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
+		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned (#3).'));
 		else if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
 		const cl = this.clusters.get(cluster);
 
-		if (!cl) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found.'));
+		if (!cl) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found (#2).'));
 		return cl.eval<T, P>(script, options);
 	}
 
@@ -382,7 +382,7 @@ export class ClusterManager extends EventEmitter {
 	 * @returns {Promise<ValidIfSerializable<T>>} The result of the evaluation.
 	 */
 	public async evalOnGuild<T, P extends object, C = ShardingClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {
-		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.'));
+		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned (#4).'));
 		else if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Id must be a string.'));
 
 		return this.broadcastEval<T, P>(`(${options?.experimental ? ShardingUtils.guildEvalParser(script) : script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`, {

@@ -55,7 +55,7 @@ export class ReClusterManager {
 				args: [this.manager.options.spawnOptions.timeout !== -1 ? this.manager.options.spawnOptions.timeout + this.manager.options.spawnOptions.delay * length : this.manager.options.spawnOptions.timeout],
 				timeout: (this.manager.options.spawnOptions.delay || 8000) * length,
 				run: async (...a: number[]) => {
-					if (!this.manager) throw new Error('Manager is missing on ReClusterManager.');
+					if (!this.manager) throw new Error('Manager is missing on ReClusterManager (#1).');
 
 					const cluster = this.manager.createCluster(clusterId, listOfShardsForCluster[i], true);
 					newClusters.set(clusterId, cluster);
@@ -63,7 +63,7 @@ export class ReClusterManager {
 					this.manager._debug(`[ReClustering] [Cluster ${clusterId}] Spawning Cluster.`);
 					const c = await cluster.spawn(...a);
 
-					if (!this.manager) throw new Error('Manager is missing on ReClusterManager.');
+					if (!this.manager) throw new Error('Manager is missing on ReClusterManager (#2).');
 					this.manager._debug(`[ReClustering] [Cluster ${clusterId}] Cluster Ready.`);
 
 					if (options.restartMode === 'rolling') {

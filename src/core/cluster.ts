@@ -174,7 +174,7 @@ export class Cluster extends EventEmitter {
 	 * @throws {Error} - If the cluster does not have a child process/worker.
 	 */
 	public async kill(options?: ClusterKillOptions): Promise<void> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
+		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#1).'));
 
 		this.thread.kill();
 		if (this.thread) this.thread = null;
@@ -211,7 +211,7 @@ export class Cluster extends EventEmitter {
 	 * cluster.send({ id: '797012765352001557', username: 'Digital', discriminator: '3999' });
 	 */
 	public async send<T extends Serializable>(message: SerializableInput<T>): Promise<void> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
+		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#2).'));
 		this.manager._debug(`[IPC] [Cluster ${this.id}] Sending message to child.`);
 
 		return this.thread.send({
@@ -233,7 +233,7 @@ export class Cluster extends EventEmitter {
 	 * cluster.request({ customMessage: 'Hello world!' });
 	 */
 	public async request<T extends Serializable, O>(message: SerializableInput<T>, options: { timeout?: number; } = {}): Promise<Serialized<O>> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
+		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#3).'));
 		const nonce = ShardingUtils.generateNonce();
 
 		this.thread.send<BaseMessage<'reply'>>({
@@ -289,7 +289,7 @@ export class Cluster extends EventEmitter {
 	 * cluster.evalOnClient((client, context) => client.cluster.id + context, { context: 1 }); // 0 + 1
 	 */
 	public async evalOnClient<T, P extends object, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
+		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#4).'));
 		else if (typeof script !== 'string' && typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_TYPE | Cluster ' + this.id + ' eval script must be a string or function.'));
 
 		const nonce = ShardingUtils.generateNonce();
@@ -324,7 +324,7 @@ export class Cluster extends EventEmitter {
 	 * cluster.evalOnGuild('945340723425837066', (client, context, guild) => guild.name + context, { context: ' is cool!' }); // Digital's Basement is cool!
 	 */
 	public async evalOnGuild<T, P extends object, C = ShardingClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
+		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#5).'));
 		else if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_TYPE | Cluster ' + this.id + ' eval script must be a function.'));
 
 		return this.manager.evalOnGuild(guildId, script, options);
@@ -358,7 +358,7 @@ export class Cluster extends EventEmitter {
 	 * cluster.sendInstance({ _type: MessageTypes.CustomMessage, _nonce: '1234567890', data: { id: '797012765352001557', username: 'Digital', discriminator: '3999' } });
 	 */
 	public _sendInstance<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker.'));
+		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#6).'));
 
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
 		return this.thread.send(message);
