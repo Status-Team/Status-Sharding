@@ -81,8 +81,13 @@ export class Worker {
 	 */
 	public send<T extends Serializable>(message: SerializableInput<T, true> | unknown): Promise<void> {
 		return new Promise<void>((resolve) => {
-			this.process?.postMessage(message);
-			resolve();
+			try {
+				this.process?.postMessage(message);
+				resolve();
+			} catch (error) {
+				console.error('Data sending failed:', message);
+				throw error;
+			}
 		});
 	}
 }
@@ -117,8 +122,13 @@ export class WorkerClient {
 	 */
 	public send<T extends Serializable>(message: SerializableInput<T, true> | unknown): Promise<void> {
 		return new Promise<void>((resolve) => {
-			this.ipc?.postMessage(message);
-			resolve();
+			try {
+				this.ipc?.postMessage(message);
+				resolve();
+			} catch (error) {
+				console.error('Data sending failed:', message);
+				throw error;
+			}
 		});
 	}
 
