@@ -34,3 +34,6 @@ For more information, please refer to the [documentation](https://help.crni.xyz/
 - This clone was created by [Digital](https://crni.xyz/). The original can be found [here](https://github.com/meister03/discord-hybrid-sharding).
 - Special thanks to maintainers for their work on the initial package, which served as the foundation for this clone. Their contributions are greatly appreciated.
 - Please note that this clone is an independent project and may have diverged from the original discord-hybrid-sharding package in certain aspects.
+
+## Dependencies
+- [discord.js](https://www.npmjs.com/package/discord.js) (v14.14.1 or higher)

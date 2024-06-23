@@ -6,7 +6,7 @@ import { workerData } from 'worker_threads';
  * @export
  * @returns {ClusterClientData} The data.
  */
-export function getInfo() {
+export function getInfo(): ClusterClientData {
 	const clusterMode = process.env.CLUSTER_MANAGER_MODE;
 	if (clusterMode !== 'worker' && clusterMode !== 'process') throw new Error('NO_CLUSTER_MANAGER_MODE | ClusterManager Mode is not defined in the environment variables.');
 

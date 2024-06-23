@@ -26,7 +26,7 @@ export type ClientEventsModifiable = Omit<ClientEvents, 'ready'> & { ready: [cli
  * @typedef {ShardingClient}
  * @extends {DiscordClient}
  */
-export class ShardingClient extends DiscordClient {
+export class ShardingClient<Ready extends boolean = boolean> extends DiscordClient<Ready> {
 	/**
 	 * Cluster associated with this client.
 	 * @type {ClusterClient<this>}

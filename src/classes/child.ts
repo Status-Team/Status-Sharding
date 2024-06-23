@@ -91,6 +91,7 @@ export class Child {
 	 * @returns {Promise<boolean>} If the child process was killed.
 	 */
 	public kill(): Promise<boolean> {
+		// @ts-ignore
 		this.process?.removeAllListeners();
 		return Promise.resolve(this.process?.kill() || false);
 	}

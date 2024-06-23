@@ -69,6 +69,7 @@ export class Worker {
 	 * @returns {Promise<boolean>} The promise.
 	 */
 	public kill(): Promise<boolean> {
+		// @ts-ignore
 		this.process?.removeAllListeners();
 		return typeof this.process?.terminate() === 'number' ? Promise.resolve(true) : Promise.resolve(false);
 	}
