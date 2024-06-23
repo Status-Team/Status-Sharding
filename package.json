@@ -9,8 +9,9 @@
 		"build": "tsc --build",
 		"watch": "tsc --watch",
 		"lint": "eslint . --ext .ts",
-		"docs": "pnpm typedoc --out docs src",
-		"updates": "pnpm npm-check-updates -i --format group"
+		"docs": "pnpm typedoc --out docs src --validation.notExported false",
+		"updates": "pnpm npm-check-updates -i --format group",
+		"prepublish": "pnpm run build && pnpm run docs"
 	},
 	"main": "dist/index.js",
 	"repository": "https://github.com/Status-Team/Status-Sharding",
