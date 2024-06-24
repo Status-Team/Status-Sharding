@@ -13,7 +13,7 @@ export interface WorkerThreadOptions extends WorkerOptions {
 	 * Data to send to the cluster.
 	 * @type {(NodeJS.ProcessEnv | undefined)}
 	 */
-	clusterData: NodeJS.ProcessEnv | undefined;
+	clusterData?: NodeJS.ProcessEnv | undefined;
 }
 
 /**

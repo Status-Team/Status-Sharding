@@ -13,7 +13,7 @@ export interface ChildProcessOptions extends ForkOptions {
 	 * Data to send to the cluster.
 	 * @type {(NodeJS.ProcessEnv | undefined)}
 	 */
-	clusterData: NodeJS.ProcessEnv | undefined;
+	clusterData?: NodeJS.ProcessEnv | undefined;
 	/**
 	 * The arguments to pass to the child process.
 	 * @type {?(string[] | undefined)}
