@@ -32,15 +32,18 @@ export class ShardingUtils {
 	 * @template {unknown} T - The type of the array.
 	 * @param {T[]} array - The array to chunk.
 	 * @param {number} chunkSize - The size of the chunks.
+	 * @param {boolean} [equalize=false] - Whether to equalize items per chunk or to fill them up and last one possibly being smaller.
 	 * @returns {T[][]} The chunked array.
 	 */
-	public static chunkArray<T>(array: T[], chunkSize: number): T[][] {
+	public static chunkArray<T>(array: T[], chunkSize: number, equalize = false): T[][] {
 		const R = [] as T[][];
-
+	
+		if (equalize) chunkSize = Math.ceil(array.length / (Math.ceil(array.length / chunkSize)));
+	
 		for (let i = 0; i < array.length; i += chunkSize) {
 			R.push(array.slice(i, i + chunkSize));
 		}
-
+	
 		return R;
 	}
 
