@@ -40,10 +40,15 @@ export class ClusterHandler {
 				this.cluster.emit('ready', this.cluster);
 				this.cluster.manager._debug(`[Cluster ${this.cluster.id}] Cluster is ready.`);
 
-				if (this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {
+				const allReady = this.cluster.manager.clusters.every((cluster) => cluster.ready);
+				if (allReady && this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {
 					this.cluster.manager.ready = true;
 					this.cluster.manager.emit('ready', this.cluster.manager);
 					this.cluster.manager._debug('All clusters are ready.');
+
+					for (const _ of this.cluster.manager.clusters.values()) {
+						this.ipc.send({ _type: MessageTypes.ManagerReady } as BaseMessage<'readyOrSpawn'>);
+					}
 				}
 
 				break;
@@ -193,6 +198,10 @@ export class ClusterClientHandler<InternalClient extends ShardingClient = Shardi
 			case MessageTypes.ClientBroadcastResponse:
 			case MessageTypes.ClientBroadcastResponseError: {
 				this.clusterClient.promise.resolve(message);
+				break;
+			}
+			case MessageTypes.ManagerReady: {
+				this.clusterClient.emit('managerReady');
 				break;
 			}
 			case MessageTypes.ClientMaintenanceDisable: {

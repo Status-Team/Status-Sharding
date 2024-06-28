@@ -32,30 +32,31 @@ export const Endpoints = {
  * @enum {number}
  */
 export enum MessageTypes {
-    'MissingType',
-    'CustomRequest',
-    'CustomMessage',
-    'CustomReply',
-    'Heartbeat',
-    'HeartbeatAck',
-    'ClientBroadcast',
-    'ClientBroadcastRequest',
-    'ClientBroadcastResponse',
-    'ClientBroadcastResponseError',
-    'ClientRespawn',
-    'ClientRespawnAll',
-    'ClientMaintenance',
-    'ClientMaintenanceEnable',
-    'ClientMaintenanceDisable',
-    'ClientMaintenanceAll',
-    'ClientSpawnNextCluster',
-    'ClientReady',
-    'ClientEvalRequest',
-    'ClientEvalResponse',
-    'ClientEvalResponseError',
-    'ClientManagerEvalRequest',
-    'ClientManagerEvalResponse',
-    'ClientManagerEvalResponseError',
+    'MissingType' = 0,
+    'CustomRequest' = 1,
+    'CustomMessage' = 2,
+    'CustomReply' = 3,
+    'Heartbeat' = 4,
+    'HeartbeatAck' = 5,
+    'ClientBroadcast' = 6,
+    'ClientBroadcastRequest' = 7,
+    'ClientBroadcastResponse' = 8,
+    'ClientBroadcastResponseError' = 9,
+    'ClientRespawn' = 10,
+    'ClientRespawnAll' = 11,
+    'ClientMaintenance' = 12,
+    'ClientMaintenanceEnable' = 13,
+    'ClientMaintenanceDisable' = 14,
+    'ClientMaintenanceAll' = 15,
+    'ClientSpawnNextCluster' = 16,
+    'ClientReady' = 17,
+    'ClientEvalRequest' = 18,
+    'ClientEvalResponse' = 19,
+    'ClientEvalResponseError' = 20,
+    'ClientManagerEvalRequest' = 21,
+    'ClientManagerEvalResponse' = 22,
+    'ClientManagerEvalResponseError' = 23,
+    'ManagerReady' = 24,
 }
 
 /**
@@ -576,6 +577,11 @@ export interface ClusterEvents {
  * @typedef {ClusterClientEvents}
  */
 export interface ClusterClientEvents {
+    /**
+     * Emits when all clusters are ready.
+     * @type {[]}
+     */
+    managerReady: [];
     /**
      * Emits when message is sent from IPC.
      * @type {[message: ProcessMessage]}

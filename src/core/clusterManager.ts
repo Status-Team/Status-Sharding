@@ -1,4 +1,16 @@
-import { Awaitable, ClusterHeartbeatOptions, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized, ValidIfSerializable, Serializable, SerializableInput } from '../types';
+import {
+	Awaitable,
+	ClusterHeartbeatOptions,
+	ClusterManagerCreateOptions,
+	ClusterManagerEvents,
+	ClusterManagerOptions,
+	ClusteringMode,
+	EvalOptions,
+	Serialized,
+	ValidIfSerializable,
+	Serializable,
+	SerializableInput,
+} from '../types';
 import { HeartbeatManager } from '../plugins/heartbeat';
 import { ReClusterManager } from '../plugins/reCluster';
 import { ShardingUtils } from '../other/shardingUtils';
@@ -8,6 +20,7 @@ import { ShardingClient } from './clusterClient';
 import { ChildProcess } from 'child_process';
 import { Queue } from '../handlers/queue';
 import { Worker } from 'worker_threads';
+import CustomMap from '../other/map';
 import { Cluster } from './cluster';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
@@ -55,9 +68,9 @@ export class ClusterManager extends EventEmitter {
 	/**
 	 * A collection of all clusters the manager spawned.
 	 * @readonly
-	 * @type {Map<number, Cluster>}
+	 * @type {CustomMap<number, Cluster>}
 	 */
-	readonly clusters: Map<number, Cluster>;
+	readonly clusters: CustomMap<number, Cluster>;
 	/**
 	 * ReCluster Manager for the ClusterManager
 	 * @readonly
@@ -115,7 +128,7 @@ export class ClusterManager extends EventEmitter {
 
 		this.ready = false;
 		this.maintenance = '';
-		this.clusters = new Map();
+		this.clusters = new CustomMap();
 
 		this.promise = new PromiseHandler(this);
 		this.broker = new IPCBrokerManager(this);
