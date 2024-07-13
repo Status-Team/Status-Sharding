@@ -57,6 +57,7 @@ export enum MessageTypes {
     'ClientManagerEvalResponse' = 22,
     'ClientManagerEvalResponseError' = 23,
     'ManagerReady' = 24,
+    'Kill' = 25,
 }
 
 /**
@@ -90,7 +91,7 @@ export type UnknownFunction = (...args: unknown[]) => unknown;
  * @export
  * @typedef {HeartbeatData}
  */
-export type HeartbeatData = { restarts: number; missedBeats: number; };
+export type HeartbeatData = { restarts: number; missedBeats: number; killing: boolean; };
 /**
  * Type that removes null and undefined from a type.
  * @export
@@ -334,6 +335,11 @@ export interface ClusterSpawnOptions {
  * @typedef {ClusterHeartbeatOptions}
  */
 export interface ClusterHeartbeatOptions {
+    /**
+     * Whether the heartbeat system is enabled.
+     * @type {boolean}
+     */
+    enabled: boolean;
     /**
      * Maximum amount of missed heartbeats a cluster can have in the interval.
      * @type {?number}

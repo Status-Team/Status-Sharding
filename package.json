@@ -1,5 +1,5 @@
 {
-	"version": "1.7.0",
+	"version": "1.7.1",
 	"name": "status-sharding",
 	"author": "Digital39999",
 	"scripts": {
@@ -40,7 +40,7 @@
 		"@typescript-eslint/eslint-plugin": "7.13.1",
 		"@typescript-eslint/parser": "7.13.1",
 		"discord.js": "14.15.3",
-		"eslint": "9.5.0",
+		"eslint": "8.57.0",
 		"typescript": "5.5.2"
 	},
 	"engines": {

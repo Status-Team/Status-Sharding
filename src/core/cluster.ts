@@ -34,7 +34,7 @@ export class Cluster extends EventEmitter {
 	/**
 	 * Represents the last time the cluster received a heartbeat.
 	 */
-	public lastHeartbeatReceived: number;
+	public lastHeartbeatReceived?: number;
 
 	/**
 	 * Message processor that handles messages from the child process/worker/manager.
@@ -74,7 +74,6 @@ export class Cluster extends EventEmitter {
 	constructor(public manager: ClusterManager, public id: number, public shardList: number[]) {
 		super();
 
-		this.lastHeartbeatReceived = Date.now();
 		this.ready = false; this.thread = null;
 
 		this.envData = Object.assign({}, process.env, {
@@ -114,8 +113,8 @@ export class Cluster extends EventEmitter {
 	 * @throws {Error} - If the cluster does not have a file provided.
 	 */
 	public async spawn(spawnTimeout: number = 30000): Promise<ChildProcess | WorkerThread> {
-		if (this.thread) throw new Error('CLUSTER ALREADY SPAWNED | Cluster ' + this.id + ' has already been spawned.');
-		else if (!this.manager.file) throw new Error('NO FILE PROVIDED | Cluster ' + this.id + ' does not have a file provided.');
+		if (this.thread) throw new Error('CLUSTER_ALREADY_SPAWNED | Cluster ' + this.id + ' has already been spawned.');
+		else if (!this.manager.file) throw new Error('NO_FILE_PROVIDED | Cluster ' + this.id + ' does not have a file provided.');
 
 		const options = {
 			...this.manager.options.clusterOptions,
@@ -176,12 +175,13 @@ export class Cluster extends EventEmitter {
 	public async kill(options?: ClusterKillOptions): Promise<void> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#1).'));
 
-		this.thread.kill();
-		if (this.thread) this.thread = null;
+		const check = await this.thread.kill();
+		if (!check) return Promise.reject(new Error('CLUSTERING_KILL_FAILED | Cluster ' + this.id + ' failed to kill the child process/worker.'));
 
+		this.thread = null;
 		this.ready = false;
 
-		this.manager.heartbeat.removeCluster(this.id);
+		this.manager.heartbeat?.removeCluster(this.id);
 		this.manager._debug('[KILL] Cluster killed with reason: ' + (options?.reason || 'Unknown reason.'));
 	}
 
@@ -393,7 +393,7 @@ export class Cluster extends EventEmitter {
 	 * @returns {void} The void promise.
 	 */
 	private _handleExit(exitCode: number): void {
-		this.manager.heartbeat.removeCluster(this.id, true);
+		// this.manager.heartbeat?.removeCluster(this.id);
 		this.emit('death', this, this.thread?.process);
 
 		this.manager._debug('[Death] [Cluster ' + this.id + '] Cluster died with exit code ' + exitCode + '.');

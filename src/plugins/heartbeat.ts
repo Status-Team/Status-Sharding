@@ -33,11 +33,23 @@ export class HeartbeatManager {
 		this.beats = new Map();
 		this.interval = setInterval(() => {
 			for (const cluster of this.manager.clusters.values()) {
-				if (!cluster.ready) continue; cluster._sendInstance({
+				if (!cluster.ready || this.beats.get(cluster.id)?.killing || !cluster.lastHeartbeatReceived) continue;
+
+				cluster._sendInstance({
 					_type: MessageTypes.Heartbeat,
 				} as BaseMessage<'heartbeat'>)?.catch(() => null);
+
+				if (Date.now() - cluster.lastHeartbeatReceived > this.manager.options.heartbeat.timeout) {
+					this.addMissedBeat(cluster.id);
+				} else {
+					const clusterData = this.getClusterStats(cluster.id);
+					if (clusterData.missedBeats > 0) {
+						clusterData.missedBeats = 0;
+						this.beats.set(cluster.id, clusterData);
+					}
+				}
 			}
-		}, this.manager.options.heartbeat.interval || 30000); // 30 seconds
+		}, this.manager.options.heartbeat.interval);
 	}
 
 	/**
@@ -54,7 +66,7 @@ export class HeartbeatManager {
 	 * @returns {HeartbeatData} The heartbeat data.
 	 */
 	public getClusterStats(id: number): HeartbeatData {
-		return this.beats.get(id) || this.beats.set(id, { missedBeats: 0, restarts: 0 }).get(id) as HeartbeatData;
+		return this.beats.get(id) || this.beats.set(id, { missedBeats: 0, restarts: 0, killing: false }).get(id) as HeartbeatData;
 	}
 
 	/**
@@ -63,21 +75,8 @@ export class HeartbeatManager {
 	 * @param {boolean} [tryRespawn=true] - Whether to try to respawn the cluster.
 	 * @returns {void} Nothing.
 	 */
-	public removeCluster(id: number, tryRespawn: boolean = true): void {
-		const cluster = this.getClusterStats(id);
+	public removeCluster(id: number): void {
 		this.beats.delete(id);
-
-		if (tryRespawn) {
-			if (cluster.restarts < this.manager.options.heartbeat.maxRestarts) {
-				this.manager._debug(`Cluster ${id} is restarting... (${this.manager.options.heartbeat.maxRestarts - cluster.restarts} left.)`);
-				this.manager.clusters.get(id)?.spawn();
-
-				cluster.missedBeats = 0;
-				cluster.restarts++;
-
-				this.beats.set(id, cluster);
-			} else this.manager._debug(`Cluster ${id} reached the maximum amount of restarts. (${cluster.restarts})`);
-		}
 	}
 
 	/**
@@ -85,21 +84,23 @@ export class HeartbeatManager {
 	 * @param {number} id - The id of the cluster.
 	 * @returns {void} Nothing.
 	 */
-	public addMissedBeat(id: number): void {
+	private async addMissedBeat(id: number): Promise<void> {
 		const cluster = this.getClusterStats(id);
 		cluster.missedBeats++;
 
-		if (cluster.missedBeats > this.manager.options.heartbeat.maxMissedHeartbeats) {
-			this.manager.clusters.get(id)?.kill({ reason: 'Missed too many heartbeats.' });
+		if (cluster.missedBeats >= this.manager.options.heartbeat.maxMissedHeartbeats) {
+			this.beats.set(id, { ...cluster, killing: true });
 			this.manager._debug(`Cluster ${id} has missed too many heartbeats. (${cluster.missedBeats})`);
+			await this.manager.clusters.get(id)?.kill({ reason: 'Missed too many heartbeats.' });
+			this.beats.set(id, { ...cluster, killing: false });
 
 			if (cluster.restarts < this.manager.options.heartbeat.maxRestarts) {
-				this.manager._debug(`Cluster ${id} is restarting... (${this.manager.options.heartbeat.maxRestarts - cluster.restarts} left.)`);
-				this.manager.clusters.get(id)?.spawn();
+				this.manager._debug(`Cluster ${id} is restarting.. (${this.manager.options.heartbeat.maxRestarts - cluster.restarts} left).`);
+				await this.manager.clusters.get(id)?.spawn();
 
 				cluster.missedBeats = 0;
 				cluster.restarts++;
-			} else this.manager._debug(`Cluster ${id} reached the maximum amount of restarts. (${cluster.restarts})`);
+			} else this.manager._debug(`Cluster ${id} reached the maximum amount of restarts (${cluster.restarts}).`);
 		}
 
 		this.beats.set(id, cluster);

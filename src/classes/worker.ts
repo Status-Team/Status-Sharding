@@ -59,8 +59,8 @@ export class Worker {
 	 * Respawns the worker.
 	 * @returns {Worker} The worker.
 	 */
-	public respawn(): WorkerThread {
-		this.kill();
+	public async respawn(): Promise<WorkerThread> {
+		await this.kill();
 		return this.spawn();
 	}
 
@@ -68,10 +68,19 @@ export class Worker {
 	 * Kills the worker.
 	 * @returns {Promise<boolean>} The promise.
 	 */
-	public kill(): Promise<boolean> {
+	public async kill(): Promise<boolean> {
 		// @ts-ignore
 		this.process?.removeAllListeners();
-		return typeof this.process?.terminate() === 'number' ? Promise.resolve(true) : Promise.resolve(false);
+
+		return new Promise<boolean>((resolve) => {
+			try {
+				process.kill(this.process?.threadId as number, 'SIGKILL');
+				resolve(true);
+			} catch (error) {
+				console.error('Worker termination failed.');
+				throw error;
+			}
+		});
 	}
 
 	/**

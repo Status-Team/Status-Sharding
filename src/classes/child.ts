@@ -81,8 +81,8 @@ export class Child {
 	 * Respawns the child process.
 	 * @returns {ChildProcess} The child process.
 	 */
-	public respawn(): ChildProcess {
-		this.kill();
+	public async respawn(): Promise<ChildProcess> {
+		await this.kill();
 		return this.spawn();
 	}
 
@@ -90,10 +90,18 @@ export class Child {
 	 * Kills the child process.
 	 * @returns {Promise<boolean>} If the child process was killed.
 	 */
-	public kill(): Promise<boolean> {
+	public async kill(): Promise<boolean> {
 		// @ts-ignore
 		this.process?.removeAllListeners();
-		return Promise.resolve(this.process?.kill() || false);
+		return new Promise<boolean>((resolve) => {
+			try {
+				process.kill(this.process?.pid as number, 'SIGKILL');
+				resolve(true);
+			} catch (error) {
+				console.error('Worker termination failed.');
+				throw error;
+			}
+		});
 	}
 
 	/**

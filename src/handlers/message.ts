@@ -36,19 +36,21 @@ export class ClusterHandler {
 				if (this.cluster.ready) throw new Error('Cluster already ready, if autoLogin is enabled, check if you are not using .login() in your code.');
 				this.cluster.ready = true;
 
+				this.cluster.lastHeartbeatReceived = Date.now();
+
 				// Emitted upon the cluster's ready event.
 				this.cluster.emit('ready', this.cluster);
 				this.cluster.manager._debug(`[Cluster ${this.cluster.id}] Cluster is ready.`);
 
 				const allReady = this.cluster.manager.clusters.every((cluster) => cluster.ready);
-				if (allReady && this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {
+				if (!this.cluster.manager.ready && allReady && this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {
 					this.cluster.manager.ready = true;
 					this.cluster.manager.emit('ready', this.cluster.manager);
 					this.cluster.manager._debug('All clusters are ready.');
 
-					for (const _ of this.cluster.manager.clusters.values()) {
+					this.cluster.manager.clusters.forEach(() => {
 						this.ipc.send({ _type: MessageTypes.ManagerReady } as BaseMessage<'readyOrSpawn'>);
-					}
+					});
 				}
 
 				break;
@@ -126,11 +128,13 @@ export class ClusterHandler {
 				break;
 			}
 			case MessageTypes.Heartbeat: {
+				this.cluster.manager._debug(`[Cluster ${this.cluster.id}] Sending heartbeat..`);
 				this.ipc.send({ _type: MessageTypes.Heartbeat } as BaseMessage<'heartbeat'>);
 				break;
 			}
 			case MessageTypes.HeartbeatAck: {
 				this.cluster.lastHeartbeatReceived = Date.now();
+				this.cluster.manager._debug(`[Cluster ${this.cluster.id}] Received heartbeat.`);
 				break;
 			}
 		}

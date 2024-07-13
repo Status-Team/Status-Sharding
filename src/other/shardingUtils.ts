@@ -37,13 +37,13 @@ export class ShardingUtils {
 	 */
 	public static chunkArray<T>(array: T[], chunkSize: number, equalize = false): T[][] {
 		const R = [] as T[][];
-	
+
 		if (equalize) chunkSize = Math.ceil(array.length / (Math.ceil(array.length / chunkSize)));
-	
+
 		for (let i = 0; i < array.length; i += chunkSize) {
 			R.push(array.slice(i, i + chunkSize));
 		}
-	
+
 		return R;
 	}
 
@@ -108,18 +108,20 @@ export class ShardingUtils {
 	 * @returns {T} The merged object.
 	 */
 	public static mergeObjects<T extends object>(main: Partial<T>, toMerge: Partial<T>): T {
-		for (const key in toMerge) {
-			if (toMerge[key] && typeof toMerge[key] === 'object') {
-				if (!main[key]) Object.assign(main, { [key]: {} });
-				this.mergeObjects(main[key] as Record<string, unknown>, toMerge[key] as Record<string, unknown>);
-			} else {
-				Object.assign(main, { [key]: toMerge[key] });
+		const merged: Partial<T> = { ...toMerge };
+
+		for (const key in main) {
+			if (Object.prototype.hasOwnProperty.call(main, key)) {
+				if (typeof main[key] === 'object' && !Array.isArray(main[key])) {
+					merged[key] = ShardingUtils.mergeObjects(toMerge[key] ?? {}, main[key] ?? {}) as T[Extract<keyof T, string>];
+				} else {
+					merged[key] = main[key];
+				}
 			}
 		}
 
-		return main as T;
+		return merged as T;
 	}
-
 	/**
 	 * Gets the shard id for a guild id.
 	 * @param {string} guildId - The guild id to get the shard id for.

@@ -80,9 +80,9 @@ export class ClusterManager extends EventEmitter {
 	/**
 	 * Heartbeat Manager for the ClusterManager
 	 * @readonly
-	 * @type {HeartbeatManager}
+	 * @type {HeartbeatManager | null}
 	 */
-	readonly heartbeat: HeartbeatManager;
+	readonly heartbeat: HeartbeatManager | null;
 	/**
 	 * Queue for the ClusterManager
 	 * @readonly
@@ -111,7 +111,13 @@ export class ClusterManager extends EventEmitter {
 			totalClusters: options.totalClusters === undefined ? -1 : options.totalClusters,
 			shardsPerClusters: options.shardsPerClusters === undefined ? -1 : options.shardsPerClusters,
 			respawn: options.respawn === undefined ? true : options.respawn,
-			heartbeat: ShardingUtils.mergeObjects<Required<ClusterHeartbeatOptions>>(options.heartbeat || {}, { maxRestarts: 3, interval: 30000, timeout: 45000, maxMissedHeartbeats: 4 }),
+			heartbeat: ShardingUtils.mergeObjects<Required<ClusterHeartbeatOptions>>(options.heartbeat || {}, {
+				enabled: false,
+				maxRestarts: 3,
+				interval: 5000,
+				timeout: 30000,
+				maxMissedHeartbeats: 3,
+			}),
 			mode: options.mode || 'worker',
 			shardList: [], clusterList: [],
 			spawnOptions: {
@@ -133,7 +139,7 @@ export class ClusterManager extends EventEmitter {
 		this.promise = new PromiseHandler(this);
 		this.broker = new IPCBrokerManager(this);
 		this.reCluster = new ReClusterManager(this);
-		this.heartbeat = new HeartbeatManager(this);
+		this.heartbeat = this.options.heartbeat.enabled ? new HeartbeatManager(this) : null;
 
 		this.clusterQueue = new Queue(this.options.queueOptions || {
 			mode: 'auto', timeout: this.options.spawnOptions.timeout || 30000,
@@ -415,7 +421,7 @@ export class ClusterManager extends EventEmitter {
 		if (!recluster) this.clusters.set(id, cluster);
 
 		this.emit('clusterCreate', cluster);
-		this.heartbeat.getClusterStats(id);
+		this.heartbeat?.getClusterStats(id);
 
 		return cluster;
 	}
