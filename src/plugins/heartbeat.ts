@@ -30,6 +30,10 @@ export class HeartbeatManager {
 	 * @param {ClusterManager} manager - The instance of the cluster manager.
 	 */
 	constructor(private readonly manager: ClusterManager) {
+		if (this.manager.options.heartbeat.interval <= 0) throw new Error('The heartbeat interval must be greater than 0.');
+		else if (this.manager.options.heartbeat.timeout <= 0) throw new Error('The heartbeat timeout must be greater than 0.');
+		else if (this.manager.options.heartbeat.interval < this.manager.options.heartbeat.timeout) throw new Error('The heartbeat interval must be greater than the heartbeat timeout.');
+
 		this.beats = new Map();
 		this.interval = setInterval(() => {
 			for (const cluster of this.manager.clusters.values()) {
@@ -103,6 +107,7 @@ export class HeartbeatManager {
 			} else this.manager._debug(`Cluster ${id} reached the maximum amount of restarts (${cluster.restarts}).`);
 		}
 
+		this.manager._debug(`Cluster ${id} has missed a heartbeat. (${cluster.missedBeats} missed)`);
 		this.beats.set(id, cluster);
 	}
 }
