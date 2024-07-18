@@ -48,9 +48,9 @@ export class ClusterHandler {
 					this.cluster.manager.emit('ready', this.cluster.manager);
 					this.cluster.manager._debug('All clusters are ready.');
 
-					this.cluster.manager.clusters.forEach(() => {
-						this.ipc.send({ _type: MessageTypes.ManagerReady } as BaseMessage<'readyOrSpawn'>);
-					});
+					for (const cluster of this.cluster.manager.clusters.values()) {
+						cluster._sendInstance({ _type: MessageTypes.ManagerReady } as BaseMessage<'readyOrSpawn'>);
+					}
 				}
 
 				break;
