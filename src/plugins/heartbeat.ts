@@ -31,8 +31,8 @@ export class HeartbeatManager {
 	 */
 	constructor(private readonly manager: ClusterManager) {
 		if (this.manager.options.heartbeat.interval <= 0) throw new Error('The heartbeat interval must be greater than 0.');
-		else if (this.manager.options.heartbeat.timeout <= 0) throw new Error('The heartbeat timeout must be greater than 0.');
-		else if (this.manager.options.heartbeat.interval < this.manager.options.heartbeat.timeout) throw new Error('The heartbeat interval must be greater than the heartbeat timeout.');
+		if (this.manager.options.heartbeat.timeout <= 0) throw new Error('The heartbeat timeout must be greater than 0.');
+		if (this.manager.options.heartbeat.interval >= this.manager.options.heartbeat.timeout) throw new Error('The heartbeat timeout must be greater than the heartbeat interval.');
 
 		this.beats = new Map();
 		this.interval = setInterval(() => {
