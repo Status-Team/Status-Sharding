@@ -5,7 +5,7 @@ import { BrokerMessage, IPCBrokerClient } from '../handlers/broker';
 import { ClusterClientHandler } from '../handlers/message';
 import { ShardingUtils } from '../other/shardingUtils';
 import { PromiseHandler } from '../handlers/promise';
-import { ClusterManager } from './clusterManager';
+import { RefClusterManager } from './clusterManager';
 import { WorkerClient } from '../classes/worker';
 import { ChildClient } from '../classes/child';
 import { Serializable } from 'child_process';
@@ -24,14 +24,19 @@ export type ClientEventsModifiable = Omit<ClientEvents, 'ready'> & { ready: [cli
  * @export
  * @class ShardingClient
  * @typedef {ShardingClient}
+ * @template {boolean} [Ready=boolean] - The ready state of the client.
+ * @template {RefClusterManager} [InternalManager=RefClusterManager] - The manager to use for the client.
  * @extends {DiscordClient}
  */
-export class ShardingClient<Ready extends boolean = boolean> extends DiscordClient<Ready> {
+export class ShardingClient<
+	Ready extends boolean = boolean,
+	InternalManager extends RefClusterManager = RefClusterManager,
+> extends DiscordClient<Ready> {
 	/**
 	 * Cluster associated with this client.
-	 * @type {ClusterClient<this>}
+	 * @type {ClusterClient<this, InternalManage>}
 	 */
-	cluster: ClusterClient<this>;
+	cluster: ClusterClient<this, InternalManager>;
 
 	/**
 	 * Creates an instance of ShardingClient.
@@ -45,7 +50,7 @@ export class ShardingClient<Ready extends boolean = boolean> extends DiscordClie
 			shardCount: getInfo().TotalShards,
 		});
 
-		this.cluster = new ClusterClient<this>(this);
+		this.cluster = new ClusterClient<this, InternalManager>(this);
 	}
 
 	/**
@@ -153,15 +158,23 @@ export class ShardingClient<Ready extends boolean = boolean> extends DiscordClie
 	}
 }
 
+export type RefShardingClient = ShardingClient;
+
+
 /**
  * Simplified Cluster instance available on the {@link ClusterClient}.
  * @export
  * @class ClusterClient
  * @typedef {ClusterClient} [InternalClient=ShardingClient] - The client to use for the cluster.
  * @template {ShardingClient} [InternalClient=ShardingClient] - The client to use for the cluster.
+ * @template {RefClusterManager} [InternalManager=RefClusterManager] - The manager to use for the cluster.
+ * @template {RefCluster} [InternalCluster=RefCluster] - The cluster to use for the cluster.
  * @extends {EventEmitter} - The EventEmitter class.
  */
-export class ClusterClient<InternalClient extends ShardingClient = ShardingClient> extends EventEmitter {
+export class ClusterClient<
+	InternalClient extends RefShardingClient = RefShardingClient,
+	InternalManager extends RefClusterManager = RefClusterManager,
+> extends EventEmitter {
 	/**
 	 * Ready state of the cluster.
 	 * @type {boolean}
@@ -341,7 +354,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 * @async
 	 * @template {unknown} T - The type of the result.
 	 * @template {object} P - The type of the context.
-	 * @template {unknown} [M=ClusterManager] - The type of the manager.
+	 * @template {unknown} [M=InternalManager] - The type of the manager.
 	 * @param {(((manager: M, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
 	 * @param {?{ context?: P, timeout?: number }} [options] - The options for the eval.
 	 * @returns {Promise<ValidIfSerializable<T>>} A promise that resolves with the result of the eval.
@@ -353,7 +366,7 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 	 *    return manager.clusters.size;
 	 * }); // 8 (8 clusters)
 	 */
-	public async evalOnManager<T, P extends object, M = ClusterManager>(script: ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<ValidIfSerializable<T>> {
+	public async evalOnManager<T, P extends object, M = InternalManager>(script: ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<ValidIfSerializable<T>> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#4).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#4).'));
 		else if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function (#1).'));
@@ -622,6 +635,8 @@ export class ClusterClient<InternalClient extends ShardingClient = ShardingClien
 		this.emit('debug', message);
 	}
 }
+
+export type RefClusterClient = ClusterClient;
 
 // Credits for EventEmitter typings: https://github.com/discordjs/discord.js/blob/main/packages/rest/src/lib/RequestManager.ts#L159
 /**

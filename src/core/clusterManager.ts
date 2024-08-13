@@ -16,12 +16,12 @@ import { ReClusterManager } from '../plugins/reCluster';
 import { ShardingUtils } from '../other/shardingUtils';
 import { IPCBrokerManager } from '../handlers/broker';
 import { PromiseHandler } from '../handlers/promise';
-import { ShardingClient } from './clusterClient';
+import { RefShardingClient } from './clusterClient';
+import { Cluster, RefCluster } from './cluster';
 import { ChildProcess } from 'child_process';
 import { Queue } from '../handlers/queue';
 import { Worker } from 'worker_threads';
 import CustomMap from '../other/map';
-import { Cluster } from './cluster';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 import path from 'path';
@@ -35,7 +35,10 @@ import fs from 'fs';
  * @typedef {ClusterManager}
  * @extends {EventEmitter}
  */
-export class ClusterManager extends EventEmitter {
+export class ClusterManager<
+	InternalClient extends RefShardingClient = RefShardingClient,
+	InternalCluster extends RefCluster = RefCluster
+> extends EventEmitter {
 	/**
 	 * Check if all clusters are ready.
 	 * @type {boolean}
@@ -68,9 +71,9 @@ export class ClusterManager extends EventEmitter {
 	/**
 	 * A collection of all clusters the manager spawned.
 	 * @readonly
-	 * @type {CustomMap<number, Cluster>}
+	 * @type {CustomMap<number, InternalCluster>}
 	 */
-	readonly clusters: CustomMap<number, Cluster>;
+	readonly clusters: CustomMap<number, InternalCluster>;
 	/**
 	 * ReCluster Manager for the ClusterManager
 	 * @readonly
@@ -231,9 +234,9 @@ export class ClusterManager extends EventEmitter {
 	 * @param {number} [clusterDelay=8000] - The delay between each cluster respawn.
 	 * @param {number} [respawnDelay=800] - The delay between each shard respawn.
 	 * @param {number} [timeout=30000] - The timeout for each respawn.
-	 * @returns {Promise<Map<number, Cluster>>} A collection of all clusters.
+	 * @returns {Promise<Map<number, InternalCluster>>} The clusters after the respawn.
 	 */
-	public async respawnAll(clusterDelay: number = 8000, respawnDelay: number = 800, timeout: number = 30000): Promise<Map<number, Cluster>> {
+	public async respawnAll(clusterDelay: number = 8000, respawnDelay: number = 800, timeout: number = 30000): Promise<Map<number, InternalCluster>> {
 		let s = 0; let i = 0;
 		this.promise.nonces.clear();
 		this._debug('[ClusterManager] Respawning all clusters.');
@@ -294,7 +297,7 @@ export class ClusterManager extends EventEmitter {
 	 * @param {?EvalOptions<P>} [options] - The options for the evaluation.
 	 * @returns {Promise<ValidIfSerializable<T>[]>} The result of the evaluation.
 	 */
-	public async broadcastEval<T, P extends object, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
+	public async broadcastEval<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned (#1).'));
 		else if ((options?.cluster !== undefined || options?.shard !== undefined) && options?.guildId !== undefined) return Promise.reject(new Error('CLUSTERING_INVALID_OPTION | Cannot use both guildId and cluster/shard options.'));
 
@@ -358,7 +361,7 @@ export class ClusterManager extends EventEmitter {
 	 * @param {?Exclude<EvalOptions<P>, 'cluster'>} [options] - The options for the evaluation.
 	 * @returns {Promise<ValidIfSerializable<T>>} The result of the evaluation.
 	 */
-	public async evalOnClusterClient<T, P extends object, C = ShardingClient>(cluster: number, script: ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
+	public async evalOnClusterClient<T, P extends object, C = InternalClient>(cluster: number, script: ((client: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned (#2).'));
 		else if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
@@ -374,18 +377,18 @@ export class ClusterManager extends EventEmitter {
 	 * @template {unknown} T - The type of the result.
 	 * @template {object} P - The type of the context.
 	 * @param {number} cluster - The cluster to run the method on.
-	 * @param {(string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
+	 * @param {(string | ((cluster: InternalCluster, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
 	 * @param {?Exclude<EvalOptions<P>, 'cluster'>} [options] - The options for the evaluation.
 	 * @returns {Promise<ValidIfSerializable<T>>} The result of the evaluation.
 	 */
-	public async evalOnCluster<T, P extends object>(cluster: number, script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
+	public async evalOnCluster<T, P extends object, C = InternalCluster>(cluster: number, script: string | ((cluster: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned (#3).'));
 		else if (typeof cluster !== 'number' || cluster < 0) return Promise.reject(new RangeError('CLUSTER_ID_OUT_OF_RANGE | Cluster Ids must be greater than or equal to 0.'));
 
 		const cl = this.clusters.get(cluster);
 
 		if (!cl) return Promise.reject(new Error('CLUSTERING_CLUSTER_NOT_FOUND | Cluster with id ' + cluster + ' was not found (#2).'));
-		return cl.eval<T, P>(script, options);
+		return cl.eval<T, P, C>(script, options);
 	}
 
 	/**
@@ -400,7 +403,7 @@ export class ClusterManager extends EventEmitter {
 	 * @param {?{ context?: P; timeout?: number; experimental?: E; }} [options] - The options for the eval.
 	 * @returns {Promise<ValidIfSerializable<T>>} The result of the evaluation.
 	 */
-	public async evalOnGuild<T, P extends object, C = ShardingClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {
+	public async evalOnGuild<T, P extends object, C = InternalClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned (#4).'));
 		else if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Id must be a string.'));
 
@@ -414,11 +417,11 @@ export class ClusterManager extends EventEmitter {
 	 * @param {number} id - The id of the cluster.
 	 * @param {number[]} shardsToSpawn - The shards to spawn for the cluster.
 	 * @param {boolean} [recluster=false] - Whether the cluster is a recluster.
-	 * @returns {Cluster} The created cluster.
+	 * @returns {Cluster<this>} The created cluster.
 	 */
-	public createCluster(id: number, shardsToSpawn: number[], recluster: boolean = false): Cluster {
+	public createCluster(id: number, shardsToSpawn: number[], recluster: boolean = false): Cluster<this> {
 		const cluster = new Cluster(this, id, shardsToSpawn);
-		if (!recluster) this.clusters.set(id, cluster);
+		if (!recluster) this.clusters.set(id, cluster as unknown as InternalCluster);
 
 		this.emit('clusterCreate', cluster);
 		this.heartbeat?.getClusterStats(id);
@@ -449,6 +452,8 @@ export class ClusterManager extends EventEmitter {
 		this.emit('debug', message);
 	}
 }
+
+export type RefClusterManager = ClusterManager;
 
 // Credits for EventEmitter typings: https://github.com/discordjs/discord.js/blob/main/packages/rest/src/lib/RequestManager.ts#L159
 /**

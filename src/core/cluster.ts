@@ -3,9 +3,9 @@ import { ProcessMessage, BaseMessage, DataType } from '../other/message';
 import { Worker as WorkerThread } from 'worker_threads';
 import { ShardingUtils } from '../other/shardingUtils';
 import { ClusterHandler } from '../handlers/message';
+import { RefClusterManager } from './clusterManager';
+import { RefShardingClient } from './clusterClient';
 import { BrokerMessage } from '../handlers/broker';
-import { ClusterManager } from './clusterManager';
-import { ShardingClient } from './clusterClient';
 import { ChildProcess } from 'child_process';
 import { Worker } from '../classes/worker';
 import { Child } from '../classes/child';
@@ -19,10 +19,13 @@ import path from 'path';
  * When its child process/worker exits for any reason, the cluster will spawn a new one to replace it as necessary.
  * @export
  * @class Cluster
- * @typedef {Cluster}
+ * @typedef {Cluster<ClusterManager>} - The Cluster type.
  * @extends {EventEmitter}
  */
-export class Cluster extends EventEmitter {
+export class Cluster<
+	InternalManager extends RefClusterManager = RefClusterManager,
+	InternalClient extends RefShardingClient = RefShardingClient,
+> extends EventEmitter {
 	/**
 	 * Represents whether the cluster is ready.
 	 */
@@ -67,11 +70,11 @@ export class Cluster extends EventEmitter {
 	/**
 	 * Creates an instance of Cluster.
 	 * @constructor
-	 * @param {ClusterManager} manager - The ClusterManager instance that manages this cluster.
+	 * @param {InternalManager} manager - The ClusterManager instance that manages this cluster.
 	 * @param {number} id - The ID of the cluster.
 	 * @param {number[]} shardList - The list of shards assigned to this cluster.
 	 */
-	constructor(public manager: ClusterManager, public id: number, public shardList: number[]) {
+	constructor(public manager: InternalManager, public id: number, public shardList: number[]) {
 		super();
 
 		this.ready = false; this.thread = null;
@@ -264,13 +267,13 @@ export class Cluster extends EventEmitter {
 	 * @async
 	 * @template {unknown} T - The type of the result of the script.
 	 * @template {object} P - The type of the context of the script.
-	 * @param {(string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
+	 * @param {(string | ((cluster: Cluster<InternalManager>, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
 	 * @param {?Exclude<EvalOptions<P>, 'cluster'>} [options] - The options for the eval.
 	 * @returns {Promise<ValidIfSerializable<T>>} The promise that resolves with the result of the script.
 	 * @example
 	 * cluster.eval('this.manager.clusters.size'); // 1
 	*/
-	public async eval<T, P extends object>(script: string | ((cluster: Cluster, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
+	public async eval<T, P extends object, C = Cluster<InternalManager, InternalClient>>(script: string | ((cluster: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
 		return eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
 	}
 
@@ -288,7 +291,7 @@ export class Cluster extends EventEmitter {
 	 * cluster.evalOnClient((client) => client.cluster.id); // 0
 	 * cluster.evalOnClient((client, context) => client.cluster.id + context, { context: 1 }); // 0 + 1
 	 */
-	public async evalOnClient<T, P extends object, C = ShardingClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+	public async evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#4).'));
 		else if (typeof script !== 'string' && typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_TYPE | Cluster ' + this.id + ' eval script must be a string or function.'));
 
@@ -323,7 +326,7 @@ export class Cluster extends EventEmitter {
 	 * cluster.evalOnGuild('945340723425837066', (client, context, guild) => guild.name); // Digital's Basement
 	 * cluster.evalOnGuild('945340723425837066', (client, context, guild) => guild.name + context, { context: ' is cool!' }); // Digital's Basement is cool!
 	 */
-	public async evalOnGuild<T, P extends object, C = ShardingClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {
+	public async evalOnGuild<T, P extends object, C = InternalClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#5).'));
 		else if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_TYPE | Cluster ' + this.id + ' eval script must be a function.'));
 
@@ -413,6 +416,8 @@ export class Cluster extends EventEmitter {
 	}
 }
 
+export type RefCluster = Cluster;
+
 // Credits for EventEmitter typings: https://github.com/discordjs/discord.js/blob/main/packages/rest/src/lib/RequestManager.ts#L159
 /**
  * A self-contained cluster created by the ClusterManager.
@@ -420,7 +425,7 @@ export class Cluster extends EventEmitter {
  * When its child process/worker exits for any reason, the cluster will spawn a new one to replace it as necessary.
  * @export
  * @interface Cluster - The Cluster interface.
- * @typedef {Cluster} - The Cluster type.
+ * @typedef {Cluster<ClusterManager>} - The Cluster type.
  */
 export declare interface Cluster {
 	/**
