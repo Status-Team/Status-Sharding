@@ -1,0 +1,60 @@
+name: Publish to npm
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+  workflow_dispatch:
+
+env:
+  publish: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Install dependencies
+        run: |
+          npm i -g pnpm
+          pnpm install
+
+      - name: Check if package needs publishing
+        id: check_publish
+        run: |
+          current_version=$(node -p "require('./package.json').version")
+          npm_package_name=$(node -p "require('./package.json').name")
+          published_version=$(npm show $npm_package_name version) || echo "0.0.0"
+
+          echo "Current version: $current_version"
+          echo "Published version: $published_version"
+
+          if [ "$current_version" == "$published_version" ]; then
+            echo "No new version. Skipping publish."
+            echo "publish=false" >> $GITHUB_ENV
+          else
+            echo "New version available. Proceeding to publish."
+            echo "publish=true" >> $GITHUB_ENV
+          fi
+
+      - name: Build the project
+        run: |
+          pnpm run build
+
+      - name: Publish to npm
+        if: env.publish == 'true'
+        run: |
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
