@@ -176,16 +176,28 @@ export class ClusterClientHandler<InternalClient extends ShardingClient = Shardi
 						data: ShardingUtils.makePlainError(new Error('No script provided.')),
 					} as BaseMessage<'error'>);
 
-					const result = await this.clusterClient.evalOnClient(script);
+					try {
+						const result = await this.clusterClient.evalOnClient(script);
+						this.clusterClient._respond({
+							_type: MessageTypes.ClientEvalResponse,
+							_nonce: message._nonce,
+							data: ShardingUtils.isSerializable(result) ? result : {
+								...ShardingUtils.makePlainError(new Error('Evaluated script returned an unserializable value.')),
+								script: script?.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, ''),
+							},
+						} as BaseMessage<'evalResult'>);
+					} catch (err) {
+						this.clusterClient._respond({
+							_type: MessageTypes.ClientEvalResponseError,
+							_nonce: message._nonce,
+							data: {
+								...ShardingUtils.makePlainError(new Error('An error occurred while evaluating the script.')),
+								script: script?.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, ''),
+							},
+						} as BaseMessage<'error'>);
 
-					this.clusterClient._respond({
-						_type: MessageTypes.ClientEvalResponse,
-						_nonce: message._nonce,
-						data: ShardingUtils.isSerializable(result) ? result : {
-							...ShardingUtils.makePlainError(new Error('Evaluated script returned an unserializable value.')),
-							script: script?.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, ''),
-						},
-					} as BaseMessage<'evalResult'>);
+						throw err;
+					}
 				} catch (err) {
 					this.clusterClient._respond({
 						_type: MessageTypes.ClientEvalResponseError,
