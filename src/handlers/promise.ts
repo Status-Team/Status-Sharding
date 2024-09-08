@@ -40,10 +40,12 @@ export class PromiseHandler {
 
 		if (message._type !== MessageTypes.ClientEvalResponseError) promise.resolve(message.data);
 		else {
-			const error = new Error((message.data as BaseMessage<'error'>['data']).message);
+			const data = message.data as BaseMessage<'error'>['data'];
+			const error = new Error(data.message + '\n' + data.stack);
 
-			error.stack = (message.data as BaseMessage<'error'>['data']).stack;
-			error.name = (message.data as BaseMessage<'error'>['data']).name;
+			error.cause = data.script;
+			error.stack = data.stack;
+			error.name = data.name;
 			promise.reject(error);
 		}
 	}

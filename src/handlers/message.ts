@@ -187,14 +187,25 @@ export class ClusterClientHandler<InternalClient extends ShardingClient = Shardi
 							},
 						} as BaseMessage<'evalResult'>);
 					} catch (err) {
-						this.clusterClient._respond({
-							_type: MessageTypes.ClientEvalResponseError,
-							_nonce: message._nonce,
-							data: {
-								...ShardingUtils.makePlainError(new Error('An error occurred while evaluating the script.')),
-								script: script?.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, ''),
-							},
-						} as BaseMessage<'error'>);
+						if (err instanceof Error) {
+							this.clusterClient._respond({
+								_type: MessageTypes.ClientEvalResponseError,
+								_nonce: message._nonce,
+								data: {
+									...ShardingUtils.makePlainError(err),
+									script: script?.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, ''),
+								},
+							} as BaseMessage<'error'>);
+						} else {
+							this.clusterClient._respond({
+								_type: MessageTypes.ClientEvalResponseError,
+								_nonce: message._nonce,
+								data: {
+									...ShardingUtils.makePlainError(new Error('An error occurred while evaluating the script.')),
+									script: script?.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, ''),
+								},
+							} as BaseMessage<'error'>);
+						}
 
 						throw err;
 					}

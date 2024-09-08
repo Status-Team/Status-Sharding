@@ -61,6 +61,7 @@ export type DataTypes<A = object, P extends object = object> = {
 	evalResult: EvalResultMessage;
 	error: {
 		message: string;
+		script: string;
 		stack?: string;
 		name: string;
 	};
