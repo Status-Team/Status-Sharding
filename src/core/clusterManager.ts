@@ -118,7 +118,7 @@ export class ClusterManager<
 				enabled: false,
 				maxRestarts: 3,
 				interval: 5000,
-				timeout: 30000,
+				timeout: -1,
 				maxMissedHeartbeats: 3,
 			}),
 			mode: options.mode || 'worker',
@@ -145,7 +145,7 @@ export class ClusterManager<
 		this.heartbeat = this.options.heartbeat.enabled ? new HeartbeatManager(this) : null;
 
 		this.clusterQueue = new Queue(this.options.queueOptions || {
-			mode: 'auto', timeout: this.options.spawnOptions.timeout || 30000,
+			mode: 'auto', timeout: this.options.spawnOptions.timeout || -1,
 		});
 
 		this._debug('[ClusterManager] Initialized successfully.');
@@ -232,11 +232,11 @@ export class ClusterManager<
 	 * Kills all running clusters and respawns them.
 	 * @async
 	 * @param {number} [clusterDelay=8000] - The delay between each cluster respawn.
-	 * @param {number} [respawnDelay=800] - The delay between each shard respawn.
-	 * @param {number} [timeout=30000] - The timeout for each respawn.
+	 * @param {number} [respawnDelay=5500] - The delay between each shard respawn.
+	 * @param {number} [timeout=-1] - The timeout for each respawn.
 	 * @returns {Promise<Map<number, InternalCluster>>} The clusters after the respawn.
 	 */
-	public async respawnAll(clusterDelay: number = 8000, respawnDelay: number = 800, timeout: number = 30000): Promise<Map<number, InternalCluster>> {
+	public async respawnAll(clusterDelay: number = 8000, respawnDelay: number = 5500, timeout: number = -1): Promise<Map<number, InternalCluster>> {
 		let s = 0; let i = 0;
 		this.promise.nonces.clear();
 		this._debug('[ClusterManager] Respawning all clusters.');

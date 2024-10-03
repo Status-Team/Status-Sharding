@@ -110,12 +110,12 @@ export class Cluster<
 	/**
 	 * Spawn function that spawns the cluster's child process/worker.
 	 * @async
-	 * @param {number} [spawnTimeout=30000] - The amount of time to wait for the cluster to become ready before killing it.
+	 * @param {number} [spawnTimeout=-1] - The amount of time to wait for the cluster to become ready before killing it.
 	 * @returns {Promise<ChildProcess | WorkerThread>} The child process/worker of the cluster.
 	 * @throws {Error} - If the cluster has already been spawned.
 	 * @throws {Error} - If the cluster does not have a file provided.
 	 */
-	public async spawn(spawnTimeout: number = 30000): Promise<ChildProcess | WorkerThread> {
+	public async spawn(spawnTimeout: number = -1): Promise<ChildProcess | WorkerThread> {
 		if (this.thread) throw new Error('CLUSTER_ALREADY_SPAWNED | Cluster ' + this.id + ' has already been spawned.');
 		else if (!this.manager.file) throw new Error('NO_FILE_PROVIDED | Cluster ' + this.id + ' does not have a file provided.');
 
@@ -140,11 +140,13 @@ export class Cluster<
 		const shouldAbort = spawnTimeout > 0 && spawnTimeout !== Infinity;
 
 		await new Promise<void>((resolve, reject) => {
-			const cleanup = () => {
+			const cleanup = (isDeath: boolean = false) => {
 				clearTimeout(spawnTimeoutTimer);
 
-				this.off('ready', onReady);
-				this.off('death', onDeath);
+				if (isDeath) {
+					this.off('ready', onReady);
+					this.off('death', onDeath);
+				}
 			};
 
 			const onReady = () => {
@@ -153,7 +155,7 @@ export class Cluster<
 			};
 
 			const onDeath = () => {
-				cleanup(); reject(new Error('CLUSTERING_READY_DIED | Cluster ' + this.id + ' died.'));
+				cleanup(true); reject(new Error('CLUSTERING_READY_DIED | Cluster ' + this.id + ' died.'));
 			};
 
 			const onTimeout = () => {
@@ -191,12 +193,12 @@ export class Cluster<
 	/**
 	 * Respawn function that respawns the cluster's child process/worker.
 	 * @async
-	 * @param {number} [delay=this.manager.options.spawnOptions.delay || 800] - The amount of time to wait before respawning the cluster.
-	 * @param {number} [timeout=this.manager.options.spawnOptions.timeout || 30000] - The amount of time to wait for the cluster to become ready before killing it.
+	 * @param {number} [delay=this.manager.options.spawnOptions.delay || 5500] - The amount of time to wait before respawning the cluster.
+	 * @param {number} [timeout=this.manager.options.spawnOptions.timeout || -1] - The amount of time to wait for the cluster to become ready before killing it.
 	 * @returns {Promise<ChildProcess | WorkerThread>} The child process/worker of the cluster.
 	 * @throws {Error} - If the cluster does not have a child process/worker.
 	 */
-	public async respawn(delay: number = this.manager.options.spawnOptions.delay || 800, timeout: number = this.manager.options.spawnOptions.timeout || 30000): Promise<ChildProcess | WorkerThread> {
+	public async respawn(delay: number = this.manager.options.spawnOptions.delay || 5500, timeout: number = this.manager.options.spawnOptions.timeout || -1): Promise<ChildProcess | WorkerThread> {
 		if (this.thread) await this.kill();
 		if (delay > 0) await ShardingUtils.delayFor(delay);
 
