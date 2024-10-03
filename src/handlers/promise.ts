@@ -47,6 +47,8 @@ export class PromiseHandler {
 			error.stack = data.stack;
 			error.name = data.name;
 			promise.reject(error);
+
+			console.error('An error occurred while evaluating the script:', data);
 		}
 	}
 
