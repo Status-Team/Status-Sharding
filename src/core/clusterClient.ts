@@ -1,6 +1,7 @@
 import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, ClusterClientData } from '../types';
 import { BaseMessage, BaseMessageInput, DataType, ProcessMessage } from '../other/message';
 import { BrokerMessage, IPCBrokerClient } from '../handlers/broker';
+import { ShardingClient, ShardingClientSapphire } from './client';
 import { ClusterClientHandler } from '../handlers/message';
 import { ShardingUtils } from '../other/shardingUtils';
 import { RefClusterManager } from './clusterManager';
@@ -8,12 +9,11 @@ import { PromiseHandler } from '../handlers/promise';
 import { WorkerClient } from '../classes/worker';
 import { ChildClient } from '../classes/child';
 import { Serializable } from 'child_process';
-import { ShardingClient } from './client';
 import { getInfo } from '../other/data';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 
-export type RefShardingClient = ShardingClient;
+export type RefShardingClient = ShardingClient | ShardingClientSapphire;
 
 /**
  * Simplified Cluster instance available on the {@link ClusterClient}.
@@ -85,7 +85,8 @@ export class ClusterClient<
 		this.process.ipc.on('message', this._handleMessage.bind(this));
 		this.promise = new PromiseHandler(this);
 
-		if (client?.once) client.once('ready', () => {
+		// @ts-ignore
+		if ('once' in client) client.once('ready', () => {
 			setTimeout(() => this.triggerReady(), 1500); // Allow main listener to be called first.
 		});
 	}
