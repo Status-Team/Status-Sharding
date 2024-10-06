@@ -1,4 +1,4 @@
-import { ClientEvents, ClientOptions, Client } from 'discord.js';
+import { Client, ClientEvents, ClientOptions } from 'discord.js';
 import { RefClusterManager } from '../clusterManager';
 import { ClusterClient } from '../clusterClient';
 import { getInfo } from '../../other/data';
@@ -8,7 +8,7 @@ import { getInfo } from '../../other/data';
  * @export
  * @typedef {ClientEventsModifiable}
  */
-export type ClientEventsModifiable = Omit<ClientEvents, 'ready'> & { ready: [client: ShardingClient] };
+type ClientEventsModifiable = Omit<ClientEvents, 'ready'> & { ready: [client: ShardingClient] };
 
 /**
  * Modified DiscordClient with bunch of new methods.
@@ -42,5 +42,30 @@ export class ShardingClient<
 		});
 
 		this.cluster = new ClusterClient<this, InternalManager>(this);
+	}
+
+	// Events.
+	on<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	on<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+	on(event: symbol, listener: (...args: unknown[]) => void): this {
+		return super.on(event, listener);
+	}
+
+	once<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	once<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+	once(event: symbol, listener: (...args: unknown[]) => void): this {
+		return super.once(event, listener);
+	}
+
+	off<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	off<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+	off(event: symbol, listener: (...args: unknown[]) => void): this {
+		return super.off(event, listener);
+	}
+
+	emit<K extends keyof ClientEventsModifiable>(event: K, ...args: ClientEventsModifiable[K]): boolean;
+	emit<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, ...args: unknown[]): boolean;
+	emit(event: symbol, ...args: unknown[]): boolean {
+		return super.emit(event, ...args);
 	}
 }
