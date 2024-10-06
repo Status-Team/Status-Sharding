@@ -1,18 +1,6 @@
-import {
-	Awaitable,
-	ClusterHeartbeatOptions,
-	ClusterManagerCreateOptions,
-	ClusterManagerEvents,
-	ClusterManagerOptions,
-	ClusteringMode,
-	EvalOptions,
-	Serialized,
-	ValidIfSerializable,
-	Serializable,
-	SerializableInput,
-} from '../types';
-import { HeartbeatManager } from '../plugins/heartbeat';
+import { Awaitable, ClusterHeartbeatOptions, ClusterManagerCreateOptions, ClusterManagerEvents, ClusterManagerOptions, ClusteringMode, EvalOptions, Serialized, ValidIfSerializable, Serializable, SerializableInput } from '../types';
 import { ReClusterManager } from '../plugins/reCluster';
+import { HeartbeatManager } from '../plugins/heartbeat';
 import { ShardingUtils } from '../other/shardingUtils';
 import { IPCBrokerManager } from '../handlers/broker';
 import { PromiseHandler } from '../handlers/promise';

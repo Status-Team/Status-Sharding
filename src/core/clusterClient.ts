@@ -1,165 +1,19 @@
 import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, ClusterClientData } from '../types';
 import { BaseMessage, BaseMessageInput, DataType, ProcessMessage } from '../other/message';
-import { ClientOptions, Client as DiscordClient, Guild, ClientEvents } from 'discord.js';
 import { BrokerMessage, IPCBrokerClient } from '../handlers/broker';
 import { ClusterClientHandler } from '../handlers/message';
 import { ShardingUtils } from '../other/shardingUtils';
-import { PromiseHandler } from '../handlers/promise';
 import { RefClusterManager } from './clusterManager';
+import { PromiseHandler } from '../handlers/promise';
 import { WorkerClient } from '../classes/worker';
 import { ChildClient } from '../classes/child';
 import { Serializable } from 'child_process';
+import { ShardingClient } from './client';
 import { getInfo } from '../other/data';
+import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 
-/**
- * Modified ClientEvents such that the ready event has the ShardingClient instead of the normal Client.
- * @export
- * @typedef {ClientEventsModifiable}
- */
-export type ClientEventsModifiable = Omit<ClientEvents, 'ready'> & { ready: [client: ShardingClient] };
-
-/**
- * Modified DiscordClient with bunch of new methods.
- * @export
- * @class ShardingClient
- * @typedef {ShardingClient}
- * @template {boolean} [Ready=boolean] - The ready state of the client.
- * @template {RefClusterManager} [InternalManager=RefClusterManager] - The manager to use for the client.
- * @extends {DiscordClient}
- */
-export class ShardingClient<
-	Ready extends boolean = boolean,
-	InternalManager extends RefClusterManager = RefClusterManager,
-> extends DiscordClient<Ready> {
-	/**
-	 * Cluster associated with this client.
-	 * @type {ClusterClient<this, InternalManage>}
-	 */
-	cluster: ClusterClient<this, InternalManager>;
-
-	/**
-	 * Creates an instance of ShardingClient.
-	 * @constructor
-	 * @param {ClientOptions} options - The options for the client.
-	 */
-	constructor(options: ClientOptions) {
-		super({
-			...options,
-			shards: getInfo().ShardList,
-			shardCount: getInfo().TotalShards,
-		});
-
-		this.cluster = new ClusterClient<this, InternalManager>(this);
-	}
-
-	/**
-	 * Listen for an event.
-	 * @template {keyof ClientEventsModifiable} K - The type of the event.
-	 * @param {K} event - The event to listen for.
-	 * @param {(...args: ClientEventsModifiable[K]) => void} listener - The listener to execute.
-	 * @returns {this} The client.
-	 */
-	on<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
-	/**
-	 * Listen for an event.
-	 * @template {string | symbol} S - The type of the event.
-	 * @param {Exclude<S, keyof ClientEventsModifiable>} event - The event to listen for.
-	 * @param {(...args: unknown[]) => void} listener - The listener to execute.
-	 * @returns {this} The client.
-	 */
-	on<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
-	/**
-	 * Listen for an event.
-	 * @param {(string | symbol)} event - The event to listen for.
-	 * @param {(...args: unknown[]) => void} listener - The listener to execute.
-	 * @returns {this} The client.
-	 */
-	on(event: string | symbol, listener: (...args: unknown[]) => void): this {
-		return super.on(event, listener);
-	}
-
-	/**
-	 * Listen for an event once.
-	 * @template {keyof ClientEventsModifiable} K - The type of the event.
-	 * @param {K} event - The event to listen for.
-	 * @param {(...args: ClientEventsModifiable[K]) => void} listener - The listener to execute.
-	 * @returns {this} The client.
-	 */
-	once<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
-	/**
-	 * Listen for an event once.
-	 * @template {string | symbol} S - The type of the event.
-	 * @param {Exclude<S, keyof ClientEventsModifiable>} event - The event to listen for.
-	 * @param {(...args: unknown[]) => void} listener - The listener to execute.
-	 * @returns {this} The client.
-	 */
-	once<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
-	/**
-	 * Listen for an event once.
-	 * @param {(string | symbol)} event - The event to listen for.
-	 * @param {(...args: unknown[]) => void} listener - The listener to execute.
-	 * @returns {this} The client.
-	 */
-	once(event: string | symbol, listener: (...args: unknown[]) => void): this {
-		return super.once(event, listener);
-	}
-
-	/**
-	 * Listen for an event.
-	 * @template {keyof ClientEventsModifiable} K - The type of the event.
-	 * @param {K} event - The event to listen for.
-	 * @param {(...args: ClientEventsModifiable[K]) => void} listener - The listener to execute.
-	 * @returns {this} The client.
-	 */
-	off<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
-	/**
-	 * Listen for an event.
-	 * @template {string | symbol} S - The type of the event.
-	 * @param {Exclude<S, keyof ClientEventsModifiable>} event - The event to listen for.
-	 * @param {(...args: unknown[]) => void} listener - The listener to execute.
-	 * @returns {this} The client.
-	 */
-	off<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
-	/**
-	 * Listen for an event.
-	 * @param {(string | symbol)} event - The event to listen for.
-	 * @param {(...args: unknown[]) => void} listener - The listener to execute.
-	 * @returns {this} The client.
-	 */
-	off(event: string | symbol, listener: (...args: unknown[]) => void): this {
-		return super.off(event, listener);
-	}
-
-	/**
-	 * Emit an event.
-	 * @template {keyof ClientEventsModifiable} K - The type of the event.
-	 * @param {K} event - The event to emit.
-	 * @param {...ClientEventsModifiable[K]} args - The arguments to pass to the listener.
-	 * @returns {boolean} Whether the event was emitted.
-	 */
-	emit<K extends keyof ClientEventsModifiable>(event: K, ...args: ClientEventsModifiable[K]): boolean;
-	/**
-	 * Emit an event.
-	 * @template {string | symbol} S - The type of the event.
-	 * @param {Exclude<S, keyof ClientEventsModifiable>} event - The event to emit.
-	 * @param {...unknown[]} args - The arguments to pass to the listener.
-	 * @returns {boolean} Whether the event was emitted.
-	 */
-	emit<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, ...args: unknown[]): boolean;
-	/**
-	 * Emit an event.
-	 * @param {(string | symbol)} event - The event to emit.
-	 * @param {...unknown[]} args - The arguments to pass to the listener.
-	 * @returns {boolean} Whether the event was emitted.
-	 */
-	emit(event: string | symbol, ...args: unknown[]): boolean {
-		return super.emit(event, ...args);
-	}
-}
-
 export type RefShardingClient = ShardingClient;
-
 
 /**
  * Simplified Cluster instance available on the {@link ClusterClient}.

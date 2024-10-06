@@ -1,6 +1,6 @@
 import { ChildProcess, Serializable as ChildSerializable } from 'child_process';
-import { ClusterManager } from './core/clusterManager';
 import { WorkerThreadOptions } from './classes/worker';
+import { ClusterManager } from './core/clusterManager';
 import { ChildProcessOptions } from './classes/child';
 import { ClusterClient } from './core/clusterClient';
 import { ProcessMessage } from './other/message';

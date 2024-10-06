@@ -1,7 +1,7 @@
 import { MessageTypes, Serializable, StoredPromise } from '../types';
 import { BaseMessage, DataType } from '../other/message';
-import { ClusterManager } from 'src/core/clusterManager';
-import { ClusterClient } from 'src/core/clusterClient';
+import { ClusterManager } from '../core/clusterManager';
+import { ClusterClient } from '../core/clusterClient';
 
 /**
  * Handles promises by storing them in a map and resolving them when the response is received.

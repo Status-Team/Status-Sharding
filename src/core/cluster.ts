@@ -2,8 +2,8 @@ import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialize
 import { ProcessMessage, BaseMessage, DataType } from '../other/message';
 import { Worker as WorkerThread } from 'worker_threads';
 import { ShardingUtils } from '../other/shardingUtils';
-import { ClusterHandler } from '../handlers/message';
 import { RefClusterManager } from './clusterManager';
+import { ClusterHandler } from '../handlers/message';
 import { RefShardingClient } from './clusterClient';
 import { BrokerMessage } from '../handlers/broker';
 import { ChildProcess } from 'child_process';

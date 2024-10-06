@@ -1,5 +1,5 @@
 import { BaseMessage, DataType, DataTypes, EvalMessage } from '../other/message';
-import { ClusterClient, ShardingClient } from '../core/clusterClient';
+import { ClusterClient, RefShardingClient } from '../core/clusterClient';
 import { ShardingUtils } from '../other/shardingUtils';
 import { MessageTypes, Serializable } from '../types';
 import { Worker } from '../classes/worker';
@@ -146,9 +146,9 @@ export class ClusterHandler {
  * @export
  * @class ClusterClientHandler
  * @typedef {ClusterClientHandler}
- * @template {ShardingClient} [InternalClient=ShardingClient] - The type of the internal client.
+ * @template {RefShardingClient} [InternalClient=RefShardingClient] - The type of the internal client.
  */
-export class ClusterClientHandler<InternalClient extends ShardingClient = ShardingClient> {
+export class ClusterClientHandler<InternalClient extends RefShardingClient = RefShardingClient> {
 	/**
 	 * Creates an instance of ClusterClientHandler.
 	 * @constructor
