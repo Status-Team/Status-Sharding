@@ -96,19 +96,20 @@ export class Child {
 			return false;
 		}
 
-		this.process.removeAllListeners?.();
 		try {
 			this.process.kill();
 
 			return new Promise((resolve, reject) => {
-				this.process?.once('exit', () => resolve(true));
+				this.process?.once('exit', () => {
+					this.process?.removeAllListeners?.();
+					resolve(true);
+				});
 
 				this.process?.once('error', (err) => {
 					console.error('Error with child process:', err);
 					reject(err);
 				});
 			});
-			return true;
 		} catch (error) {
 			console.error('Child termination failed:', error);
 			return false;

@@ -44,6 +44,7 @@ export class HeartbeatManager {
 				} as BaseMessage<'heartbeat'>)?.catch(() => null);
 
 				if (Date.now() - cluster.lastHeartbeatReceived > this.manager.options.heartbeat.timeout) {
+					this.manager._debug(`Cluster ${cluster.id} has missed a heartbeat. (${this.getClusterStats(cluster.id).missedBeats} missed)`);
 					this.addMissedBeat(cluster.id);
 				} else {
 					const clusterData = this.getClusterStats(cluster.id);
@@ -51,6 +52,8 @@ export class HeartbeatManager {
 						clusterData.missedBeats = 0;
 						this.beats.set(cluster.id, clusterData);
 					}
+
+					this.manager._debug(`Cluster ${cluster.id} has received a heartbeat.`);
 				}
 			}
 		}, this.manager.options.heartbeat.interval);

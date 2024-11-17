@@ -74,12 +74,14 @@ export class Worker {
 			return false;
 		}
 
-		this.process.removeAllListeners?.();
 		try {
 			this.process!.terminate();
 
 			return new Promise((resolve, reject) => {
-				this.process?.once('exit', () => resolve(true));
+				this.process?.once('exit', () => {
+					this.process?.removeAllListeners?.();
+					resolve(true);
+				});
 
 				this.process?.once('error', (err) => {
 					console.error('Error with worker thread:', err);
