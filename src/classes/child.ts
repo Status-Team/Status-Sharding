@@ -91,17 +91,28 @@ export class Child {
 	 * @returns {Promise<boolean>} If the child process was killed.
 	 */
 	public async kill(): Promise<boolean> {
-		// @ts-ignore
-		this.process?.removeAllListeners();
-		return new Promise<boolean>((resolve) => {
-			try {
-				process.kill(this.process?.pid as number, 'SIGKILL');
-				resolve(true);
-			} catch (error) {
-				console.error('Worker termination failed.');
-				throw error;
-			}
-		});
+		if (!this.process || !this.process.pid) {
+			console.warn('No process to kill.');
+			return false;
+		}
+
+		this.process.removeAllListeners?.();
+		try {
+			this.process.kill();
+
+			return new Promise((resolve, reject) => {
+				this.process?.once('exit', () => resolve(true));
+
+				this.process?.once('error', (err) => {
+					console.error('Error with child process:', err);
+					reject(err);
+				});
+			});
+			return true;
+		} catch (error) {
+			console.error('Child termination failed:', error);
+			return false;
+		}
 	}
 
 	/**

@@ -399,7 +399,6 @@ export class Cluster<
 	 * @returns {void} The void promise.
 	 */
 	private _handleExit(exitCode: number): void {
-		// this.manager.heartbeat?.removeCluster(this.id);
 		this.emit('death', this, this.thread?.process);
 
 		this.manager._debug('[Death] [Cluster ' + this.id + '] Cluster died with exit code ' + exitCode + '.');

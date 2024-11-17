@@ -69,18 +69,27 @@ export class Worker {
 	 * @returns {Promise<boolean>} The promise.
 	 */
 	public async kill(): Promise<boolean> {
-		// @ts-ignore
-		this.process?.removeAllListeners();
+		if (!this.process || !this.process.threadId) {
+			console.warn('No process to kill.');
+			return false;
+		}
 
-		return new Promise<boolean>((resolve) => {
-			try {
-				process.kill(this.process?.threadId as number, 'SIGKILL');
-				resolve(true);
-			} catch (error) {
-				console.error('Worker termination failed.');
-				throw error;
-			}
-		});
+		this.process.removeAllListeners?.();
+		try {
+			this.process!.terminate();
+
+			return new Promise((resolve, reject) => {
+				this.process?.once('exit', () => resolve(true));
+
+				this.process?.once('error', (err) => {
+					console.error('Error with worker thread:', err);
+					reject(err);
+				});
+			});
+		} catch (error) {
+			console.error('Child termination failed:', error);
+			return false;
+		}
 	}
 
 	/**
