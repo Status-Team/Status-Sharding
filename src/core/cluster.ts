@@ -131,6 +131,7 @@ export class Cluster<
 		this.messageHandler = new ClusterHandler(this, this.thread);
 
 		const thread = this.thread.spawn();
+		thread.on('disconnect', this._handleExit.bind(this));
 		thread.on('message', this._handleMessage.bind(this));
 		thread.on('error', this._handleError.bind(this));
 		thread.on('exit', this._handleExit.bind(this));
