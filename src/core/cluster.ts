@@ -131,7 +131,7 @@ export class Cluster<
 		this.messageHandler = new ClusterHandler(this, this.thread);
 
 		const thread = this.thread.spawn();
-		thread.on('disconnect', this._handleExit.bind(this));
+		thread.on('disconnect', this._handleDisconnect.bind(this));
 		thread.on('message', this._handleMessage.bind(this));
 		thread.on('error', this._handleError.bind(this));
 		thread.on('exit', this._handleExit.bind(this));
@@ -405,6 +405,11 @@ export class Cluster<
 
 		this.ready = false;
 		this.thread = null;
+	}
+
+	private _handleDisconnect(): void {
+		this.emit('disconnect', this, this.thread?.process);
+		this.manager._debug('[Death] [Cluster ' + this.id + '] Cluster disconnected.');
 	}
 
 	/**
