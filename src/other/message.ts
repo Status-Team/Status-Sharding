@@ -22,6 +22,19 @@ export type RespawnMessage = {
 	clusterDelay?: number; // Only when respawning all clusters.
 	respawnDelay?: number;
 	timeout?: number;
+	except?: number[];
+};
+
+/**
+ * Respawn some message type.
+ * @export
+ * @typedef {RespawnSomeMessage}
+ */
+export type RespawnSomeMessage = {
+	clusterIds: number[];
+	clusterDelay?: number; // Only when respawning all clusters.
+	respawnDelay?: number;
+	timeout?: number;
 };
 
 /**
@@ -41,7 +54,7 @@ export type MaintenanceMessage = string;
  * @export
  * @typedef {DataType}
  */
-export type DataType = 'normal' | 'eval' | 'respawn' | 'maintenance' | 'evalResult' | 'readyOrSpawn' | 'heartbeat' | 'error' | 'reply';
+export type DataType = 'normal' | 'eval' | 'respawnAll' | 'maintenance' | 'evalResult' | 'readyOrSpawn' | 'heartbeat' | 'error' | 'reply' | 'respawnSome';
 
 /**
  * The type of the message.
@@ -56,7 +69,8 @@ export type DataTypes<A = object, P extends object = object> = {
 	eval: EvalMessage<P>;
 	readyOrSpawn: undefined;
 	heartbeat: undefined;
-	respawn: RespawnMessage;
+	respawnAll: RespawnMessage;
+	respawnSome: RespawnSomeMessage;
 	maintenance: MaintenanceMessage;
 	evalResult: EvalResultMessage;
 	error: {

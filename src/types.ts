@@ -58,6 +58,7 @@ export enum MessageTypes {
     'ClientManagerEvalResponseError' = 23,
     'ManagerReady' = 24,
     'Kill' = 25,
+    'ClientRespawnSpecific' = 26,
 }
 
 /**

@@ -373,20 +373,55 @@ export class ClusterClient<
 	}
 
 	/**
-	 * Respawns all clusters.
-	 * @param {{ clusterDelay?: number; respawnDelay?: number; timeout?: number }} [options={}] - The options for the respawn.
+	 * Kills all running clusters and respawns them.
+	 * @async
+	 * @param {number} [clusterDelay=8000] - The delay between each cluster respawn.
+	 * @param {number} [respawnDelay=5500] - The delay between each shard respawn.
+	 * @param {number} [timeout=-1] - The timeout for each respawn.
+	 * @param {number[]} [except=[]] - The clusters to exclude from the respawn.
 	 * @returns {Promise<void>} A promise that resolves when the message was sent.
 	 */
-	public respawnAll(options: { clusterDelay?: number; respawnDelay?: number; timeout?: number } = {}): Promise<void> {
+	public respawnAll(clusterDelay: number = 8000, respawnDelay: number = 5500, timeout: number = -1, except: number[] = []): Promise<void> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#8).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#8).'));
 
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
 
 		return this.process.send({
-			data: options,
 			_type: MessageTypes.ClientRespawnAll,
-		} as BaseMessage<'respawn'>);
+			data: {
+				clusterDelay,
+				respawnDelay,
+				timeout,
+				except,
+			},
+		} as BaseMessage<'respawnAll'>);
+	}
+
+	/**
+	 * Kills specific clusters and respawns them.
+	 * @async
+	 * @param {number[]} clusters - The clusters to respawn.
+	 * @param {number} [clusterDelay=8000] - The delay between each cluster respawn.
+	 * @param {number} [respawnDelay=5500] - The delay between each shard respawn.
+	 * @param {number} [timeout=-1] - The timeout for each respawn.
+	 * @returns {Promise<void>} A promise that resolves when the message was sent.
+	 */
+	public async respawnClusters(clusters: number[], clusterDelay: number = 8000, respawnDelay: number = 5500, timeout: number = -1): Promise<void> {
+		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#8).'));
+		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#8).'));
+
+		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
+
+		return this.process.send({
+			_type: MessageTypes.ClientRespawnSpecific,
+			data: {
+				clusterIds: clusters,
+				clusterDelay,
+				respawnDelay,
+				timeout,
+			},
+		} as BaseMessage<'respawnSome'>);
 	}
 
 	/**

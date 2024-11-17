@@ -106,12 +106,17 @@ export class ClusterHandler {
 				break;
 			}
 			case MessageTypes.ClientRespawnAll: {
-				const { clusterDelay, respawnDelay, timeout } = message.data as DataTypes['respawn'];
-				this.cluster.manager.respawnAll(clusterDelay, respawnDelay, timeout);
+				const { clusterDelay, respawnDelay, timeout, except } = message.data as DataTypes['respawnAll'];
+				this.cluster.manager.respawnAll(clusterDelay, respawnDelay, timeout, except);
+				break;
+			}
+			case MessageTypes.ClientRespawnSpecific: {
+				const { clusterDelay, respawnDelay, timeout, clusterIds } = message.data as DataTypes['respawnSome'];
+				this.cluster.manager.respawnClusters(clusterIds, clusterDelay, respawnDelay, timeout);
 				break;
 			}
 			case MessageTypes.ClientRespawn: {
-				const { respawnDelay, timeout } = message.data as DataTypes['respawn'];
+				const { respawnDelay, timeout } = message.data as Omit<DataTypes['respawnAll'], 'clusterDelay' | 'except'>;
 				this.cluster.respawn(respawnDelay, timeout);
 				break;
 			}
