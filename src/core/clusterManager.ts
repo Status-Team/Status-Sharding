@@ -6,9 +6,7 @@ import { IPCBrokerManager } from '../handlers/broker';
 import { PromiseHandler } from '../handlers/promise';
 import { RefShardingClient } from './clusterClient';
 import { Cluster, RefCluster } from './cluster';
-import { ChildProcess } from 'child_process';
 import { Queue } from '../handlers/queue';
-import { Worker } from 'worker_threads';
 import CustomMap from '../other/map';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
@@ -87,7 +85,7 @@ export class ClusterManager<
 	 * @param {string} file - Path to the file that will be spawned.
 	 * @param {ClusterManagerCreateOptions<ClusteringMode>} options - Options for the ClusterManager.
 	 */
-	constructor(public file: string, options: ClusterManagerCreateOptions<ClusteringMode>) {
+	constructor (public file: string, options: ClusterManagerCreateOptions<ClusteringMode>) {
 		super();
 
 		if (!file) throw new Error('CLIENT_INVALID_OPTION | No File specified.');
@@ -225,26 +223,35 @@ export class ClusterManager<
 	 * @returns {Promise<Map<number, InternalCluster>>} The clusters after the respawn.
 	 */
 	public async respawnAll(clusterDelay: number = 8000, respawnDelay: number = 5500, timeout: number = -1, except: number[] = []): Promise<Map<number, InternalCluster>> {
-		let s = 0; let i = 0;
 		this.promise.nonces.clear();
 		this._debug('[ClusterManager] Respawning all clusters.');
 
-		const promises: Promise<ChildProcess | Worker | void>[] = [];
-		const listOfShardsForCluster = ShardingUtils.chunkArray(this.options.shardList || [], this.options.shardsPerClusters || this.options.totalShards);
+		const listOfShardsForCluster = ShardingUtils.chunkArray(
+			this.options.shardList || [],
+			this.options.shardsPerClusters || this.options.totalShards,
+		);
 
 		const clustersToRestart = Array.from(this.clusters.values()).filter((c) => !except.includes(c.id));
 		if (clustersToRestart.length === 0) return this.clusters;
 
-		for (const cluster of clustersToRestart) {
-			promises.push(cluster.respawn(respawnDelay, timeout));
+		let i = 0;
+
+		while (clustersToRestart.length > 0) {
+			const cluster = clustersToRestart.shift();
+			if (!cluster) continue;
+
+			this._debug(`Respawning cluster ${cluster.id}`);
+			await cluster.respawn(respawnDelay, timeout);
 
 			const length = listOfShardsForCluster[i]?.length || this.options.totalShards / this.options.totalClusters;
-			if (++s < this.clusters.size && clusterDelay > 0) promises.push(ShardingUtils.delayFor(length * clusterDelay));
+			if (clusterDelay > 0) {
+				this._debug(`Delaying ${length * clusterDelay}ms for cluster ${cluster.id}`);
+				await ShardingUtils.delayFor(length * clusterDelay);
+			}
 
 			i++;
 		}
 
-		await Promise.allSettled(promises);
 		return this.clusters;
 	}
 
@@ -258,26 +265,32 @@ export class ClusterManager<
 	 * @returns {Promise<Map<number, InternalCluster>>} The clusters after the respawn.
 	 */
 	public async respawnClusters(clusters: number[], clusterDelay: number = 8000, respawnDelay: number = 5500, timeout: number = -1): Promise<Map<number, InternalCluster>> {
-		let s = 0; let i = 0;
 		this.promise.nonces.clear();
 		this._debug('[ClusterManager] Respawning specific clusters.');
 
-		const promises: Promise<ChildProcess | Worker | void>[] = [];
-		const listOfShardsForCluster = ShardingUtils.chunkArray(this.options.shardList || [], this.options.shardsPerClusters || this.options.totalShards);
+		const listOfShardsForCluster = ShardingUtils.chunkArray(
+			this.options.shardList || [],
+			this.options.shardsPerClusters || this.options.totalShards,
+		);
 
 		const clustersToRestart = Array.from(this.clusters.values()).filter((c) => clusters.includes(c.id));
 		if (clustersToRestart.length === 0) return this.clusters;
 
+		let i = 0;
+
 		for (const cluster of clustersToRestart) {
-			promises.push(cluster.respawn(respawnDelay, timeout));
+			this._debug(`Respawning cluster ${cluster.id}`);
+			await cluster.respawn(respawnDelay, timeout);
 
 			const length = listOfShardsForCluster[i]?.length || this.options.totalShards / this.options.totalClusters;
-			if (++s < clusters.length && clusterDelay > 0) promises.push(ShardingUtils.delayFor(length * clusterDelay));
+			if (clusterDelay > 0 && clustersToRestart.length > 1) {
+				this._debug(`Delaying ${length * clusterDelay}ms for cluster ${cluster.id}`);
+				await ShardingUtils.delayFor(length * clusterDelay);
+			}
 
 			i++;
 		}
 
-		await Promise.allSettled(promises);
 		return this.clusters;
 	}
 
