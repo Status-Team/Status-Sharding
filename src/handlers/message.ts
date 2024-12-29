@@ -1,7 +1,8 @@
 import { BaseMessage, DataType, DataTypes, EvalMessage } from '../other/message';
-import { ClusterClient, RefShardingClient } from '../core/clusterClient';
 import { ShardingUtils } from '../other/shardingUtils';
 import { MessageTypes, Serializable } from '../types';
+import { ClusterClient } from '../core/clusterClient';
+import { RefShardingClient } from 'src/core/client';
 import { Worker } from '../classes/worker';
 import { Cluster } from '../core/cluster';
 import { Child } from '../classes/child';
