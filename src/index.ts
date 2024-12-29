@@ -4,7 +4,6 @@ export * from './classes/worker';
 export * from './core/clusterManager';
 export * from './core/clusterClient';
 export * from './core/cluster';
-export * from './core/client';
 
 export * from './handlers/message';
 export * from './handlers/promise';

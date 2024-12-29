@@ -104,7 +104,7 @@ export class ClusterManager<
 				enabled: false,
 				maxRestarts: 3,
 				interval: 5000,
-				timeout: -1,
+				timeout: 10000,
 				maxMissedHeartbeats: 3,
 			}),
 			mode: options.mode || 'worker',
