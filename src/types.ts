@@ -32,33 +32,33 @@ export const Endpoints = {
  * @enum {number}
  */
 export enum MessageTypes {
-    'MissingType' = 0,
-    'CustomRequest' = 1,
-    'CustomMessage' = 2,
-    'CustomReply' = 3,
-    'Heartbeat' = 4,
-    'HeartbeatAck' = 5,
-    'ClientBroadcast' = 6,
-    'ClientBroadcastRequest' = 7,
-    'ClientBroadcastResponse' = 8,
-    'ClientBroadcastResponseError' = 9,
-    'ClientRespawn' = 10,
-    'ClientRespawnAll' = 11,
-    'ClientMaintenance' = 12,
-    'ClientMaintenanceEnable' = 13,
-    'ClientMaintenanceDisable' = 14,
-    'ClientMaintenanceAll' = 15,
-    'ClientSpawnNextCluster' = 16,
-    'ClientReady' = 17,
-    'ClientEvalRequest' = 18,
-    'ClientEvalResponse' = 19,
-    'ClientEvalResponseError' = 20,
-    'ClientManagerEvalRequest' = 21,
-    'ClientManagerEvalResponse' = 22,
-    'ClientManagerEvalResponseError' = 23,
-    'ManagerReady' = 24,
-    'Kill' = 25,
-    'ClientRespawnSpecific' = 26,
+	'MissingType' = 0,
+	'CustomRequest' = 1,
+	'CustomMessage' = 2,
+	'CustomReply' = 3,
+	'Heartbeat' = 4,
+	'HeartbeatAck' = 5,
+	'ClientBroadcast' = 6,
+	'ClientBroadcastRequest' = 7,
+	'ClientBroadcastResponse' = 8,
+	'ClientBroadcastResponseError' = 9,
+	'ClientRespawn' = 10,
+	'ClientRespawnAll' = 11,
+	'ClientMaintenance' = 12,
+	'ClientMaintenanceEnable' = 13,
+	'ClientMaintenanceDisable' = 14,
+	'ClientMaintenanceAll' = 15,
+	'ClientSpawnNextCluster' = 16,
+	'ClientReady' = 17,
+	'ClientEvalRequest' = 18,
+	'ClientEvalResponse' = 19,
+	'ClientEvalResponseError' = 20,
+	'ClientManagerEvalRequest' = 21,
+	'ClientManagerEvalResponse' = 22,
+	'ClientManagerEvalResponseError' = 23,
+	'ManagerReady' = 24,
+	'Kill' = 25,
+	'ClientRespawnSpecific' = 26,
 }
 
 /**
@@ -143,71 +143,71 @@ export type Serialized<T> = T extends symbol | bigint | UnknownFunction ? never 
  * @template {ClusteringMode} T - The type of the clustering mode.
  */
 export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
-    /**
-     * What mode to use for clustering.
-     * @type {?T}
-     */
-    mode?: T;
-    /**
-     * The token of the discord bot.
-     * @type {?string}
-     */
-    token?: string;
-    /**
-     * Number of total internal shards or -1.
-     * @type {?number}
-     */
-    totalShards?: number;
-    /**
-     * Number of total Clusters/Process to spawn.
-     * @type {?number}
-     */
-    totalClusters?: number;
-    /**
-     * Number of shards per cluster.
-     * @type {?number}
-     */
-    shardsPerClusters?: number;
-    /**
-     * Arguments to pass to the clustered script when spawning (only available when using the `process` mode).
-     * @type {?string[]}
-     */
-    shardArgs?: string[];
-    /**
-     * Arguments to pass to the clustered script executable when spawning.
-     * @type {?string[]}
-     */
-    execArgv?: string[];
-    /**
-     * Whether clusters should automatically respawn upon exiting.
-     * @type {?boolean}
-     */
-    respawn?: boolean;
-    /**
-     * Heartbeat options.
-     * @type {?ClusterHeartbeatOptions}
-     */
-    heartbeat?: ClusterHeartbeatOptions;
-    /**
-     * Control the Spawn Queue.
-     * @type {?QueueOptions}
-     */
-    queueOptions?: QueueOptions;
-    /**
-     * Options to pass to the spawn, respawn method.
-     * @type {?ClusterSpawnOptions}
-     */
-    spawnOptions?: ClusterSpawnOptions;
-    /**
-     * Data, which is passed to the Cluster.
-     * @type {?object}
-     */
-    clusterData?: object;
-    /**
-     * Options, which is passed when forking a child or creating a thread.
-     * @type {?T extends 'worker' ? WorkerThreadOptions : ChildProcessOptions}
-     */
-    clusterOptions?: T extends 'worker' ? WorkerThreadOptions : ChildProcessOptions;
+	/**
+	 * What mode to use for clustering.
+	 * @type {?T}
+	 */
+	mode?: T;
+	/**
+	 * The token of the discord bot.
+	 * @type {?string}
+	 */
+	token?: string;
+	/**
+	 * Number of total internal shards or -1.
+	 * @type {?number}
+	 */
+	totalShards?: number;
+	/**
+	 * Number of total Clusters/Process to spawn.
+	 * @type {?number}
+	 */
+	totalClusters?: number;
+	/**
+	 * Number of shards per cluster.
+	 * @type {?number}
+	 */
+	shardsPerClusters?: number;
+	/**
+	 * Arguments to pass to the clustered script when spawning (only available when using the `process` mode).
+	 * @type {?string[]}
+	 */
+	shardArgs?: string[];
+	/**
+	 * Arguments to pass to the clustered script executable when spawning.
+	 * @type {?string[]}
+	 */
+	execArgv?: string[];
+	/**
+	 * Whether clusters should automatically respawn upon exiting.
+	 * @type {?boolean}
+	 */
+	respawn?: boolean;
+	/**
+	 * Heartbeat options.
+	 * @type {?ClusterHeartbeatOptions}
+	 */
+	heartbeat?: ClusterHeartbeatOptions;
+	/**
+	 * Control the Spawn Queue.
+	 * @type {?QueueOptions}
+	 */
+	queueOptions?: QueueOptions;
+	/**
+	 * Options to pass to the spawn, respawn method.
+	 * @type {?ClusterSpawnOptions}
+	 */
+	spawnOptions?: ClusterSpawnOptions;
+	/**
+	 * Data, which is passed to the Cluster.
+	 * @type {?object}
+	 */
+	clusterData?: object;
+	/**
+	 * Options, which is passed when forking a child or creating a thread.
+	 * @type {?T extends 'worker' ? WorkerThreadOptions : ChildProcessOptions}
+	 */
+	clusterOptions?: T extends 'worker' ? WorkerThreadOptions : ChildProcessOptions;
 }
 
 /**
@@ -219,46 +219,46 @@ export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
  * @extends {ClusterManagerCreateOptions<T>}
  */
 export interface ClusterManagerOptions<T extends ClusteringMode> extends ClusterManagerCreateOptions<T> {
-    /**
-     * Which mode to use for clustering.
-     * @type {T}
-     */
-    mode: T;
-    /**
-     * Number of total internal shards or -1.
-     * @type {number}
-     */
-    totalShards: number;
-    /**
-     * Number of total Clusters/Process to spawn.
-     * @type {number}
-     */
-    totalClusters: number;
-    /**
-     * Number of shards per cluster.
-     * @type {number}
-     */
-    shardsPerClusters: number;
-    /**
-     * An Array of Internal Shards Ids, which should get spawned.
-     * @type {number[]}
-     */
-    shardList: number[];
-    /**
-     * An Array of Ids to assign to the spawned Clusters, when the default id scheme is not wanted.
-     * @type {number[]}
-     */
-    clusterList: number[];
-    /**
-     * Options to pass to the spawn, respawn method.
-     * @type {Required<ClusterSpawnOptions>}
-     */
-    spawnOptions: Required<ClusterSpawnOptions>;
-    /**
-     * Heartbeat options.
-     * @type {Required<ClusterHeartbeatOptions>}
-     */
-    heartbeat: Required<ClusterHeartbeatOptions>;
+	/**
+	 * Which mode to use for clustering.
+	 * @type {T}
+	 */
+	mode: T;
+	/**
+	 * Number of total internal shards or -1.
+	 * @type {number}
+	 */
+	totalShards: number;
+	/**
+	 * Number of total Clusters/Process to spawn.
+	 * @type {number}
+	 */
+	totalClusters: number;
+	/**
+	 * Number of shards per cluster.
+	 * @type {number}
+	 */
+	shardsPerClusters: number;
+	/**
+	 * An Array of Internal Shards Ids, which should get spawned.
+	 * @type {number[]}
+	 */
+	shardList: number[];
+	/**
+	 * An Array of Ids to assign to the spawned Clusters, when the default id scheme is not wanted.
+	 * @type {number[]}
+	 */
+	clusterList: number[];
+	/**
+	 * Options to pass to the spawn, respawn method.
+	 * @type {Required<ClusterSpawnOptions>}
+	 */
+	spawnOptions: Required<ClusterSpawnOptions>;
+	/**
+	 * Heartbeat options.
+	 * @type {Required<ClusterHeartbeatOptions>}
+	 */
+	heartbeat: Required<ClusterHeartbeatOptions>;
 }
 
 /**
@@ -269,45 +269,45 @@ export interface ClusterManagerOptions<T extends ClusteringMode> extends Cluster
  */
 export interface ClusterClientData {
 	/**
-     * List of shards that are assigned to this cluster.
-     * @type {number[]}
-     */
-    ShardList: number[];
+	 * List of shards that are assigned to this cluster.
+	 * @type {number[]}
+	 */
+	ShardList: number[];
 	/**
-     * The total amount of shards.
-     * @type {number}
-     */
-    TotalShards: number;
+	 * The total amount of shards.
+	 * @type {number}
+	 */
+	TotalShards: number;
 	/**
-     * The total amount of clusters.
-     * @type {number}
-     */
-    ClusterCount: number;
+	 * The total amount of clusters.
+	 * @type {number}
+	 */
+	ClusterCount: number;
 	/**
-     * The id of the cluster.
-     * @type {number}
-     */
-    ClusterId: number;
+	 * The id of the cluster.
+	 * @type {number}
+	 */
+	ClusterId: number;
 	/**
-     * Mode of the manager.
-     * @type {ClusteringMode}
-     */
-    ClusterManagerMode: ClusteringMode;
+	 * Mode of the manager.
+	 * @type {ClusteringMode}
+	 */
+	ClusterManagerMode: ClusteringMode;
 	/**
-     * Mode of the queue.
-     * @type {?('auto' | 'manual')}
-     */
-    ClusterQueueMode?: 'auto' | 'manual';
+	 * Mode of the queue.
+	 * @type {?('auto' | 'manual')}
+	 */
+	ClusterQueueMode?: 'auto' | 'manual';
 	/**
-     * First shard id of the cluster.
-     * @type {number}
-     */
-    FirstShardId: number;
+	 * First shard id of the cluster.
+	 * @type {number}
+	 */
+	FirstShardId: number;
 	/**
-     * Last shard id of the cluster.
-     * @type {number}
-     */
-    LastShardId: number;
+	 * Last shard id of the cluster.
+	 * @type {number}
+	 */
+	LastShardId: number;
 }
 
 /**
@@ -317,16 +317,16 @@ export interface ClusterClientData {
  * @typedef {ClusterSpawnOptions}
  */
 export interface ClusterSpawnOptions {
-    /**
-     * How long to wait between spawning each cluster.
-     * @type {?number}
-     */
-    delay?: number;
-    /**
-     * How long to wait for a cluster to become ready before killing it and retrying.
-     * @type {?number}
-     */
-    timeout?: number;
+	/**
+	 * How long to wait between spawning each cluster.
+	 * @type {?number}
+	 */
+	delay?: number;
+	/**
+	 * How long to wait for a cluster to become ready before killing it and retrying.
+	 * @type {?number}
+	 */
+	timeout?: number;
 }
 
 /**
@@ -336,31 +336,31 @@ export interface ClusterSpawnOptions {
  * @typedef {ClusterHeartbeatOptions}
  */
 export interface ClusterHeartbeatOptions {
-    /**
-     * Whether the heartbeat system is enabled.
-     * @type {boolean}
-     */
-    enabled: boolean;
-    /**
-     * Maximum amount of missed heartbeats a cluster can have in the interval.
-     * @type {?number}
-     */
-    maxMissedHeartbeats?: number;
-    /**
-     * Maximum amount of restarts a cluster can have in the interval.
-     * @type {?number}
-     */
-    maxRestarts?: number;
-    /**
-     * Interval in milliseconds between each heartbeat.
-     * @type {?number}
-     */
-    interval?: number;
-    /**
-     * Timeout in milliseconds after which a cluster will be considered as unresponsive.
-     * @type {?number}
-     */
-    timeout?: number;
+	/**
+	 * Whether the heartbeat system is enabled.
+	 * @type {boolean}
+	 */
+	enabled: boolean;
+	/**
+	 * Maximum amount of missed heartbeats a cluster can have in the interval.
+	 * @type {?number}
+	 */
+	maxMissedHeartbeats?: number;
+	/**
+	 * Maximum amount of restarts a cluster can have in the interval.
+	 * @type {?number}
+	 */
+	maxRestarts?: number;
+	/**
+	 * Interval in milliseconds between each heartbeat.
+	 * @type {?number}
+	 */
+	interval?: number;
+	/**
+	 * Timeout in milliseconds after which a cluster will be considered as unresponsive.
+	 * @type {?number}
+	 */
+	timeout?: number;
 }
 
 /**
@@ -370,16 +370,16 @@ export interface ClusterHeartbeatOptions {
  * @typedef {QueueOptions}
  */
 export interface QueueOptions {
-    /**
-     * Whether the spawn queue be automatically managed.
-     * @type {?('auto' | 'manual')}
-     */
-    mode?: 'auto' | 'manual';
-    /**
-     * Time to wait until next item.
-     * @type {?number}
-     */
-    timeout?: number;
+	/**
+	 * Whether the spawn queue be automatically managed.
+	 * @type {?('auto' | 'manual')}
+	 */
+	mode?: 'auto' | 'manual';
+	/**
+	 * Time to wait until next item.
+	 * @type {?number}
+	 */
+	timeout?: number;
 }
 
 /**
@@ -389,11 +389,11 @@ export interface QueueOptions {
  * @typedef {ClusterKillOptions}
  */
 export interface ClusterKillOptions {
-    /**
-     * The reason for killing the cluster.
-     * @type {string}
-     */
-    reason: string;
+	/**
+	 * The reason for killing the cluster.
+	 * @type {string}
+	 */
+	reason: string;
 }
 
 /**
@@ -404,36 +404,36 @@ export interface ClusterKillOptions {
  * @template {object} [T=object] - The type of the context.
  */
 export interface EvalOptions<T extends object = object> {
-    /**
-     * Only run the script in a single cluster or set of clusters.
-     * @type {?(number | number[])}
-     */
-    cluster?: number | number[];
-    /**
-     * On what shard to run the script.
-     * @type {?(number | number[])}
-     */
-    shard?: number | number[];
-    /**
-     * On what guild to run the script.
-     * @type {?string}
-     */
-    guildId?: string;
-    /**
-     * Context to use for the script.
-     * @type {?T}
-     */
-    context?: T;
-    /**
-     * Timeout before the script is cancelled.
-     * @type {?number}
-     */
-    timeout?: number;
-    /**
-     * Whether to continue running the script even if one of the clusters returns an error.
-     * @type {?boolean}
-     */
-    useAllSettled?: boolean;
+	/**
+	 * Only run the script in a single cluster or set of clusters.
+	 * @type {?(number | number[])}
+	 */
+	cluster?: number | number[];
+	/**
+	 * On what shard to run the script.
+	 * @type {?(number | number[])}
+	 */
+	shard?: number | number[];
+	/**
+	 * On what guild to run the script.
+	 * @type {?string}
+	 */
+	guildId?: string;
+	/**
+	 * Context to use for the script.
+	 * @type {?T}
+	 */
+	context?: T;
+	/**
+	 * Timeout before the script is cancelled.
+	 * @type {?number}
+	 */
+	timeout?: number;
+	/**
+	 * Whether to continue running the script even if one of the clusters returns an error.
+	 * @type {?boolean}
+	 */
+	useAllSettled?: boolean;
 }
 
 /**
@@ -451,26 +451,26 @@ export type ReClusterRestartMode = 'gracefulSwitch' | 'rolling';
  */
 export interface ReClusterOptions {
 	/**
-     * The new totalShards of the bot.
-     * @type {?number}
-     */
-    totalShards?: number;
+	 * The new totalShards of the bot.
+	 * @type {?number}
+	 */
+	totalShards?: number;
 	/**
-     * The amount of totalClusters to spread the shards over all clusters.
-     * @type {?number}
-     */
-    totalClusters?: number;
+	 * The amount of totalClusters to spread the shards over all clusters.
+	 * @type {?number}
+	 */
+	totalClusters?: number;
 	/**
-     * The amount of shards per cluster.
-     * @type {?number}
-     */
-    shardsPerClusters?: number;
+	 * The amount of shards per cluster.
+	 * @type {?number}
+	 */
+	shardsPerClusters?: number;
 
 	/**
-     * The restartMode of the clusterManager, gracefulSwitch = waits until all new clusters have spawned with maintenance mode, rolling = Once the Cluster is Ready, the old cluster will be killed.
-     * @type {?ReClusterRestartMode}
-     */
-    restartMode?: ReClusterRestartMode;
+	 * The restartMode of the clusterManager, gracefulSwitch = waits until all new clusters have spawned with maintenance mode, rolling = Once the Cluster is Ready, the old cluster will be killed.
+	 * @type {?ReClusterRestartMode}
+	 */
+	restartMode?: ReClusterRestartMode;
 }
 
 /**
@@ -481,22 +481,22 @@ export interface ReClusterOptions {
  */
 export interface StoredPromise {
 	/**
-     * Timeout before promise is canceled.
-     * @type {?NodeJS.Timeout}
-     */
-    timeout?: NodeJS.Timeout;
+	 * Timeout before promise is canceled.
+	 * @type {?NodeJS.Timeout}
+	 */
+	timeout?: NodeJS.Timeout;
 
-    /**
-     * Resolves the promise.
-     * @template {unknown} T - Type of data.
-     * @param {unknown} value - Data that resolves the promise.
-     */
-    resolve(value: unknown): void;
 	/**
-     * Return an error if failed.
-     * @param {Error} error - Error to return.
-     */
-    reject(error: Error): void;
+	 * Resolves the promise.
+	 * @template {unknown} T - Type of data.
+	 * @param {unknown} value - Data that resolves the promise.
+	 */
+	resolve(value: unknown): void;
+	/**
+	 * Return an error if failed.
+	 * @param {Error} error - Error to return.
+	 */
+	reject(error: Error): void;
 }
 
 /**
@@ -506,36 +506,36 @@ export interface StoredPromise {
  * @typedef {ClusterManagerEvents}
  */
 export interface ClusterManagerEvents {
-    /**
-     * Emits when client sends a request via IPC.
-     * @type {[message: ProcessMessage]}
-     */
-    clientRequest: [message: ProcessMessage];
-    /**
-     * Emits when cluster is created.
-     * @type {[cluster: Cluster]}
-     */
-    clusterCreate: [cluster: Cluster];
-    /**
-     * Emits when cluster is ready.
-     * @type {[cluster: Cluster]}
-     */
-    clusterReady: [cluster: Cluster];
-    /**
-     * Emits when any message is sent from IPC.
-     * @type {[message: ProcessMessage]}
-     */
-    message: [message: ProcessMessage];
-    /**
-     * Debug events.
-     * @type {[debugMessage: string]}
-     */
-    debug: [debugMessage: string];
-    /**
-     * When all manager's clsuters are ready.
-     * @type {[manager: ClusterManager]}
-     */
-    ready: [manager: ClusterManager];
+	/**
+	 * Emits when client sends a request via IPC.
+	 * @type {[message: ProcessMessage]}
+	 */
+	clientRequest: [message: ProcessMessage];
+	/**
+	 * Emits when cluster is created.
+	 * @type {[cluster: Cluster]}
+	 */
+	clusterCreate: [cluster: Cluster];
+	/**
+	 * Emits when cluster is ready.
+	 * @type {[cluster: Cluster]}
+	 */
+	clusterReady: [cluster: Cluster];
+	/**
+	 * Emits when any message is sent from IPC.
+	 * @type {[message: ProcessMessage]}
+	 */
+	message: [message: ProcessMessage];
+	/**
+	 * Debug events.
+	 * @type {[debugMessage: string]}
+	 */
+	debug: [debugMessage: string];
+	/**
+	 * When all manager's clsuters are ready.
+	 * @type {[manager: ClusterManager]}
+	 */
+	ready: [manager: ClusterManager];
 }
 
 /**
@@ -545,36 +545,36 @@ export interface ClusterManagerEvents {
  * @typedef {ClusterEvents}
  */
 export interface ClusterEvents {
-    /**
-     * Emits when any message is sent from IPC.
-     * @type {[message: ProcessMessage]}
-     */
-    message: [message: ProcessMessage];
-    /**
-     * Emits when cluster dies.
-     * @type {([cluster: Cluster, thread: ChildProcess | Worker | undefined | null])}
-     */
-    death: [cluster: Cluster, thread: ChildProcess | Worker | undefined | null];
-    /**
-     * Emits when cluster is spawned.
-     * @type {([thread: ChildProcess | Worker | undefined | null])}
-     */
-    spawn: [thread: ChildProcess | Worker | undefined | null];
-    /**
-     * Emits when cluster is ready.
-     * @type {[cluster: Cluster]}
-     */
-    ready: [cluster: Cluster];
-    /**
-     * Emits when debug message is sent.
-     * @type {[message: string]}
-     */
-    debug: [message: string];
-    /**
-     * Emits when there is an error.
-     * @type {[error: Error]}
-     */
-    error: [error: Error];
+	/**
+	 * Emits when any message is sent from IPC.
+	 * @type {[message: ProcessMessage]}
+	 */
+	message: [message: ProcessMessage];
+	/**
+	 * Emits when cluster dies.
+	 * @type {([cluster: Cluster, thread: ChildProcess | Worker | undefined | null])}
+	 */
+	death: [cluster: Cluster, thread: ChildProcess | Worker | undefined | null];
+	/**
+	 * Emits when cluster is spawned.
+	 * @type {([thread: ChildProcess | Worker | undefined | null])}
+	 */
+	spawn: [thread: ChildProcess | Worker | undefined | null];
+	/**
+	 * Emits when cluster is ready.
+	 * @type {[cluster: Cluster]}
+	 */
+	ready: [cluster: Cluster];
+	/**
+	 * Emits when debug message is sent.
+	 * @type {[message: string]}
+	 */
+	debug: [message: string];
+	/**
+	 * Emits when there is an error.
+	 * @type {[error: Error]}
+	 */
+	error: [error: Error];
 }
 
 /**
@@ -584,24 +584,24 @@ export interface ClusterEvents {
  * @typedef {ClusterClientEvents}
  */
 export interface ClusterClientEvents {
-    /**
-     * Emits when all clusters are ready.
-     * @type {[]}
-     */
-    managerReady: [];
-    /**
-     * Emits when message is sent from IPC.
-     * @type {[message: ProcessMessage]}
-     */
-    message: [message: ProcessMessage];
-    /**
-     * Emits when cluster is ready.
-     * @type {[clusterClient: ClusterClient]}
-     */
-    ready: [clusterClient: ClusterClient];
-    /**
-     * Emits when debug message is sent.
-     * @type {[message: string]}
-     */
-    debug: [message: string];
+	/**
+	 * Emits when all clusters are ready.
+	 * @type {[]}
+	 */
+	managerReady: [];
+	/**
+	 * Emits when message is sent from IPC.
+	 * @type {[message: ProcessMessage]}
+	 */
+	message: [message: ProcessMessage];
+	/**
+	 * Emits when cluster is ready.
+	 * @type {[clusterClient: ClusterClient]}
+	 */
+	ready: [clusterClient: ClusterClient];
+	/**
+	 * Emits when debug message is sent.
+	 * @type {[message: string]}
+	 */
+	debug: [message: string];
 }
