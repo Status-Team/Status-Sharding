@@ -38,14 +38,12 @@ export class Cluster<
 	 * Represents the last time the cluster received a heartbeat.
 	 */
 	public lastHeartbeatReceived?: number;
-
 	/**
 	 * Message processor that handles messages from the child process/worker/manager.
 	 * @private
 	 * @type {?ClusterHandler}
 	 */
 	private messageHandler?: ClusterHandler;
-
 	/**
 	 * Represents the environment data of the cluster.
 	 * @private
@@ -74,7 +72,7 @@ export class Cluster<
 	 * @param {number} id - The ID of the cluster.
 	 * @param {number[]} shardList - The list of shards assigned to this cluster.
 	 */
-	constructor(public manager: InternalManager, public id: number, public shardList: number[]) {
+	constructor (public manager: InternalManager, public id: number, public shardList: number[]) {
 		super();
 
 		this.ready = false; this.thread = null;

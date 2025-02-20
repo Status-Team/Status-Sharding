@@ -42,7 +42,6 @@ export class ClusterClient<
 	 * @type {PromiseHandler}
 	 */
 	public promise: PromiseHandler;
-
 	/**
 	 * Client that manages broker tunnels.
 	 * @readonly
@@ -55,7 +54,6 @@ export class ClusterClient<
 	 * @type {(ChildClient | WorkerClient | null)}
 	 */
 	readonly process: ChildClient | WorkerClient | null;
-
 	/**
 	 * Handler that handles messages from the ClusterManager and the Cluster.
 	 * @private
@@ -68,7 +66,7 @@ export class ClusterClient<
 	 * @constructor
 	 * @param {InternalClient} client - The client to use for the sharding.
 	 */
-	constructor(public client: InternalClient) {
+	constructor (public client: InternalClient) {
 		super();
 
 		this.ready = false;
@@ -539,22 +537,22 @@ export declare interface ClusterClient {
 	 * @type {(<K extends keyof ClusterClientEvents>(event: K, ...args: ClusterClientEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, ...args: unknown[]) => boolean)}
 	 */
 	emit: (<K extends keyof ClusterClientEvents>(event: K, ...args: ClusterClientEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, ...args: unknown[]) => boolean);
-    /**
+	/**
 	 * Remove an event listener.
 	 * @type {(<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this)}
 	 */
 	off: (<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this);
-    /**
+	/**
 	 * Listen for an event.
 	 * @type {(<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this)}
 	 */
 	on: (<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this);
-    /**
+	/**
 	 * Listen for an event once.
 	 * @type {(<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this)}
 	 */
 	once: (<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this);
-    /**
+	/**
 	 * Remove all listeners for an event.
 	 * @type {(<K extends keyof ClusterClientEvents>(event?: K) => this) & (<S extends string | symbol>(event?: Exclude<S, keyof ClusterClientEvents>) => this)}
 	 */

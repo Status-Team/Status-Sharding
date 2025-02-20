@@ -35,7 +35,6 @@ export class ClusterManager<
 	 * @type {string}
 	 */
 	public maintenance: string;
-
 	/**
 	 * IPC Broker for the ClusterManager.
 	 * @readonly
