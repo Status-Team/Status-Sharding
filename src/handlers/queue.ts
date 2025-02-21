@@ -1,68 +1,29 @@
 import { ShardingUtils } from '../other/shardingUtils';
 import { QueueOptions } from '../types';
 
-/**
- * Item of the queue.
- * @export
- * @interface QueueItem
- * @typedef {QueueItem}
- */
+/** Item of the queue. */
 export interface QueueItem<A = unknown[]> {
-    /**
-	 * Runs the item.
-	 * @param {...unknown[]} args - The arguments to pass to the item.
-	 * @returns {Promise<unknown>} The result of the item.
-	 */
+    /** Runs the item. */
 	run(...args: unknown[]): Promise<unknown>;
-    /**
-	 * Arguments to pass to the item.
-	 * @type {A}
-	 */
+    /** Arguments to pass to the item. */
 	args: A;
-    /**
-	 * Time when the item was added to the queue.
-	 * @type {?number}
-	 */
+    /** Time when the item was added to the queue. */
 	time?: number;
-    /**
-	 * Time to wait until next item.
-	 * @type {number}
-	 */
+    /** Time to wait until next item. */
 	timeout: number;
 }
 
-/**
- * Queue class.
- * @export
- * @class Queue
- * @typedef {Queue}
- */
+/** Queue class. */
 export class Queue {
-	/**
-	 * Whether the queue is paused.
-	 * @private
-	 * @type {boolean}
-	 */
+	/** Whether the queue is paused. */
 	private paused: boolean = false;
-	/**
-	 * List of items in the queue.
-	 * @private
-	 * @type {QueueItem[]}
-	 */
+	/** List of items in the queue. */
 	private queue: QueueItem[] = [];
 
-	/**
-	 * Creates an instance of Queue.
-	 * @constructor
-	 * @param {QueueOptions} options - The options for the queue.
-	 */
+	/** Creates an instance of Queue. */
 	constructor(public options: QueueOptions) {}
 
-	/**
-	 * Starts the queue and run's the item functions.
-	 * @async
-	 * @returns {Promise<Queue>} The queue.
-	 */
+	/** Starts the queue and run's the item functions. */
 	public async start(): Promise<Queue> {
 		if (this.options.mode !== 'auto') {
 			return new Promise((resolve) => {
@@ -86,11 +47,7 @@ export class Queue {
 		return this;
 	}
 
-	/**
-	 * Runs the next item in the queue.
-	 * @async
-	 * @returns {Promise<unknown>} The result of the item.
-	 */
+	/** Runs the next item in the queue. */
 	public async next(): Promise<unknown> {
 		if (this.paused) return;
 		const item = this.queue.shift();
@@ -99,29 +56,19 @@ export class Queue {
 		return item.run(...item.args);
 	}
 
-	/**
-	 * Stops the queue.
-	 * @returns {this} The queue.
-	 */
+	/** Stops the queue. */
 	public stop(): this {
 		this.paused = true;
 		return this;
 	}
 
-	/**
-	 * Resumes the queue.
-	 * @returns {this} The queue.
-	 */
+	/** Resumes the queue. */
 	public resume(): this {
 		this.paused = false;
 		return this;
 	}
 
-	/**
-	 * Adds an item to the queue.
-	 * @param {QueueItem} item - The item to add.
-	 * @returns {this} The queue.
-	 */
+	/** Adds an item to the queue. */
 	public add(item: QueueItem): this {
 		this.queue.push({
 			run: item.run,

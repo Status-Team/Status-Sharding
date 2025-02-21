@@ -2,56 +2,26 @@ import { Serializable, SerializableInput } from '../types';
 import { ClusterManager } from '../core/clusterManager';
 import { ClusterClient } from '../core/clusterClient';
 
-/**
- * Type of the broker message sent.
- * @export
- * @typedef {BrokerMessage}
- */
+/** Type of the broker message sent. */
 export type BrokerMessage = { _data: unknown; broker: string; };
-/**
- * Type of the broker message handler.
- * @export
- * @typedef {BrokerMessageHandler}
- * @template {unknown} [T=unknown] - The type of the message.
- */
+/** Type of the broker message handler. */
 export type BrokerMessageHandler<T = unknown> = (message: T) => void;
 
-/**
- * The IPC Broker Abstract class.
- * @abstract
- * @class IPCBrokerAbstract
- * @typedef {IPCBrokerAbstract}
- */
+/** The IPC Broker Abstract class. */
 abstract class IPCBrokerAbstract {
-	/**
-	 * The listeners of the IPC Broker.
-	 * @private
-	 * @type {Map<string, BrokerMessageHandler[]>}
-	 */
+	/** The listeners of the IPC Broker. */
 	private listeners: Map<string, BrokerMessageHandler[]> = new Map();
-	/**
-	 * Creates an instance of IPCBrokerAbstract.
-	 * @constructor
-	 * @param {(ClusterManager | ClusterClient)} instance - The instance of the IPC Broker.
-	 */
+	/** Creates an instance of IPCBrokerAbstract. */
 	constructor(public readonly instance: ClusterManager | ClusterClient) {}
 
-	/**
-	 * Listens to a specific channel.
-	 * @template {unknown} T - The type of the message.
-	 * @param {string} channelName - The name of the channel to listen to.
-	 * @param {BrokerMessageHandler<T>} callback - The callback to execute when a message is received.
-	 */
+	/** Listens to a specific channel. */
 	public listen<T>(channelName: string, callback: BrokerMessageHandler<T>): void {
 		const listeners = this.listeners.get(channelName) ?? [];
 		listeners.push(callback as BrokerMessageHandler);
 		this.listeners.set(channelName, listeners);
 	}
 
-	/**
-	 * Handles the message received, and executes the callback. (Not meant to be used by the user.)
-	 * @param {BrokerMessage} message - The message received.
-	 */
+	/** Handles the message received, and executes the callback. (Not meant to be used by the user.) */
 	public handleMessage(message: BrokerMessage): void {
 		if (!message._data || !message.broker) return;
 
@@ -64,23 +34,9 @@ abstract class IPCBrokerAbstract {
 	}
 }
 
-/**
- * IPC Broker Manager class.
- * @export
- * @class IPCBrokerManager
- * @typedef {IPCBrokerManager}
- * @extends {IPCBrokerAbstract}
- */
+/** IPC Broker Manager class. */
 export class IPCBrokerManager extends IPCBrokerAbstract {
-	/**
-	 * Sends a message to a specific channel.
-	 * @async
-	 * @template {Serializable} T - The type of the message.
-	 * @param {string} channelName - The name of the channel to send the message to.
-	 * @param {SerializableInput<T>} message - The message to send.
-	 * @param {?number} [clusterId] - The id of the cluster to send the message to. (If not provided, it will send the message to all clusters.)
-	 * @returns {Promise<void>} The promise.
-	 */
+	/** Sends a message to a specific channel. */
 	public async send<T extends Serializable>(channelName: string, message: SerializableInput<T>, clusterId?: number): Promise<void> {
 		if (this.instance instanceof ClusterManager) {
 			if (clusterId === undefined) {
@@ -103,22 +59,9 @@ export class IPCBrokerManager extends IPCBrokerAbstract {
 	}
 }
 
-/**
- * IPC Broker Client class.
- * @export
- * @class IPCBrokerClient
- * @typedef {IPCBrokerClient}
- * @extends {IPCBrokerAbstract}
- */
+/** IPC Broker Client class. */
 export class IPCBrokerClient extends IPCBrokerAbstract {
-	/**
-	 * Sends a message to a specific channel.
-	 * @async
-	 * @template {Serializable} T - The type of the message.
-	 * @param {string} channelName - The name of the channel to send the message to.
-	 * @param {SerializableInput<T>} message - The message to send.
-	 * @returns {Promise<void>} The promise.
-	 */
+	/** Sends a message to a specific channel. */
 	public async send<T extends Serializable>(channelName: string, message: SerializableInput<T>): Promise<void> {
 		if (this.instance instanceof ClusterClient) {
 			return this.instance.process?.send({

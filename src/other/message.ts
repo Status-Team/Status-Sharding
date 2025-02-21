@@ -2,22 +2,13 @@ import { EvalOptions, MessageTypes, SerializableInput, Serializable } from '../t
 import { ClusterClient } from '../core/clusterClient';
 import { Cluster } from '../core/cluster';
 
-/**
- * Eval message type.
- * @export
- * @typedef {EvalMessage}
- * @template {object} [P=object] - The type of the message options.
- */
+/** Eval message type. */
 export type EvalMessage<P extends object = object> = {
 	options?: EvalOptions<P>;
 	script: string;
 };
 
-/**
- * Respawn message type.
- * @export
- * @typedef {RespawnMessage}
- */
+/** Respawn message type. */
 export type RespawnMessage = {
 	clusterDelay?: number; // Only when respawning all clusters.
 	respawnDelay?: number;
@@ -25,11 +16,7 @@ export type RespawnMessage = {
 	except?: number[];
 };
 
-/**
- * Respawn some message type.
- * @export
- * @typedef {RespawnSomeMessage}
- */
+/** Respawn some message type. */
 export type RespawnSomeMessage = {
 	clusterIds: number[];
 	clusterDelay?: number; // Only when respawning all clusters.
@@ -37,32 +24,12 @@ export type RespawnSomeMessage = {
 	timeout?: number;
 };
 
-/**
- * Result of an eval message.
- * @export
- * @typedef {EvalResultMessage}
- */
+/** Result of an eval message. */
 export type EvalResultMessage = unknown;
-/**
- * The type of the maintenace message.
- * @export
- * @typedef {MaintenanceMessage}
- */
-export type MaintenanceMessage = string;
-/**
- * The type of the maintenance message.
- * @export
- * @typedef {DataType}
- */
-export type DataType = 'normal' | 'eval' | 'respawnAll' | 'maintenance' | 'evalResult' | 'readyOrSpawn' | 'heartbeat' | 'error' | 'reply' | 'respawnSome';
+/** The type of the message. */
+export type DataType = 'normal' | 'eval' | 'respawnAll' | 'evalResult' | 'readyOrSpawn' | 'heartbeat' | 'error' | 'reply' | 'respawnSome';
 
-/**
- * The type of the message.
- * @export
- * @typedef {DataTypes}
- * @template {unknown} [A=object] - The type of the message data.
- * @template {object} [P=object] - The type of the message options.
- */
+/** The type of the message. */
 export type DataTypes<A = object, P extends object = object> = {
 	normal: A extends never ? Serializable : A;
 	reply: DataTypes<A, P>['normal'];
@@ -71,7 +38,6 @@ export type DataTypes<A = object, P extends object = object> = {
 	heartbeat: undefined;
 	respawnAll: RespawnMessage;
 	respawnSome: RespawnSomeMessage;
-	maintenance: MaintenanceMessage;
 	evalResult: EvalResultMessage;
 	error: {
 		message: string;
@@ -81,76 +47,33 @@ export type DataTypes<A = object, P extends object = object> = {
 	};
 };
 
-/**
- * Base message for IPC communication.
- * @export
- * @typedef {BaseMessage}
- * @template {DataType} D - The type of the message.
- * @template {unknown} [A=Serializable] - The type of the message data.
- * @template {object} [P=object] - The type of the message options.
- */
+/** Base message for IPC communication. */
 export type BaseMessage<D extends DataType, A = Serializable, P extends object = object> = {
 	_type: MessageTypes;
 	_nonce: string;
 	data: DataTypes<A, P>[D];
 }
 
-/**
- * Serializable input.
- * @export
- * @typedef {BaseMessageInput}
- * @template {DataType} D - The type of the message.
- * @template {Serializable} [A=Serializable] - The type of the message data.
- */
+/** Serializable input. */
 export type BaseMessageInput<D extends DataType, A extends Serializable = Serializable> = Omit<BaseMessage<D, A>, '_nonce'>;
 
-/**
- * Message that is sent on IPC.
- * @export
- * @class ProcessMessage
- * @typedef {ProcessMessage}
- * @template {DataType} [D='normal'] - The type of the message.
- * @template {Serializable} [A=Serializable] - The type of the message data.
- * @template {object} [P=object] - The type of the message options.
- */
+/** Message that is sent on IPC. */
 export class ProcessMessage<D extends DataType = 'normal', A extends Serializable = Serializable, P extends object = object> {
-	/**
-	 * Instance of the cluster client or cluster.
-	 * @private
-	 * @type {(ClusterClient | Cluster)}
-	 */
+	/** Instance of the cluster client or cluster. */
 	private _instance: ClusterClient | Cluster;
-	/**
-	 * The nonce of the message.
-	 * @private
-	 * @type {string}
-	 */
+	/** The nonce of the message. */
 	private _nonce: string;
-	/**
-	 * The data of the message.
-	 * @type {DataTypes<A, object>[D]}
-	 */
+	/** The data of the message. */
 	public data: DataTypes<A, object>[D];
 
-	/**
-	 * Creates an instance of ProcessMessage.
-	 * @constructor
-	 * @param {(ClusterClient | Cluster)} instance - The instance of the cluster client or cluster.
-	 * @param {BaseMessage<D, A, P>} data - The data of the message.
-	 */
-	constructor(instance: ClusterClient | Cluster, data: BaseMessage<D, A, P>) {
+	/** Creates an instance of ProcessMessage. */
+	constructor (instance: ClusterClient | Cluster, data: BaseMessage<D, A, P>) {
 		this.data = data.data;
 		this._nonce = data._nonce;
 		this._instance = instance;
 	}
 
-	/**
-	 * Replies to the message.
-	 * @async
-	 * @template {Serializable} T - The type of the message.
-	 * @param {SerializableInput<T>} message - The message to send.
-	 * @returns {Promise<void>} The promise.
-	 */
+	/** Replies to the message. */
 	public async reply<T extends Serializable>(message: SerializableInput<T>): Promise<void> {
 		return this._instance._sendInstance({
 			data: message,

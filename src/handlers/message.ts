@@ -7,30 +7,12 @@ import { Worker } from '../classes/worker';
 import { Cluster } from '../core/cluster';
 import { Child } from '../classes/child';
 
-/**
- * Handles messages for the cluster.
- * @export
- * @class ClusterHandler
- * @typedef {ClusterHandler}
- */
+/** Handles messages for the cluster. */
 export class ClusterHandler {
-	/**
-	 * Creates an instance of ClusterHandler.
-	 * @constructor
-	 * @param {Cluster} cluster - The cluster.
-	 * @param {(Worker | Child)} ipc - The IPC process.
-	 */
-	constructor(private cluster: Cluster, private ipc: Worker | Child) {}
+	/** Creates an instance of ClusterHandler. */
+	constructor (private cluster: Cluster, private ipc: Worker | Child) { }
 
-	/**
-	 * Handles the message received, and executes the callback. (Not meant to be used by the user.)
-	 * @async
-	 * @template {DataType} D - The type of the message.
-	 * @template {Serializable} A - The type of the message data.
-	 * @template {object} P - The type of the message options.
-	 * @param {BaseMessage<D, A, P>} message - The message received.
-	 * @returns {Promise<void>} The promise.
-	 */
+	/** Handles the message received, and executes the callback. (Not meant to be used by the user.) */
 	public async handleMessage<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
 		switch (message._type) {
 			case MessageTypes.ClientReady: {
@@ -121,14 +103,6 @@ export class ClusterHandler {
 				this.cluster.respawn(respawnDelay, timeout);
 				break;
 			}
-			case MessageTypes.ClientMaintenance: {
-				this.cluster.triggerMaintenance(message.data as DataTypes['maintenance']);
-				break;
-			}
-			case MessageTypes.ClientMaintenanceAll: {
-				this.cluster.manager.triggerMaintenance(message.data as DataTypes['maintenance']);
-				break;
-			}
 			case MessageTypes.ClientSpawnNextCluster: {
 				this.cluster.manager.clusterQueue.next();
 				break;
@@ -147,30 +121,12 @@ export class ClusterHandler {
 	}
 }
 
-/**
- * Handles messages for the cluster client.
- * @export
- * @class ClusterClientHandler
- * @typedef {ClusterClientHandler}
- * @template {RefShardingClient} [InternalClient=RefShardingClient] - The type of the internal client.
- */
+/** Handles messages for the cluster client. */
 export class ClusterClientHandler<InternalClient extends RefShardingClient = RefShardingClient> {
-	/**
-	 * Creates an instance of ClusterClientHandler.
-	 * @constructor
-	 * @param {ClusterClient<InternalClient>} clusterClient - The cluster client.
-	 */
-	constructor(private clusterClient: ClusterClient<InternalClient>) {}
+	/** Creates an instance of ClusterClientHandler. */
+	constructor (private clusterClient: ClusterClient<InternalClient>) { }
 
-	/**
-	 * Handles the message received, and executes the callback. (Not meant to be used by the user.)
-	 * @async
-	 * @template {DataType} D - The type of the message.
-	 * @template {Serializable} A - The type of the message data.
-	 * @template {object} P - The type of the message options.
-	 * @param {BaseMessage<D, A, P>} message - The message received.
-	 * @returns {Promise<void>} The promise.
-	 */
+	/** Handles the message received, and executes the callback. (Not meant to be used by the user.) */
 	public async handleMessage<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
 		switch (message._type) {
 			case MessageTypes.ClientEvalRequest: {
@@ -235,15 +191,6 @@ export class ClusterClientHandler<InternalClient extends RefShardingClient = Ref
 			}
 			case MessageTypes.ManagerReady: {
 				this.clusterClient.emit('managerReady');
-				break;
-			}
-			case MessageTypes.ClientMaintenanceDisable: {
-				this.clusterClient.maintenance = '';
-				this.clusterClient.emit('ready', this.clusterClient);
-				break;
-			}
-			case MessageTypes.ClientMaintenanceEnable: {
-				this.clusterClient.maintenance = (message.data as DataTypes['maintenance']) || '';
 				break;
 			}
 			case MessageTypes.Heartbeat: {

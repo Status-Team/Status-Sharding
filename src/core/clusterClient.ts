@@ -13,64 +13,27 @@ import { getInfo } from '../other/data';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 
-/**
- * Simplified Cluster instance available on the {@link ClusterClient}.
- * @export
- * @class ClusterClient
- * @typedef {ClusterClient} [InternalClient=ShardingClient] - The client to use for the cluster.
- * @template {ShardingClient} [InternalClient=ShardingClient] - The client to use for the cluster.
- * @template {RefClusterManager} [InternalManager=RefClusterManager] - The manager to use for the cluster.
- * @template {RefCluster} [InternalCluster=RefCluster] - The cluster to use for the cluster.
- * @extends {EventEmitter} - The EventEmitter class.
- */
+/** Simplified Cluster instance available on the {@link ClusterClient}. */
 export class ClusterClient<
 	InternalClient extends RefShardingClient = RefShardingClient,
 	InternalManager extends RefClusterManager = RefClusterManager,
 > extends EventEmitter {
-	/**
-	 * Ready state of the cluster.
-	 * @type {boolean}
-	 */
+	/** Ready state of the cluster. */
 	public ready: boolean;
-	/**
-	 * Maintenance state of the cluster.
-	 * @type {string}
-	 */
-	public maintenance: string;
-	/**
-	 * Handler that resolves sent messages and requests.
-	 * @type {PromiseHandler}
-	 */
+	/** Handler that resolves sent messages and requests. */
 	public promise: PromiseHandler;
-	/**
-	 * Client that manages broker tunnels.
-	 * @readonly
-	 * @type {IPCBrokerClient}
-	 */
+	/** Client that manages broker tunnels. */
 	readonly broker: IPCBrokerClient; // IPC Broker for the ClusterManager.
-	/**
-	 * Client that manages the cluster process.
-	 * @readonly
-	 * @type {(ChildClient | WorkerClient | null)}
-	 */
+	/** Client that manages the cluster process. */
 	readonly process: ChildClient | WorkerClient | null;
-	/**
-	 * Handler that handles messages from the ClusterManager and the Cluster.
-	 * @private
-	 * @type {ClusterClientHandler<InternalClient>}
-	 */
+	/** Handler that handles messages from the ClusterManager and the Cluster. */
 	private messageHandler: ClusterClientHandler<InternalClient>;
 
-	/**
-	 * Creates an instance of ClusterClient.
-	 * @constructor
-	 * @param {InternalClient} client - The client to use for the sharding.
-	 */
+	/** Creates an instance of ClusterClient. */
 	constructor (public client: InternalClient) {
 		super();
 
 		this.ready = false;
-		this.maintenance = '';
 
 		this.broker = new IPCBrokerClient(this);
 		this.process = (this.info.ClusterManagerMode === 'process' ? new ChildClient() : this.info.ClusterManagerMode === 'worker' ? new WorkerClient() : null);
@@ -87,56 +50,27 @@ export class ClusterClient<
 		});
 	}
 
-	/**
-	 * Current cluster id.
-	 * @readonly
-	 * @type {number} - The current cluster id.
-	 */
+	/** Current cluster id. */
 	public get id(): number {
 		return this.info.ClusterId;
 	}
 
-	/**
-	 * Total number of shards.
-	 * @readonly
-	 * @type {number} - The total number of shards.
-	 */
+	/** Total number of shards. */
 	public get totalShards(): number {
 		return this.info.TotalShards;
 	}
 
-	/**
-	 * Total number of clusters.
-	 * @readonly
-	 * @type {number} - The total number of clusters.
-	 */
+	/** Total number of clusters. */
 	public get totalClusters(): number {
 		return this.info.ClusterCount;
 	}
 
-	/**
-	 * Utility function to get some info about the cluster.
-	 * @readonly
-	 * @type {ClusterClientData}
-	 */
+	/** Utility function to get some info about the cluster. */
 	public get info(): ClusterClientData {
 		return getInfo();
 	}
 
-	/**
-	 * Sends a message to the Cluster as child. (goes to Cluster on _handleMessage).
-	 * @template {Serializable} T - The type of the message.
-	 * @param {(SerializableInput<T, true> | unknown)} message - The message to send.
-	 * @returns {Promise<void>} A promise that resolves when the message was sent.
-	 * @throws {Error} - When there is no process to send the message to.
-	 * @throws {Error} - When the cluster is not ready yet.
-	 * @example
-	 * client.cluster.send({ type: 'ping' });
-	 * client.cluster.send('ping');
-	 * client.cluster.send(123);
-	 * client.cluster.send(true);
-	 * client.cluster.send({ type: 'ping' }, { timeout: 5000 });
-	 */
+	/** Sends a message to the Cluster as child. (goes to Cluster on _handleMessage). */
 	public send<T extends Serializable>(message: SerializableInput<T>): Promise<void> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#1).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#1).'));
@@ -149,21 +83,7 @@ export class ClusterClient<
 		} as BaseMessage<'normal'>) as Promise<void>;
 	}
 
-	/**
-	 * Broadcasts a message to all clusters.
-	 * @template {Serializable} T - The type of the message.
-	 * @param {SerializableInput<T>} message - The message to send.
-	 * @param {boolean} [sendSelf=false] - Whether to send the message to the current cluster as well.
-	 * @returns {Promise<void>} A promise that resolves when the message was sent.
-	 * @throws {Error} - When there is no process to send the message to.
-	 * @throws {Error} - When the cluster is not ready yet.
-	 * @example
-	 * client.cluster.broadcast({ type: 'ping' });
-	 * client.cluster.broadcast('ping');
-	 * client.cluster.broadcast(123);
-	 * client.cluster.broadcast(true);
-	 * client.cluster.broadcast({ type: 'ping' }, true);
-	 */
+	/** Broadcasts a message to all clusters. */
 	public broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf: boolean = false): Promise<void> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#2).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#2).'));
@@ -179,18 +99,7 @@ export class ClusterClient<
 		}) as Promise<void>;
 	}
 
-	/**
-	 * Sends a message to the Cluster.
-	 * @template {DataType} D - The type of the message.
-	 * @template {Serializable} A - The type of the message.
-	 * @template {object} P - The type of the message.
-	 * @param {BaseMessage<D, A, P>} message - The message to send.
-	 * @returns {Promise<void>} A promise that resolves when the message was sent.
-	 * @throws {Error} - When there is no process to send the message to.
-	 * @throws {Error} - When the cluster is not ready yet.
-	 * @example
-	 * client.cluster.sendInstance({ _type: MessageTypes.CustomMessage, _nonce: '1234567890', data: { id: '797012765352001557', username: 'Digital', discriminator: '3999' } });
-	 */
+	/** Sends a message to the Cluster. */
 	public _sendInstance<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#3).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#3).'));
@@ -200,23 +109,7 @@ export class ClusterClient<
 		return this.process.send(message) as Promise<void>;
 	}
 
-	/**
-	 * Evaluates a script on the master process, in the context of the {@link ClusterManager}.
-	 * @async
-	 * @template {unknown} T - The type of the result.
-	 * @template {object} P - The type of the context.
-	 * @template {unknown} [M=InternalManager] - The type of the manager.
-	 * @param {(((manager: M, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
-	 * @param {?{ context?: P, timeout?: number }} [options] - The options for the eval.
-	 * @returns {Promise<ValidIfSerializable<T>>} A promise that resolves with the result of the eval.
-	 * @throws {Error} - When there is no process to send the message to.
-	 * @throws {Error} - When the cluster is not ready yet.
-	 * @throws {Error} - When the script is not a function.
-	 * @example
-	 * client.cluster.evalOnManager((manager, context) => {
-	 *    return manager.clusters.size;
-	 * }); // 8 (8 clusters)
-	 */
+	/** Evaluates a script on the master process, in the context of the {@link ClusterManager}. */
 	public async evalOnManager<T, P extends object, M = InternalManager>(script: ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P, timeout?: number }): Promise<ValidIfSerializable<T>> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#4).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#4).'));
@@ -236,23 +129,7 @@ export class ClusterClient<
 		return this.promise.create(nonce, options?.timeout);
 	}
 
-	/**
-	 * Evaluates a script on all clusters in parallel.
-	 * @async
-	 * @template {unknown} T - The type of the result.
-	 * @template {object} P - The type of the context.
-	 * @template {unknown} [C=InternalClient] - The type of the client.
-	 * @param {(string | ((client: C, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
-	 * @param {?EvalOptions<P>} [options] - The options for the eval.
-	 * @returns {Promise<ValidIfSerializable<T>[]>} A promise that resolves with the result of the eval.
-	 * @throws {Error} - When there is no process to send the message to.
-	 * @throws {Error} - When the cluster is not ready yet.
-	 * @throws {Error} - When the script is not a function or string.
-	 * @example
-	 * client.cluster.broadcastEval((client, context) => {
-	 *   return client.guilds.cache.size;
-	 * }); // [ 23, 23, 23, 23, 23, 23, 23, 23 ] (8 clusters)
-	 */
+	/** Evaluates a script on all clusters in parallel. */
 	public async broadcastEval<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#5).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#5).'));
@@ -272,27 +149,8 @@ export class ClusterClient<
 		return this.promise.create(nonce, options?.timeout);
 	}
 
-	/**
-	 * Evaluates a script on specific guild.
-	 * @async
-	 * @template {unknown} T - The type of the result.
-	 * @template {object} P - The type of the context.
-	 * @template {unknown} [C=InternalClient] - The type of the client.
-	 * @template {boolean} [E=false] - Whether to use experimental mode.
-	 * @param {string} guildId - The ID of the guild to use.
-	 * @param {((client: C, context: Serialized<P>, guild: Guild) => Awaitable<T>)} script - The script to evaluate.
-	 * @param {?{ context?: P; timeout?: number; experimental?: E; }} [options] - The options for the eval.
-	 * @returns {Promise<ValidIfSerializable<T>>} A promise that resolves with the result of the eval.
-	 * @throws {Error} - When there is no process to send the message to.
-	 * @throws {Error} - When the cluster is not ready yet.
-	 * @throws {Error} - When the script is not a function.
-	 * @throws {Error} - When no guild id was provided.
-	 * @example
-	 * client.cluster.evalOnGuild('945340723425837066', (client, context, guild) => {
-	 *  return guild.name;
-	 * }); // Digital's Basement
-	 */
-	public async evalOnGuild<T, P extends object, C = InternalClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: { context?: P; timeout?: number; experimental?: E; }): Promise<ValidIfSerializable<T>> {
+	/** Evaluates a script on specific guild. */
+	public async evalOnGuild<T, P extends object, C = InternalClient, E extends boolean = false>(guildId: string, script: (client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>, options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#6).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#6).'));
 		else if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function (#2).'));
@@ -301,82 +159,47 @@ export class ClusterClient<
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process.send({
-			data: {
-				script: `(${options?.experimental ? ShardingUtils.guildEvalParser(script) : script})(this,${options?.context ? JSON.stringify(options.context) : undefined},this?.guilds?.cache?.get('${guildId}'))`,
-				options: {
-					...options,
-					guildId,
-				},
-			},
-			_nonce: nonce,
 			_type: MessageTypes.ClientBroadcastRequest,
+			_nonce: nonce,
+			data: {
+				script: ShardingUtils.parseInput(script, options?.context, `this?.guilds?.cache?.get('${guildId}')`),
+				options: { ...options, guildId },
+			},
 		} as BaseMessage<'eval'>);
 
 		return this.promise.create(nonce, options?.timeout).then((data) => (data as unknown as T[])?.find((v) => v !== undefined)) as Promise<ValidIfSerializable<T>>;
 	}
 
-	/**
-	 * Evaluates a script on a current client, in the context of the {@link ShardingClient}.
-	 * @async
-	 * @template {unknown} T - The type of the result.
-	 * @template {object} P - The type of the context.
-	 * @template {unknown} [C=InternalClient] - The type of the client.
-	 * @param {(string | ((client: C, context: Serialized<P>) => Awaitable<T>))} script - The script to evaluate.
-	 * @param {?EvalOptions<P>} [options] - The options for the eval.
-	 * @returns {Promise<ValidIfSerializable<T>>} A promise that resolves with the result of the eval.
-	 * @example
-	 * client.cluster.evalOnClient((client, context) => {
-	 * 	return client.guilds.cache.size;
-	 * }); // 23
-	 */
+	/** Evaluates a script on a current client, in the context of the {@link ShardingClient}. */
 	public async evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		type EvalObject = { _eval: <T>(script: string) => T; };
 
-		if ((this.client as unknown as EvalObject)._eval) return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
+		const parsedScript = ShardingUtils.parseInput(script, options?.context);
+
+		if ((this.client as unknown as EvalObject)._eval) return await (this.client as unknown as EvalObject)._eval(parsedScript);
 		(this.client as unknown as EvalObject)._eval = function (_: string) { return (0, eval)(_); }.bind(this.client);
 
-		return await (this.client as unknown as EvalObject)._eval(typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`);
+		return await (this.client as unknown as EvalObject)._eval(parsedScript);
 	}
 
-	/**
-	 * Sends a request to the Cluster (cluster has to respond with a reply (cluster.on('message', (message) => message.reply('reply')))).
-	 * @template {Serializable} T - The type of the message.
-	 * @param {SerializableInput<T>} message - The message to send.
-	 * @param {{ timeout?: number }} [options={}] - The options for the request.
-	 * @returns {Promise<ValidIfSerializable<T>>} A promise that resolves with the result of the request.
-	 * @throws {Error} - When there is no process to send the message to.
-	 * @throws {Error} - When the cluster is not ready yet.
-	 * @example
-	 * client.cluster.request({ type: 'ping' });
-	 * client.cluster.request('ping');
-	 * client.cluster.request(123);
-	 */
+	/** Sends a request to the Cluster (cluster has to respond with a reply (cluster.on('message', (message) => message.reply('reply')))). */
 	public request<T extends Serializable>(message: SerializableInput<T>, options: { timeout?: number } = {}): Promise<ValidIfSerializable<T>> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#7).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#7).'));
 
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
-
 		const nonce = ShardingUtils.generateNonce();
 
 		this.process.send<BaseMessage<'normal'>>({
-			data: message,
 			_type: MessageTypes.CustomRequest,
 			_nonce: nonce,
+			data: message,
 		});
 
 		return this.promise.create(nonce, options.timeout);
 	}
 
-	/**
-	 * Kills all running clusters and respawns them.
-	 * @async
-	 * @param {number} [clusterDelay=8000] - The delay between each cluster respawn.
-	 * @param {number} [respawnDelay=5500] - The delay between each shard respawn.
-	 * @param {number} [timeout=-1] - The timeout for each respawn.
-	 * @param {number[]} [except=[]] - The clusters to exclude from the respawn.
-	 * @returns {Promise<void>} A promise that resolves when the message was sent.
-	 */
+	/** Kills all running clusters and respawns them. */
 	public respawnAll(clusterDelay: number = 8000, respawnDelay: number = 5500, timeout: number = -1, except: number[] = []): Promise<void> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#8).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#8).'));
@@ -394,15 +217,7 @@ export class ClusterClient<
 		} as BaseMessage<'respawnAll'>);
 	}
 
-	/**
-	 * Kills specific clusters and respawns them.
-	 * @async
-	 * @param {number[]} clusters - The clusters to respawn.
-	 * @param {number} [clusterDelay=8000] - The delay between each cluster respawn.
-	 * @param {number} [respawnDelay=5500] - The delay between each shard respawn.
-	 * @param {number} [timeout=-1] - The timeout for each respawn.
-	 * @returns {Promise<void>} A promise that resolves when the message was sent.
-	 */
+	/** Kills specific clusters and respawns them. */
 	public async respawnClusters(clusters: number[], clusterDelay: number = 8000, respawnDelay: number = 5500, timeout: number = -1): Promise<void> {
 		if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#8).'));
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#8).'));
@@ -420,12 +235,7 @@ export class ClusterClient<
 		} as BaseMessage<'respawnSome'>);
 	}
 
-	/**
-	 * Handles a message from the ClusterManager.
-	 * @private
-	 * @param {(BaseMessage<'normal'> | BrokerMessage)} message - The message to handle.
-	 * @returns {void} A promise that resolves when the message was sent.
-	 */
+	/** Handles a message from the ClusterManager. */
 	private _handleMessage(message: BaseMessage<'normal'> | BrokerMessage): void {
 		if (!message || '_data' in message) return this.broker.handleMessage(message);
 
@@ -439,24 +249,13 @@ export class ClusterClient<
 		}
 	}
 
-	/**
-	 * Sends a message to the master process.
-	 * @template {DataType} D - The type of the message.
-	 * @template {Serializable} A - The type of the message.
-	 * @template {object} P - The type of the message.
-	 * @param {BaseMessage<D, A, P>} message - The message to send.
-	 * @returns {void} A promise that resolves when the message was sent.
-	 * @throws {Error} - When there is no process to send the message to.
-	 */
+	/** Sends a message to the master process. */
 	public _respond<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): void {
 		if (!this.process) throw new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#9).');
 		this.process.send(message);
 	}
 
-	/**
-	 * Triggers the ready event, do not use this unless you know what you are doing.
-	 * @returns {boolean} Whether the cluster is ready or not.
-	 */
+	/** Triggers the ready event, do not use this unless you know what you are doing. */
 	public triggerReady(): boolean {
 		if (this.ready) return this.ready;
 		else if (!this.process) throw new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#10).');
@@ -471,37 +270,7 @@ export class ClusterClient<
 		return this.ready;
 	}
 
-	/**
-	 * Triggers the maintenance event.
-	 * @param {string} maintenance - The maintenance message.
-	 * @param {boolean} [all=false] - Whether to send the maintenance message to all clusters.
-	 * @returns {string} The maintenance message.
-	 * @throws {Error} - When there is no process to send the message to.
-	 */
-	public triggerMaintenance(maintenance: string, all: boolean = false): string {
-		if (this.maintenance === maintenance) return this.maintenance;
-		else if (!this.process) throw new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#11).');
-
-		this.maintenance = maintenance;
-
-		this.process.send({
-			data: maintenance,
-			_type: all ? MessageTypes.ClientMaintenanceAll : MessageTypes.ClientMaintenance,
-		} as BaseMessage<'maintenance'>);
-
-		return this.maintenance;
-	}
-
-	/**
-	 * Spawns the next cluster, when queue mode is on 'manual'.
-	 * @returns {void} A promise that resolves when the message was sent.
-	 * @throws {Error} - When the queue mode is not on 'manual'.
-	 * @throws {Error} - When there is no process to send the message to.
-	 * @throws {Error} - When the cluster is not ready yet.
-	 * @example
-	 * client.cluster.spawnNextCluster();
-	 * client.cluster.spawnNextCluster().catch(console.error);
-	 */
+	/** Spawns the next cluster, when queue mode is on 'manual'. */
 	public spawnNextCluster(): Promise<void> {
 		if (this.info.ClusterQueueMode === 'auto') throw new Error('Next Cluster can just be spawned when the queue is not on auto mode.');
 		else if (!this.process) return Promise.reject(new Error('CLUSTERING_NO_PROCESS_TO_SEND_TO | No process to send the message to (#12).'));
@@ -512,11 +281,7 @@ export class ClusterClient<
 		} as BaseMessage<'readyOrSpawn'>);
 	}
 
-	/**
-	 * Kills the cluster.
-	 * @param {string} message - The message to send to the ClusterManager.
-	 * @returns {void} A promise that resolves when the message was sent.
-	 */
+	/** Kills the cluster. */
 	public _debug(message: string): void {
 		this.emit('debug', message);
 	}
@@ -525,36 +290,16 @@ export class ClusterClient<
 export type RefClusterClient = ClusterClient;
 
 // Credits for EventEmitter typings: https://github.com/discordjs/discord.js/blob/main/packages/rest/src/lib/RequestManager.ts#L159
-/**
- * Modified ClusterClient with bunch of new methods.
- * @export
- * @interface ClusterClient
- * @typedef {ClusterClient}
- */
+/** Modified ClusterClient with bunch of new methods. */
 export declare interface ClusterClient {
-	/**
-	 * Emit an event.
-	 * @type {(<K extends keyof ClusterClientEvents>(event: K, ...args: ClusterClientEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, ...args: unknown[]) => boolean)}
-	 */
+	/** Emit an event. */
 	emit: (<K extends keyof ClusterClientEvents>(event: K, ...args: ClusterClientEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, ...args: unknown[]) => boolean);
-	/**
-	 * Remove an event listener.
-	 * @type {(<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this)}
-	 */
+	/** Remove an event listener. */
 	off: (<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this);
-	/**
-	 * Listen for an event.
-	 * @type {(<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this)}
-	 */
+	/** Listen for an event. */
 	on: (<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this);
-	/**
-	 * Listen for an event once.
-	 * @type {(<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this)}
-	 */
+	/** Listen for an event once. */
 	once: (<K extends keyof ClusterClientEvents>(event: K, listener: (...args: ClusterClientEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, listener: (...args: unknown[]) => void) => this);
-	/**
-	 * Remove all listeners for an event.
-	 * @type {(<K extends keyof ClusterClientEvents>(event?: K) => this) & (<S extends string | symbol>(event?: Exclude<S, keyof ClusterClientEvents>) => this)}
-	 */
+	/** Remove all listeners for an event. */
 	removeAllListeners: (<K extends keyof ClusterClientEvents>(event?: K) => this) & (<S extends string | symbol>(event?: Exclude<S, keyof ClusterClientEvents>) => this);
 }

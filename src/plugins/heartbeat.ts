@@ -2,33 +2,14 @@ import { ClusterManager } from '../core/clusterManager';
 import { HeartbeatData, MessageTypes } from '../types';
 import { BaseMessage } from '../other/message';
 
-/**
- * Handles heartbeats for the cluster manager.
- * @export
- * @class HeartbeatManager
- * @typedef {HeartbeatManager}
- */
+/** Handles heartbeats for the cluster manager. */
 export class HeartbeatManager {
-	/**
-	 * The interval of the heartbeat.
-	 * @private
-	 * @readonly
-	 * @type {NodeJS.Timeout}
-	 */
+	/** The interval of the heartbeat. */
 	private readonly interval: NodeJS.Timeout;
-	/**
-	 * The list of heartbeat data per cluster.
-	 * @private
-	 * @readonly
-	 * @type {Map<number, HeartbeatData>}
-	 */
+	/** The list of heartbeat data per cluster. */
 	private readonly beats: Map<number, HeartbeatData>;
 
-	/**
-	 * Creates an instance of HeartbeatManager.
-	 * @constructor
-	 * @param {ClusterManager} manager - The instance of the cluster manager.
-	 */
+	/** Creates an instance of HeartbeatManager. */
 	constructor(private readonly manager: ClusterManager) {
 		if (this.manager.options.heartbeat.interval <= 0) throw new Error('The heartbeat interval must be greater than 0.');
 		else if (this.manager.options.heartbeat.timeout <= 0) throw new Error('The heartbeat timeout must be greater than 0.');
@@ -59,38 +40,22 @@ export class HeartbeatManager {
 		}, this.manager.options.heartbeat.interval);
 	}
 
-	/**
-	 * Stops the heartbeat.
-	 * @returns {void} Nothing.
-	 */
+	/** Stops the heartbeat. */
 	public stop(): void {
 		clearInterval(this.interval);
 	}
 
-	/**
-	 * Gets the heartbeat data for a cluster.
-	 * @param {number} id - The id of the cluster.
-	 * @returns {HeartbeatData} The heartbeat data.
-	 */
+	/** Gets the heartbeat data for a cluster. */
 	public getClusterStats(id: number): HeartbeatData {
 		return this.beats.get(id) || this.beats.set(id, { missedBeats: 0, restarts: 0, killing: false }).get(id) as HeartbeatData;
 	}
 
-	/**
-	 * Removes a cluster from the heartbeat.
-	 * @param {number} id - The id of the cluster.
-	 * @param {boolean} [tryRespawn=true] - Whether to try to respawn the cluster.
-	 * @returns {void} Nothing.
-	 */
+	/** Removes a cluster from the heartbeat. */
 	public removeCluster(id: number): void {
 		this.beats.delete(id);
 	}
 
-	/**
-	 * Adds a missed beat to a cluster.
-	 * @param {number} id - The id of the cluster.
-	 * @returns {void} Nothing.
-	 */
+	/** Adds a missed beat to a cluster. */
 	private async addMissedBeat(id: number): Promise<void> {
 		const cluster = this.getClusterStats(id);
 		cluster.missedBeats++;

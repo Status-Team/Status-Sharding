@@ -1,50 +1,22 @@
 import { ChildProcess, fork, ForkOptions } from 'child_process';
 import { SerializableInput, Serializable } from '../types';
 
-/**
- * Options for the child process.
- * @export
- * @interface ChildProcessOptions
- * @typedef {ChildProcessOptions}
- * @extends {ForkOptions}
- */
+/** Options for the child process. */
 export interface ChildProcessOptions extends ForkOptions {
-	/**
-	 * Data to send to the cluster.
-	 * @type {(NodeJS.ProcessEnv | undefined)}
-	 */
+	/** Data to send to the cluster. */
 	clusterData?: NodeJS.ProcessEnv | undefined;
-	/**
-	 * The arguments to pass to the child process.
-	 * @type {?(string[] | undefined)}
-	 */
+	/** The arguments to pass to the child process. */
 	args?: string[] | undefined;
 }
 
-/**
- * Child class.
- * @export
- * @class Child
- * @typedef {Child}
- */
+/** Child class. */
 export class Child {
-	/**
-	 * The child process.
-	 * @type {(ChildProcess | null)}
-	 */
+	/** The child process. */
 	public process: ChildProcess | null = null;
-	/**
-	 * The options for the child process.
-	 * @type {(ForkOptions & { args?: string[] })}
-	 */
+	/** The options for the child process. */
 	public processOptions: ForkOptions & { args?: string[] } = {};
 
-	/**
-	 * Creates an instance of Child.
-	 * @constructor
-	 * @param {string} file - The file to run.
-	 * @param {ChildProcessOptions} options - The options for the child process.
-	 */
+	/** Creates an instance of Child. */
 	constructor(private file: string, options: ChildProcessOptions) {
 		this.processOptions = {};
 
@@ -68,28 +40,19 @@ export class Child {
 		};
 	}
 
-	/**
-	 * Spawns the child process.
-	 * @returns {ChildProcess} The child process.
-	 */
+	/** Spawns the child process. */
 	public spawn(): ChildProcess {
 		this.process = fork(this.file, this.processOptions.args, this.processOptions);
 		return this.process;
 	}
 
-	/**
-	 * Respawns the child process.
-	 * @returns {ChildProcess} The child process.
-	 */
+	/** Respawns the child process. */
 	public async respawn(): Promise<ChildProcess> {
 		await this.kill();
 		return this.spawn();
 	}
 
-	/**
-	 * Kills the child process.
-	 * @returns {Promise<boolean>} If the child process was killed.
-	 */
+	/** Kills the child process. */
 	public async kill(): Promise<boolean> {
 		if (!this.process || !this.process.pid) {
 			console.warn('No process to kill.');
@@ -116,12 +79,7 @@ export class Child {
 		}
 	}
 
-	/**
-	 * Sends a message to the child process.
-	 * @template {Serializable} T - The type of the message.
-	 * @param {SerializableInput<T, true>} message - The message to send.
-	 * @returns {Promise<void>} The promise.
-	 */
+	/** Sends a message to the child process. */
 	public send<T extends Serializable>(message: SerializableInput<T, true>): Promise<void> {
 		return new Promise<void>((resolve, reject) => {
 			this.process?.send(message as object, (err) => {
@@ -132,34 +90,17 @@ export class Child {
 	}
 }
 
-/**
- * Child client class.
- * @export
- * @class ChildClient
- * @typedef {ChildClient}
- */
+/** Child client class. */
 export class ChildClient {
-	/**
-	 * The IPC process.
-	 * @readonly
-	 * @type {NodeJS.Process}
-	 */
+	/** The IPC process. */
 	readonly ipc: NodeJS.Process;
 
-	/**
-	 * Creates an instance of ChildClient.
-	 * @constructor
-	 */
+	/** Creates an instance of ChildClient. */
 	constructor() {
 		this.ipc = process;
 	}
 
-	/**
-	 * Sends a message to the child process.
-	 * @template {Serializable} T - The type of the message.
-	 * @param {SerializableInput<T, true>} message - The message to send.
-	 * @returns {Promise<void>} The promise.
-	 */
+	/** Sends a message to the child process. */
 	public send<T extends Serializable>(message: SerializableInput<T, true>): Promise<void> {
 		return new Promise<void>((resolve, reject) => {
 			this.ipc.send?.(message, (err: Error | null) => {
@@ -169,10 +110,7 @@ export class ChildClient {
 		});
 	}
 
-	/**
-	 * Gets the data of the child process.
-	 * @returns {NodeJS.ProcessEnv} The data.
-	 */
+	/** Gets the data of the child process. */
 	public getData(): NodeJS.ProcessEnv {
 		return this.ipc.env;
 	}

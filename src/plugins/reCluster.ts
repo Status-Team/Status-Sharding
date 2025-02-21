@@ -3,33 +3,15 @@ import { ShardingUtils } from '../other/shardingUtils';
 import { ReClusterOptions } from '../types';
 import { Cluster } from '../core/cluster';
 
-/**
- * Handles re-clustering for the cluster manager.
- * @export
- * @class ReClusterManager
- * @typedef {ReClusterManager}
- */
+/** Handles re-clustering for the cluster manager. */
 export class ReClusterManager {
-	/**
-	 * If re-clustering is in progress.
-	 * @private
-	 * @type {boolean}
-	 */
+	/** If re-clustering is in progress. */
 	private inProgress: boolean = false;
 
-	/**
-	 * Creates an instance of ReClusterManager.
-	 * @constructor
-	 * @param {ClusterManager} manager - The cluster manager.
-	 */
-	constructor(private readonly manager: ClusterManager) {}
+	/** Creates an instance of ReClusterManager. */
+	constructor (private readonly manager: ClusterManager) { }
 
-	/**
-	 * Starts re-clustering.
-	 * @async
-	 * @param {ReClusterOptions} options - The options for re-clustering.
-	 * @returns {Promise<boolean>} If re-clustering was successful.
-	 */
+	/** Starts re-clustering. */
 	public async start(options: ReClusterOptions): Promise<boolean> {
 		if (this.inProgress) throw new Error('RECLUSTER_IN_PROGRESS | ReClustering is already in progress.');
 		else if (!this.manager.ready) throw new Error('CLUSTER_MANAGER_NOT_READY | All clusters must be ready before re-clustering.');
@@ -37,8 +19,7 @@ export class ReClusterManager {
 		if (!options.restartMode) options.restartMode = 'gracefulSwitch';
 
 		this.inProgress = true;
-		this.manager.triggerMaintenance('Reclustering..');
-		this.manager._debug('[ReClustering] Enabling Maintenance Mode on all clusters.');
+		this.manager._debug('[ReClustering] Starting ReClustering.');
 
 		const listOfShardsForCluster = ShardingUtils.chunkArray(this.manager.options.shardList || [], this.manager.options.shardsPerClusters || this.manager.options.totalShards);
 
@@ -74,8 +55,7 @@ export class ReClusterManager {
 						}
 
 						this.manager.clusters.set(clusterId, cluster);
-						this.manager._debug(`[ReClustering] [Cluster ${clusterId}] Switched OldCluster to NewCluster and exited Maintenance Mode.`);
-						cluster.triggerMaintenance(undefined);
+						this.manager._debug(`[ReClustering] [Cluster ${clusterId}] Switched OldCluster to NewCluster.`);
 					}
 
 					return c;
@@ -99,7 +79,7 @@ export class ReClusterManager {
 		}
 
 		if (options.restartMode === 'rolling') {
-			this.manager._debug('[ReClustering] Starting exiting Maintenance Mode on all clusters and killing old clusters.');
+			this.manager._debug('[ReClustering] Starting Rolling Restart.');
 
 			for (let i = 0; i < this.manager.options.totalClusters; i++) {
 				const clusterId = this.manager.options.clusterList[i] || i;
@@ -112,14 +92,13 @@ export class ReClusterManager {
 					oldClusters.delete(clusterId);
 				}
 
-				this.manager.clusters.set(clusterId, cluster); cluster.triggerMaintenance();
-				this.manager._debug(`[ReClustering] [Cluster ${clusterId}] Switched OldCluster to NewCluster and exited Maintenance Mode.`);
+				this.manager.clusters.set(clusterId, cluster);
+				this.manager._debug(`[ReClustering] [Cluster ${clusterId}] Switched Old Cluster to New Cluster.`);
 			}
 		}
 
 		newClusters.clear();
 		this.inProgress = false;
-		process.env.MAINTENANCE = undefined;
 
 		this.manager._debug('[ReClustering] Finished ReClustering.');
 		return true;
