@@ -53,7 +53,7 @@ export type RecursiveStringArray = (RecursiveStringArray | string)[];
 /** Awaitable type. */
 export type Awaitable<T> = T | PromiseLike<T>;
 /** Mode for clustering. */
-export type ClusteringMode = 'worker' | 'process';
+export type ClusteringMode = 'worker' | 'process' | 'bunExperimental';
 /** Any function. */
 export type UnknownFunction = (...args: unknown[]) => unknown;
 /** Data for restart sysytem. */
@@ -212,7 +212,7 @@ export interface ReClusterOptions {
 /** Options for storing promises. */
 export interface StoredPromise {
 	/** Timeout before promise is canceled. */
-	timeout?: NodeJS.Timeout;
+	timeout?: NodeJS.Timer;
 
 	/** Resolves the promise. */
 	resolve(value: unknown): void;

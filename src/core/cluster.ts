@@ -1,4 +1,4 @@
-import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, Serializable } from '../types';
+import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, Serializable, ClusteringMode } from '../types';
 import { ProcessMessage, BaseMessage, DataType } from '../other/message';
 import { Worker as WorkerThread } from 'worker_threads';
 import { ShardingUtils } from '../other/shardingUtils';
@@ -33,7 +33,7 @@ export class Cluster<
 		TOTAL_SHARDS: number;
 		CLUSTER_COUNT: number;
 		CLUSTER_QUEUE_MODE: 'auto' | 'manual';
-		CLUSTER_MANAGER_MODE: 'process' | 'worker';
+		CLUSTER_MANAGER_MODE: ClusteringMode;
 	};
 
 	/** Creates an instance of Cluster. */
