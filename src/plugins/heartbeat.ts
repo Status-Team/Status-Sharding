@@ -5,12 +5,12 @@ import { BaseMessage } from '../other/message';
 /** Handles heartbeats for the cluster manager. */
 export class HeartbeatManager {
 	/** The interval of the heartbeat. */
-	private readonly interval: NodeJS.Timer;
+	private readonly interval: NodeJS.Timeout;
 	/** The list of heartbeat data per cluster. */
 	private readonly beats: Map<number, HeartbeatData>;
 
 	/** Creates an instance of HeartbeatManager. */
-	constructor (private readonly manager: ClusterManager) {
+	constructor(private readonly manager: ClusterManager) {
 		if (this.manager.options.heartbeat.interval <= 0) throw new Error('The heartbeat interval must be greater than 0.');
 		else if (this.manager.options.heartbeat.timeout <= 0) throw new Error('The heartbeat timeout must be greater than 0.');
 		else if (this.manager.options.heartbeat.interval >= this.manager.options.heartbeat.timeout) throw new Error('The heartbeat timeout must be greater than the heartbeat interval.');

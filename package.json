@@ -1,5 +1,5 @@
 {
-	"version": "1.9.1-dev",
+	"version": "1.8.11",
 	"name": "status-sharding",
 	"author": "Digital39999",
 	"scripts": {
@@ -36,11 +36,9 @@
 		"discord.js-bot-sharding-example"
 	],
 	"devDependencies": {
-		"@types/bun": ">=1.2.4",
 		"@types/node": "20.14.8",
 		"@typescript-eslint/eslint-plugin": "7.13.1",
 		"@typescript-eslint/parser": "7.13.1",
-		"bun": ">=1.2.4",
 		"discord.js": ">=14.14.1",
 		"eslint": "8.57.0",
 		"typescript": "5.5.2"
@@ -50,10 +48,5 @@
 	},
 	"dependencies": {
 		"net-ipc": "^2.2.0"
-	},
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"bun"
-		]
 	}
 }

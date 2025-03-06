@@ -9,7 +9,7 @@ export class PromiseHandler {
 	nonces: Map<string, StoredPromise> = new Map();
 
 	/** Creates an instance of PromiseHandler. */
-	constructor (private instance: ClusterManager | ClusterClient) { }
+	constructor(private instance: ClusterManager | ClusterClient) {}
 
 	/** Resolves the promise with the data received. */
 	public resolve<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): void {
@@ -37,13 +37,7 @@ export class PromiseHandler {
 	public async create<T>(nonce: string, timeout?: number): Promise<T> {
 		return await new Promise<T>((resolve, reject) => {
 			if (!timeout) this.nonces.set(nonce, { resolve, reject });
-			else this.nonces.set(nonce, {
-				resolve, reject,
-				timeout: setTimeout(() => {
-					this.nonces.delete(nonce);
-					reject(new Error('Promise timed out.'));
-				}, timeout),
-			});
+			else this.nonces.set(nonce, { resolve, reject, timeout: setTimeout(() => { this.nonces.delete(nonce); reject(new Error('Promise timed out.')); }, timeout) });
 		});
 	}
 }
