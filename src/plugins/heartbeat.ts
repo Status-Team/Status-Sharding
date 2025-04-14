@@ -6,7 +6,7 @@ import { BaseMessage } from '../other/message';
 /** Handles heartbeats for the cluster manager. */
 export class HeartbeatManager {
 	/** The interval of the heartbeat. */
-	private readonly interval: NodeJS.Timer;
+	private readonly interval: NodeJS.Timeout;
 	/** The list of heartbeat data per cluster. */
 	private readonly beats: Map<number, HeartbeatData>;
 

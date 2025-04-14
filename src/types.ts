@@ -222,7 +222,7 @@ export interface ReClusterOptions {
 /** Options for storing promises. */
 export interface StoredPromise {
 	/** Timeout before promise is canceled. */
-	timeout?: NodeJS.Timer;
+	timeout?: NodeJS.Timeout;
 
 	/** Resolves the promise. */
 	resolve(value: unknown): void;
