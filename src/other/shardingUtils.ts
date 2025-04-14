@@ -125,4 +125,25 @@ export class ShardingUtils {
 		else if (typeof input === 'string') return input;
 		else throw new Error('INVALID_INPUT_TYPE | The input provided was not a string or a function.');
 	}
+
+	public static boolProp<T extends string>(input: unknown, key: T): T | `not ${T}` {
+		return input ? key : `not ${key}` as T | `not ${T}`;
+	}
+
+	public static relativeTime(time?: number): string {
+		if (!time) return 'never';
+
+		const date = new Date(time);
+		const now = new Date();
+
+		const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+		const minutes = Math.floor(seconds / 60);
+		const hours = Math.floor(minutes / 60);
+		const days = Math.floor(hours / 24);
+
+		if (seconds < 60) return `${seconds} seconds ago`;
+		else if (minutes < 60) return `${minutes} minutes ago`;
+		else if (hours < 24) return `${hours} hours ago`;
+		else return `${days} days ago`;
+	}
 }

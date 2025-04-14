@@ -20,6 +20,8 @@ export class Cluster<
 > extends EventEmitter {
 	/** Represents whether the cluster is ready. */
 	public ready: boolean;
+	/** Exited. */
+	public exited: boolean = false;
 	/** Represents the child process/worker of the cluster. */
 	public thread: null | Worker | Child;
 	/** Represents the last time the cluster received a heartbeat. */
@@ -127,6 +129,7 @@ export class Cluster<
 
 		this.thread = null;
 		this.ready = false;
+		this.exited = true;
 
 		this.manager.heartbeat?.removeCluster(this.id);
 		this.manager._debug('[KILL] Cluster killed with reason: ' + (options?.reason || 'Unknown reason.'));
@@ -211,7 +214,7 @@ export class Cluster<
 		if (!message || '_data' in message) return this.manager.broker.handleMessage(message);
 		else if (!this.messageHandler) throw new Error('CLUSTERING_NO_MESSAGE_HANDLER | Cluster ' + this.id + ' does not have a message handler.');
 
-		this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);
+		if (this.manager.options.advanced?.logMessagesInDebug) this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);
 		this.messageHandler.handleMessage(message);
 
 		if ([MessageTypes.CustomMessage, MessageTypes.CustomRequest].includes(message._type)) {
@@ -231,6 +234,7 @@ export class Cluster<
 
 		this.ready = false;
 		this.thread = null;
+		this.exited = true;
 	}
 
 	/** Error handler function that handles errors from the cluster's child process/worker/manager. */

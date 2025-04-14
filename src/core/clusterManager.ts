@@ -63,7 +63,7 @@ export class ClusterManager<
 			shardList: [], clusterList: [],
 			spawnOptions: {
 				timeout: options.spawnOptions?.timeout ?? -1,
-				delay: options.spawnOptions?.delay ?? 8000,
+				delay: options.spawnOptions?.delay ?? 7000,
 			},
 		};
 
@@ -90,11 +90,14 @@ export class ClusterManager<
 
 	/** Spawns multiple internal clusters. */
 	public async spawn(): Promise<Queue> {
-		if (this.options.spawnOptions.delay < 8000) process.emitWarning('Spawn Delay is smaller than 8s, this can cause global rate limits on /gateway/bot', {
+		if (this.options.spawnOptions.delay < 6000) process.emitWarning('Spawn Delay is smaller than 6s, this can cause global rate limits on /gateway/bot', {
 			code: 'SHARDING_DELAY',
 		});
 
-		if (this.options.token && this.options.token?.includes('Bot ') || this.options.token?.includes('Bearer ')) this.options.token = this.options.token.slice(this.options.token.indexOf(' ') + 1);
+		if (this.options.token) {
+			if (this.options.token?.includes('Bot ') || this.options.token?.includes('Bearer ')) this.options.token = this.options.token.slice(this.options.token.indexOf(' ') + 1);
+			else this.options.token = this.options.token.trim();
+		}
 
 		const cpuCores = os.cpus().length;
 		this.options.totalShards = this.options.totalShards !== -1 ? this.options.totalShards : this.options.token ? await ShardingUtils.getRecommendedShards(this.options.token) || 1 : 1;
@@ -283,7 +286,7 @@ export class ClusterManager<
 			}
 		}
 
-		if (options?.useAllSettled) {
+		if (options?.useAllSettled || this.options.advanced?.proceedBroadcastIfClusterDead) {
 			const results = (await Promise.allSettled(promises)).filter((r) => r.status === 'fulfilled') as PromiseFulfilledResult<ValidIfSerializable<T>>[];
 			return results.map((r) => r.value);
 		} else {

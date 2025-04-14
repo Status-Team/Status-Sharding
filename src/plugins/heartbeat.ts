@@ -1,16 +1,17 @@
 import { ClusterManager } from '../core/clusterManager';
+import { ShardingUtils } from '../other/shardingUtils';
 import { HeartbeatData, MessageTypes } from '../types';
 import { BaseMessage } from '../other/message';
 
 /** Handles heartbeats for the cluster manager. */
 export class HeartbeatManager {
 	/** The interval of the heartbeat. */
-	private readonly interval: NodeJS.Timeout;
+	private readonly interval: NodeJS.Timer;
 	/** The list of heartbeat data per cluster. */
 	private readonly beats: Map<number, HeartbeatData>;
 
 	/** Creates an instance of HeartbeatManager. */
-	constructor(private readonly manager: ClusterManager) {
+	constructor (private readonly manager: ClusterManager) {
 		if (this.manager.options.heartbeat.interval <= 0) throw new Error('The heartbeat interval must be greater than 0.');
 		else if (this.manager.options.heartbeat.timeout <= 0) throw new Error('The heartbeat timeout must be greater than 0.');
 		else if (this.manager.options.heartbeat.interval >= this.manager.options.heartbeat.timeout) throw new Error('The heartbeat timeout must be greater than the heartbeat interval.');
@@ -18,11 +19,12 @@ export class HeartbeatManager {
 		this.beats = new Map();
 		this.interval = setInterval(() => {
 			for (const cluster of this.manager.clusters.values()) {
-				if (!cluster.ready || this.beats.get(cluster.id)?.killing || !cluster.lastHeartbeatReceived) continue;
+				const shouldSend = cluster.ready ? true : cluster.exited;
+				this.manager._debug(`Cluster ${cluster.id} heartbeat check (${ShardingUtils.boolProp(cluster.ready, 'ready')}, ${ShardingUtils.boolProp(cluster.exited, 'exited')}, ${ShardingUtils.boolProp(this.beats.get(cluster.id)?.killing, 'killing')}, ${ShardingUtils.relativeTime(cluster.lastHeartbeatReceived)})`);
 
-				cluster._sendInstance({
-					_type: MessageTypes.Heartbeat,
-				} as BaseMessage<'heartbeat'>)?.catch(() => null);
+				if ((!shouldSend && !this.beats.get(cluster.id)?.killing) || !cluster.lastHeartbeatReceived) continue;
+
+				cluster._sendInstance({ _type: MessageTypes.Heartbeat } as BaseMessage<'heartbeat'>)?.catch(() => null);
 
 				if (Date.now() - cluster.lastHeartbeatReceived > this.manager.options.heartbeat.timeout) {
 					this.manager._debug(`Cluster ${cluster.id} has missed a heartbeat. (${this.getClusterStats(cluster.id).missedBeats} missed)`);
@@ -61,14 +63,17 @@ export class HeartbeatManager {
 		cluster.missedBeats++;
 
 		if (cluster.missedBeats >= this.manager.options.heartbeat.maxMissedHeartbeats) {
+			const targetCluster = this.manager.clusters.get(id);
+			if (!targetCluster) throw new Error(`Cluster ${id} not found for heartbeat.`);
+
 			this.beats.set(id, { ...cluster, killing: true });
 			this.manager._debug(`Cluster ${id} has missed too many heartbeats. (${cluster.missedBeats})`);
-			await this.manager.clusters.get(id)?.kill({ reason: 'Missed too many heartbeats.' });
+			if (targetCluster.thread) await targetCluster?.kill({ reason: 'Missed too many heartbeats.' });
 			this.beats.set(id, { ...cluster, killing: false });
 
-			if (cluster.restarts < this.manager.options.heartbeat.maxRestarts) {
-				this.manager._debug(`Cluster ${id} is restarting.. (${this.manager.options.heartbeat.maxRestarts - cluster.restarts} left).`);
-				await this.manager.clusters.get(id)?.spawn();
+			if (cluster.restarts < this.manager.options.heartbeat.maxRestarts || this.manager.options.heartbeat.maxRestarts !== -1) {
+				this.manager._debug(`Cluster ${id} is restarting.. (${this.manager.options.heartbeat.maxRestarts !== -1 ? this.manager.options.heartbeat.maxRestarts - cluster.restarts : 'unlimited'} left)`);
+				if (!targetCluster.thread) await targetCluster?.spawn();
 
 				cluster.missedBeats = 0;
 				cluster.restarts++;

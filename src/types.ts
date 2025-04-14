@@ -99,6 +99,8 @@ export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
 	clusterData?: object;
 	/** Options, which is passed when forking a child or creating a thread. */
 	clusterOptions?: T extends 'worker' ? WorkerThreadOptions : ChildProcessOptions;
+	/** Advanced. */
+	advanced?: Partial<ClusterManagerAdvancedOptions>;
 }
 
 /** Options for the cluster manager. */
@@ -119,6 +121,14 @@ export interface ClusterManagerOptions<T extends ClusteringMode> extends Cluster
 	spawnOptions: Required<ClusterSpawnOptions>;
 	/** Heartbeat options. */
 	heartbeat: Required<ClusterHeartbeatOptions>;
+}
+
+/** Advanced options for cluster manager. */
+export interface ClusterManagerAdvancedOptions {
+	/** Whether to spam when debugging. */
+	logMessagesInDebug: boolean;
+	/** Whether to ignore dead clusters, WARNING: If you have null-checks in your code, this might false trigger that whatever you want to do results in null (ei. getting guild from cluster that is dead). */
+	proceedBroadcastIfClusterDead: boolean;
 }
 
 /** Data of ClusterClient. */
@@ -212,7 +222,7 @@ export interface ReClusterOptions {
 /** Options for storing promises. */
 export interface StoredPromise {
 	/** Timeout before promise is canceled. */
-	timeout?: NodeJS.Timeout;
+	timeout?: NodeJS.Timer;
 
 	/** Resolves the promise. */
 	resolve(value: unknown): void;

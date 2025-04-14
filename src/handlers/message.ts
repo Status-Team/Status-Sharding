@@ -18,6 +18,7 @@ export class ClusterHandler {
 			case MessageTypes.ClientReady: {
 				if (this.cluster.ready) throw new Error('Cluster already ready, if autoLogin is enabled, check if you are not using .login() in your code.');
 				this.cluster.ready = true;
+				this.cluster.exited = false;
 
 				this.cluster.lastHeartbeatReceived = Date.now();
 
@@ -105,11 +106,6 @@ export class ClusterHandler {
 			}
 			case MessageTypes.ClientSpawnNextCluster: {
 				this.cluster.manager.clusterQueue.next();
-				break;
-			}
-			case MessageTypes.Heartbeat: {
-				this.cluster.manager._debug(`[Cluster ${this.cluster.id}] Sending heartbeat..`);
-				this.ipc.send({ _type: MessageTypes.Heartbeat } as BaseMessage<'heartbeat'>);
 				break;
 			}
 			case MessageTypes.HeartbeatAck: {
