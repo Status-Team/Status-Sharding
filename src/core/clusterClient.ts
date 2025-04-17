@@ -45,9 +45,10 @@ export class ClusterClient<
 		this.promise = new PromiseHandler(this);
 
 		// @ts-ignore
-		if ('once' in client) client.once('ready', () => {
-			setTimeout(() => this.triggerReady(), 1500); // Allow main listener to be called first.
-		});
+		if ('once' in client) {
+			client.once('ready', () => setTimeout(() => this.triggerReady(), 1500));
+			client.once('clientReady', () => setTimeout(() => this.triggerReady(), 1500));
+		}
 	}
 
 	/** Current cluster id. */

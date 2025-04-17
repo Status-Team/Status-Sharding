@@ -4,7 +4,10 @@ import { ClusterClient } from './clusterClient';
 import { getInfo } from '../other/data';
 
 /** Modified ClientEvents such that the ready event has the ShardingClient instead of the normal Client. */
-export type ClientEventsModifiable = Omit<ClientEvents, 'ready'> & { ready: [client: ShardingClient] };
+export type ClientEventsModifiable = Omit<ClientEvents, 'ready' | 'clientReady'> & {
+	ready: [client: ShardingClient];
+	clientReady: [client: ShardingClient];
+};
 
 /** Modified DiscordClient with bunch of new methods. */
 export class ShardingClient<
