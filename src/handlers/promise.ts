@@ -37,7 +37,13 @@ export class PromiseHandler {
 	public async create<T>(nonce: string, timeout?: number): Promise<T> {
 		return await new Promise<T>((resolve, reject) => {
 			if (!timeout) this.nonces.set(nonce, { resolve, reject });
-			else this.nonces.set(nonce, { resolve, reject, timeout: setTimeout(() => { this.nonces.delete(nonce); reject(new Error('Promise timed out.')); }, timeout) });
+			else this.nonces.set(nonce, {
+				resolve, reject,
+				timeout: setTimeout(() => {
+					this.nonces.delete(nonce);
+					reject(new Error('Promise timed out.'));
+				}, timeout) as NodeJS.Timeout,
+			});
 		});
 	}
 }

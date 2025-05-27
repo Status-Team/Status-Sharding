@@ -39,7 +39,7 @@ export class HeartbeatManager {
 					this.manager._debug(`Cluster ${cluster.id} has received a heartbeat.`);
 				}
 			}
-		}, this.manager.options.heartbeat.interval);
+		}, this.manager.options.heartbeat.interval) as NodeJS.Timeout;
 	}
 
 	/** Stops the heartbeat. */

@@ -108,8 +108,13 @@ export class ClusterManager<
 		if (this.options.totalClusters < 1) this.options.totalClusters = 1;
 
 		else if (this.options.totalClusters > this.options.totalShards) throw new Error('CLIENT_INVALID_OPTION | Total Clusters cannot be more than Total Shards.');
-		else if (this.options.shardsPerClusters > this.options.totalShards) throw new Error('CLIENT_INVALID_OPTION | Shards per Cluster cannot be more than Total Shards.');
-		else if (this.options.shardsPerClusters > (this.options.totalShards / this.options.totalClusters)) throw new Error('CLIENT_INVALID_OPTION | Shards per Cluster cannot be more than Total Shards divided by Total Clusters.');
+		else if (this.options.shardsPerClusters > this.options.totalShards) {
+			console.warn('[ClusterManager] Shards Per Cluster is bigger than Total Shards, setting it to Total Shards.');
+			this.options.shardsPerClusters = this.options.totalShards;
+		} else if (this.options.shardsPerClusters > (this.options.totalShards / this.options.totalClusters)) {
+			console.warn('[ClusterManager] Shards Per Cluster is bigger than Total Shards / Total Clusters, setting it to Total Shards / Total Clusters.');
+			this.options.shardsPerClusters = Math.ceil(this.options.totalShards / this.options.totalClusters);
+		}
 
 		if (!this.options.shardList?.length) this.options.shardList = new Array(this.options.totalShards).fill(0).map((_, i) => i);
 		if (this.options.shardsPerClusters) this.options.totalClusters = Math.ceil((this.options.shardList?.length || 0) / this.options.shardsPerClusters) || 1;
