@@ -101,19 +101,39 @@ export class ClusterManager<
 
 		const cpuCores = os.cpus().length;
 		this.options.totalShards = this.options.totalShards !== -1 ? this.options.totalShards : this.options.token ? await ShardingUtils.getRecommendedShards(this.options.token) || 1 : 1;
-		this.options.totalClusters = (this.options.totalClusters === -1) ? (cpuCores > this.options.totalShards ? this.options.totalShards : cpuCores) : this.options.totalClusters;
+
+		if (this.options.totalClusters === -1) {
+			if (this.options.totalShards < 1) this.options.totalClusters = cpuCores;
+			else {
+				const idealClusters = Math.max(Math.ceil(this.options.totalShards / 7), Math.min(cpuCores, this.options.totalShards));
+				this.options.totalClusters = idealClusters;
+			}
+		}
+
 		this.options.shardsPerClusters = (this.options.shardsPerClusters === -1) ? Math.ceil(this.options.totalShards / this.options.totalClusters) : this.options.shardsPerClusters;
 
 		if (this.options.totalShards < 1) this.options.totalShards = 1;
 		if (this.options.totalClusters < 1) this.options.totalClusters = 1;
 
-		else if (this.options.totalClusters > this.options.totalShards) throw new Error('CLIENT_INVALID_OPTION | Total Clusters cannot be more than Total Shards.');
-		else if (this.options.shardsPerClusters > this.options.totalShards) {
+		if (this.options.totalClusters > this.options.totalShards) {
+			this._debug(`[ClusterManager] Warning: More clusters (${this.options.totalClusters}) than shards (${this.options.totalShards}). Adjusting clusters to match shards.`);
+			this.options.totalClusters = this.options.totalShards;
+		}
+
+		if (this.options.shardsPerClusters > this.options.totalShards) {
 			console.warn('[ClusterManager] Shards Per Cluster is bigger than Total Shards, setting it to Total Shards.');
 			this.options.shardsPerClusters = this.options.totalShards;
 		} else if (this.options.shardsPerClusters > (this.options.totalShards / this.options.totalClusters)) {
-			console.warn('[ClusterManager] Shards Per Cluster is bigger than Total Shards / Total Clusters, setting it to Total Shards / Total Clusters.');
+			console.warn('[ClusterManager] Shards Per Cluster is bigger than optimal distribution, adjusting to optimal value.');
 			this.options.shardsPerClusters = Math.ceil(this.options.totalShards / this.options.totalClusters);
+		}
+
+		if (this.options.totalClusters > cpuCores * 2) {
+			console.warn(`[ClusterManager] Warning: Running ${this.options.totalClusters} clusters on ${cpuCores} CPU cores. This may impact performance. Consider reducing clusters or upgrading hardware.`);
+		}
+
+		if (this.options.mode === 'worker' && this.options.totalClusters > cpuCores * 4) {
+			console.warn(`[ClusterManager] Warning: ${this.options.totalClusters} worker threads may cause thread pool exhaustion. Consider using 'process' mode or reducing clusters.`);
 		}
 
 		if (!this.options.shardList?.length) this.options.shardList = new Array(this.options.totalShards).fill(0).map((_, i) => i);
@@ -122,14 +142,13 @@ export class ClusterManager<
 		if (!this.options.clusterList?.length) this.options.clusterList = new Array(this.options.totalClusters).fill(0).map((_, i) => i);
 		if (this.options.clusterList.length !== this.options.totalClusters) this.options.totalClusters = this.options.clusterList.length;
 
-		else if (this.options.shardsPerClusters < 1) throw new Error('CLIENT_INVALID_OPTION | Shards Per Cluster must be at least 1.');
-		else if (this.options.totalShards < this.options.shardList.length) throw new Error('CLIENT_INVALID_OPTION | Shard List is bigger than Total Shards.');
-		else if (this.options.totalClusters < this.options.clusterList.length) throw new Error('CLIENT_INVALID_OPTION | Cluster List is bigger than Total Clusters.');
+		if (this.options.shardsPerClusters < 1) throw new Error('CLIENT_INVALID_OPTION | Shards Per Cluster must be at least 1.');
+		if (this.options.totalShards < this.options.shardList.length) throw new Error('CLIENT_INVALID_OPTION | Shard List is bigger than Total Shards.');
+		if (this.options.totalClusters < this.options.clusterList.length) throw new Error('CLIENT_INVALID_OPTION | Cluster List is bigger than Total Clusters.');
+		if (this.options.shardList.some((shard) => shard < 0)) throw new Error('CLIENT_INVALID_OPTION | Shard List has invalid shards.');
+		if (this.options.clusterList.some((cluster) => cluster < 0)) throw new Error('CLIENT_INVALID_OPTION | Cluster List has invalid clusters.');
 
-		else if (this.options.shardList.some((shard) => shard < 0)) throw new Error('CLIENT_INVALID_OPTION | Shard List has invalid shards.');
-		else if (this.options.clusterList.some((cluster) => cluster < 0)) throw new Error('CLIENT_INVALID_OPTION | Cluster List has invalid clusters.');
-
-		this._debug(`[ClusterManager] Spawning ${this.options.totalClusters} Clusters with ${this.options.totalShards} Shards.`);
+		this._debug(`[ClusterManager] Spawning ${this.options.totalClusters} clusters with ${this.options.totalShards} shards in total (${this.options.shardsPerClusters} shards per cluster)`);
 
 		const listOfShardsForCluster = ShardingUtils.chunkArray(this.options.shardList || [], this.options.shardsPerClusters || this.options.totalShards);
 		if (listOfShardsForCluster.length !== this.options.totalClusters) this.options.totalClusters = listOfShardsForCluster.length;

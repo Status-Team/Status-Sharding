@@ -9,7 +9,7 @@ import { WorkerClient } from '../classes/worker';
 import { ChildClient } from '../classes/child';
 import { Serializable } from 'child_process';
 import { RefShardingClient } from './client';
-import { getInfo } from '../other/data';
+import { getInfo } from '../other/utils';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 

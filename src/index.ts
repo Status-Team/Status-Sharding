@@ -12,7 +12,7 @@ export * from './handlers/queue';
 
 export * from './other/shardingUtils';
 export * from './other/message';
-export * from './other/data';
+export * from './other/utils';
 
 export * from './plugins/heartbeat';
 export * from './plugins/reCluster';

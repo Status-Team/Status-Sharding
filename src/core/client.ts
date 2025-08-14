@@ -1,7 +1,7 @@
 import { ClientEvents, ClientOptions, Client as DiscordClient } from 'discord.js';
 import { RefClusterManager } from './clusterManager';
 import { ClusterClient } from './clusterClient';
-import { getInfo } from '../other/data';
+import { getInfo } from '../other/utils';
 
 /** Modified ClientEvents such that the ready event has the ShardingClient instead of the normal Client. */
 export type ClientEventsModifiable = Omit<ClientEvents, 'ready' | 'clientReady'> & {
@@ -34,12 +34,12 @@ export type RefShardingClient = ShardingClient;
 export declare interface ShardingClient {
 	/** Emit an event. */
 	emit: (<K extends keyof ClientEventsModifiable>(event: K, ...args: ClientEventsModifiable[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, ...args: unknown[]) => boolean);
-    /** Remove an event listener. */
+	/** Remove an event listener. */
 	off: (<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void) => this);
-    /** Listen for an event. */
+	/** Listen for an event. */
 	on: (<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void) => this);
-    /** Listen for an event once. */
+	/** Listen for an event once. */
 	once: (<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void) => this);
-    /** Remove all listeners for an event. */
+	/** Remove all listeners for an event. */
 	removeAllListeners: (<K extends keyof ClientEventsModifiable>(event?: K) => this) & (<S extends string | symbol>(event?: Exclude<S, keyof ClientEventsModifiable>) => this);
 }
