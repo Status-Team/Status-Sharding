@@ -29,7 +29,7 @@ jobs:
         run: |
           npm i -g pnpm
           pnpm install
-          pnpm add discord.js@latest --save-dev --no-save
+          pnpm add -D discord.js@latest
 
       - name: Check if package needs publishing
         id: check_publish
