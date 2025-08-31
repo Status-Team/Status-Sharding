@@ -25,10 +25,11 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org/"
 
-      - name: Install dependencies
+      - name: Install dependencies and latest discord.js
         run: |
           npm i -g pnpm
           pnpm install
+          pnpm add discord.js@latest --save-dev --no-save
 
       - name: Check if package needs publishing
         id: check_publish
@@ -47,6 +48,10 @@ jobs:
             echo "New version available. Proceeding to publish."
             echo "publish=true" >> $GITHUB_ENV
           fi
+
+      - name: Build the project
+        run: |
+          pnpm run build
 
       - name: Publish to npm
         if: env.publish == 'true'
