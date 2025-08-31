@@ -1,6 +1,5 @@
 import { ClusterClientData } from '../types';
 import { workerData } from 'worker_threads';
-import { version } from 'discord.js';
 
 export function getInfo(): ClusterClientData {
 	const clusterMode = process.env.CLUSTER_MANAGER_MODE;
@@ -22,8 +21,8 @@ export function getInfo(): ClusterClientData {
 			ClusterId: Number(process.env.CLUSTER),
 			ClusterManagerMode: clusterMode,
 			ClusterQueueMode: process.env.CLUSTER_QUEUE_MODE as 'auto' | 'manual',
-			FirstShardId: shardList[0],
-			LastShardId: shardList[shardList.length - 1],
+			FirstShardId: shardList[0] ?? 0,
+			LastShardId: shardList[shardList.length - 1] ?? 0,
 		};
 	} else {
 		data = {
@@ -41,13 +40,13 @@ export function getInfo(): ClusterClientData {
 	return data;
 }
 
-export function getDiscordVersion() {
-	const [major, minor, patch] = version.split('.').map(Number);
+export async function getDiscordVersion() {
+	try {
+		const { version } = await import('discord.js');
+		const [major = 0, minor = 0, patch = 0] = version.split('.').map(Number) as [number, number, number];
 
-	return {
-		major,
-		minor,
-		patch,
-		raw: version,
-	};
+		return { major, minor, patch, raw: version };
+	} catch (error) {
+		throw new Error('Discord.js is not installed or not accessible');
+	}
 }

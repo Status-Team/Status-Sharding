@@ -162,9 +162,9 @@ export class ClusterManager<
 				this._debug(`[ClusterManager] Added Cluster ${this.options.clusterList?.[i] || i} to the queue with ${listOfShardsForCluster[i]} shards.`);
 
 				this.clusterQueue.add({
-					timeout: this.options.spawnOptions.delay * listOfShardsForCluster[i]?.length,
-					args: [this.options.spawnOptions.timeout !== -1 ? this.options.spawnOptions.timeout + this.options.spawnOptions.delay * listOfShardsForCluster[i]?.length : this.options.spawnOptions.timeout],
-					run: (...timeout: number[]) => this.createCluster(this.options.clusterList?.[i] || i, listOfShardsForCluster[i]).spawn(...timeout),
+					timeout: this.options.spawnOptions.delay * (listOfShardsForCluster[i]?.length ?? 0),
+					args: [this.options.spawnOptions.timeout !== -1 ? this.options.spawnOptions.timeout + this.options.spawnOptions.delay * (listOfShardsForCluster[i]?.length ?? 0) : this.options.spawnOptions.timeout],
+					run: (...timeout: number[]) => this.createCluster(this.options.clusterList?.[i] || i, listOfShardsForCluster[i] || []).spawn(...timeout),
 				});
 			}
 		}

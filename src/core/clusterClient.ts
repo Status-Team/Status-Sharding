@@ -44,12 +44,16 @@ export class ClusterClient<
 		this.process.ipc.on('message', this._handleMessage.bind(this));
 		this.promise = new PromiseHandler(this);
 
-		const { major, minor, patch } = getDiscordVersion();
+		this.setupReadyEvent();
+	}
+
+	private async setupReadyEvent(): Promise<void> {
+		const { major, minor, patch } = await getDiscordVersion();
 		const useClientReady = major > 14 || (major === 14 && (minor > 22 || (minor === 22 && patch >= 0)));
 
 		// @ts-ignore
-		if ('once' in client) {
-			client.once(useClientReady ? 'clientReady' : 'ready', () => setTimeout(() => this.triggerReady(), 1500));
+		if ('once' in this.client) {
+			this.client.once(useClientReady ? 'clientReady' : 'ready', () => setTimeout(() => this.triggerReady(), 1500));
 		}
 	}
 

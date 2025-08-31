@@ -1,16 +1,47 @@
 {
 	"compilerOptions": {
+		/* Basic Options */
+		"incremental": true,		
 		"module": "CommonJS",
 		"target": "ES2022",
-		"sourceMap": true,
 		"outDir": "./dist",
-		"skipLibCheck": true,
-		"noImplicitAny": true,
-		"declaration": true,
+
+		/* Strict Type-Checking Options */
 		"strict": true,
+		"noImplicitAny": true,
 		"strictNullChecks": true,
+		"strictFunctionTypes": true,
+		"strictBindCallApply": true,
+		"strictPropertyInitialization": true,
+		"noImplicitThis": true,
+		"alwaysStrict": true,
+
+		/* Additional Checks */
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+
+		/* Module Resolution Options */
+		"moduleResolution": "node",
 		"esModuleInterop": true,
-		"baseUrl": "./",
+		"baseUrl": ".",
+
+		"declaration": true,
+		"skipLibCheck": true,
+		"resolveJsonModule": true,
+		"noUncheckedIndexedAccess": true,
+
+		/* Experimental Options */
+		"experimentalDecorators": true,
+
+		/* Advanced Options */
+		"forceConsistentCasingInFileNames": true,
+
+		/* Alias */
+		"paths": {
+			"discord.js": ["./node_modules/discord.js"]
+		}
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules"]

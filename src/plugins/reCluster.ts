@@ -38,7 +38,7 @@ export class ReClusterManager {
 				run: async (...a: number[]) => {
 					if (!this.manager) throw new Error('Manager is missing on ReClusterManager (#1).');
 
-					const cluster = this.manager.createCluster(clusterId, listOfShardsForCluster[i], true);
+					const cluster = this.manager.createCluster(clusterId, listOfShardsForCluster[i] || [], true);
 					newClusters.set(clusterId, cluster);
 
 					this.manager._debug(`[ReClustering] [Cluster ${clusterId}] Spawning Cluster.`);

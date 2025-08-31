@@ -104,10 +104,10 @@ export class ShardingUtils {
 	}
 
 	/** Gets the cluster id for a shard id. */
-	public static async getRecommendedShards(token: string, guildsPerShard: number = 1000): Promise<number> {
+	public static async getRecommendedShards(token: string, guildsPerShard: number = 1000, options = DefaultOptions): Promise<number> {
 		if (!token) throw new Error('DISCORD_TOKEN_MISSING | No token was provided to ClusterManager options.');
 
-		const response = await fetch(`${DefaultOptions.http.api}/v${DefaultOptions.http.version}${Endpoints.botGateway}`, {
+		const response = await fetch(`${options.http.api}/v${options.http.version}${Endpoints.botGateway}`, {
 			method: 'GET',
 			headers: { Authorization: `Bot ${token.replace(/^Bot\s*/i, '')}` },
 		}).then((res) => {
