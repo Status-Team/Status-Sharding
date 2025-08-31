@@ -1,5 +1,6 @@
 import { ClusterClientData } from '../types';
 import { workerData } from 'worker_threads';
+import { version } from 'discord.js';
 
 export function getInfo(): ClusterClientData {
 	const clusterMode = process.env.CLUSTER_MANAGER_MODE;
@@ -38,4 +39,15 @@ export function getInfo(): ClusterClientData {
 	}
 
 	return data;
+}
+
+export function getDiscordVersion() {
+	const [major, minor, patch] = version.split('.').map(Number);
+
+	return {
+		major,
+		minor,
+		patch,
+		raw: version,
+	};
 }

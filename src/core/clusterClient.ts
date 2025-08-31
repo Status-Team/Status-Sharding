@@ -1,6 +1,7 @@
 import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, ClusterClientData } from '../types';
 import { BaseMessage, BaseMessageInput, DataType, ProcessMessage } from '../other/message';
 import { BrokerMessage, IPCBrokerClient } from '../handlers/broker';
+import { getDiscordVersion, getInfo } from '../other/utils';
 import { ClusterClientHandler } from '../handlers/message';
 import { ShardingUtils } from '../other/shardingUtils';
 import { RefClusterManager } from './clusterManager';
@@ -9,7 +10,6 @@ import { WorkerClient } from '../classes/worker';
 import { ChildClient } from '../classes/child';
 import { Serializable } from 'child_process';
 import { RefShardingClient } from './client';
-import { getInfo } from '../other/utils';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 
@@ -44,10 +44,12 @@ export class ClusterClient<
 		this.process.ipc.on('message', this._handleMessage.bind(this));
 		this.promise = new PromiseHandler(this);
 
+		const { major, minor, patch } = getDiscordVersion();
+		const useClientReady = major > 14 || (major === 14 && (minor > 22 || (minor === 22 && patch >= 0)));
+
 		// @ts-ignore
 		if ('once' in client) {
-			client.once('ready', () => setTimeout(() => this.triggerReady(), 1500));
-			client.once('clientReady', () => setTimeout(() => this.triggerReady(), 1500));
+			client.once(useClientReady ? 'clientReady' : 'ready', () => setTimeout(() => this.triggerReady(), 1500));
 		}
 	}
 
