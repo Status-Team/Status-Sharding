@@ -38,11 +38,15 @@ export class Cluster<
 		CLUSTER_MANAGER_MODE: 'process' | 'worker';
 	};
 
+	/** Track active spawn/kill operations to prevent race conditions */
+	private _operationInProgress = false;
+
 	/** Creates an instance of Cluster. */
 	constructor (public manager: InternalManager, public id: number, public shardList: number[]) {
 		super();
 
-		this.ready = false; this.thread = null;
+		this.ready = false;
+		this.thread = null;
 
 		this.envData = Object.assign({}, process.env, {
 			CLUSTER: this.id,
@@ -64,79 +68,111 @@ export class Cluster<
 		return this.manager.options.totalClusters;
 	}
 
-	/** Spawn function that spawns the cluster's child process/worker. */
+	/** Spawn function that spawns the cluster's child process/worker with proper event management. */
 	public async spawn(spawnTimeout: number = -1): Promise<ChildProcess | WorkerThread> {
-		if (this.thread) throw new Error('CLUSTER_ALREADY_SPAWNED | Cluster ' + this.id + ' has already been spawned.');
+		if (this._operationInProgress) throw new Error('CLUSTER_OPERATION_IN_PROGRESS | Another spawn/kill operation is already in progress for cluster ' + this.id);
+		else if (this.thread) throw new Error('CLUSTER_ALREADY_SPAWNED | Cluster ' + this.id + ' has already been spawned.');
 		else if (!this.manager.file) throw new Error('NO_FILE_PROVIDED | Cluster ' + this.id + ' does not have a file provided.');
 
-		const options = {
-			...this.manager.options.clusterOptions,
-			execArgv: this.manager.options.execArgv,
-			env: this.envData,
-			args: [...(this.manager.options.shardArgs || []), '--clusterId ' + this.id, `--shards [${this.shardList.join(', ').trim()}]`],
-			clusterData: { ...this.envData, ...this.manager.options.clusterData },
-		};
+		this._operationInProgress = true;
 
-		this.thread = this.manager.options.mode === 'process' ? new Child(path.resolve(this.manager.file), options) : new Worker(path.resolve(this.manager.file), options);
-		this.messageHandler = new ClusterHandler(this, this.thread);
-
-		const thread = this.thread.spawn();
-		thread.on('message', this._handleMessage.bind(this));
-		thread.on('error', this._handleError.bind(this));
-		thread.on('exit', this._handleExit.bind(this));
-
-		this.emit('spawn', this, this.thread.process);
-
-		const shouldAbort = spawnTimeout > 0 && spawnTimeout !== Infinity;
-
-		await new Promise<void>((resolve, reject) => {
-			const cleanup = (isDeath: boolean = false) => {
-				clearTimeout(spawnTimeoutTimer);
-
-				if (isDeath) {
-					this.off('ready', onReady);
-					this.off('death', onDeath);
-				}
+		try {
+			const options = {
+				...this.manager.options.clusterOptions,
+				execArgv: this.manager.options.execArgv,
+				env: this.envData,
+				args: [...(this.manager.options.shardArgs || []), '--clusterId ' + this.id, `--shards [${this.shardList.join(', ').trim()}]`],
+				clusterData: { ...this.envData, ...this.manager.options.clusterData },
 			};
 
-			const onReady = () => {
-				this.manager.emit('clusterReady', this);
-				cleanup(); resolve();
-			};
+			this.thread = this.manager.options.mode === 'process'
+				? new Child(path.resolve(this.manager.file), options)
+				: new Worker(path.resolve(this.manager.file), options);
 
-			const onDeath = () => {
-				cleanup(true); reject(new Error('CLUSTERING_READY_DIED | Cluster ' + this.id + ' died.'));
-			};
+			this.messageHandler = new ClusterHandler(this, this.thread);
+			const thread = this.thread.spawn();
 
-			const onTimeout = () => {
-				cleanup(); reject(new Error('CLUSTERING_READY_TIMEOUT | Cluster ' + this.id + ' took too long to get ready.'));
-			};
+			this._setupEventListeners(thread);
+			this.emit('spawn', this, this.thread.process);
 
-			const spawnTimeoutTimer = shouldAbort ? setTimeout(onTimeout, spawnTimeout) : -1;
-			this.once('ready', onReady); this.once('death', onDeath);
-			if (!shouldAbort) resolve();
-		});
+			const shouldAbort = spawnTimeout > 0 && spawnTimeout !== Infinity;
 
-		return this.thread.process as ChildProcess | WorkerThread;
+			await new Promise<void>((resolve, reject) => {
+				const cleanup = (isDeath: boolean = false) => {
+					if (spawnTimeoutTimer !== -1) clearTimeout(spawnTimeoutTimer);
+
+					if (isDeath) {
+						this.off('ready', onReady);
+						this.off('death', onDeath);
+					}
+				};
+
+				const onReady = () => {
+					this.manager.emit('clusterReady', this);
+					cleanup();
+					resolve();
+				};
+
+				const onDeath = () => {
+					cleanup(true);
+					reject(new Error('CLUSTERING_READY_DIED | Cluster ' + this.id + ' died.'));
+				};
+
+				const onTimeout = () => {
+					cleanup();
+					reject(new Error('CLUSTERING_READY_TIMEOUT | Cluster ' + this.id + ' took too long to get ready.'));
+				};
+
+				const spawnTimeoutTimer = shouldAbort ? setTimeout(onTimeout, spawnTimeout) : -1;
+
+				this.once('ready', onReady);
+				this.once('death', onDeath);
+
+				if (!shouldAbort) resolve();
+			});
+
+			return this.thread.process as ChildProcess | WorkerThread;
+		} finally {
+			this._operationInProgress = false;
+		}
 	}
 
-	/** Kill function that kills the cluster's child process/worker. */
+	private _setupEventListeners(thread: ChildProcess | WorkerThread): void {
+		if (!thread) return;
+
+		thread.addListener('message', this._handleMessage.bind(this));
+		thread.addListener('error', this._handleError.bind(this));
+		thread.addListener('exit', this._handleExit.bind(this));
+	}
+
 	public async kill(options?: ClusterKillOptions): Promise<void> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#1).'));
+		if (this._operationInProgress) throw new Error('CLUSTER_OPERATION_IN_PROGRESS | Another spawn/kill operation is already in progress for cluster ' + this.id);
+		else if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#1).'));
 
-		const check = await this.thread.kill();
-		if (!check) return Promise.reject(new Error('CLUSTERING_KILL_FAILED | Cluster ' + this.id + ' failed to kill the child process/worker.'));
+		this._operationInProgress = true;
 
-		this.thread = null;
-		this.ready = false;
-		this.exited = true;
+		try {
+			const check = await this.thread.kill();
+			if (!check) throw new Error('CLUSTERING_KILL_FAILED | Cluster ' + this.id + ' failed to kill the child process/worker.');
 
-		this.manager.heartbeat?.removeCluster(this.id);
-		this.manager._debug('[KILL] Cluster killed with reason: ' + (options?.reason || 'Unknown reason.'));
+			this.thread = null;
+			this.ready = false;
+			this.exited = true;
+
+			this.manager.heartbeat?.removeCluster(this.id);
+			this.manager._debug('[KILL] Cluster killed with reason: ' + (options?.reason || 'Unknown reason.'));
+		} finally {
+			this._operationInProgress = false;
+		}
 	}
 
 	/** Respawn function that respawns the cluster's child process/worker. */
 	public async respawn(delay: number = this.manager.options.spawnOptions.delay || 5500, timeout: number = this.manager.options.spawnOptions.timeout || -1): Promise<ChildProcess | WorkerThread> {
+		if (this._operationInProgress) throw new Error('CLUSTER_OPERATION_IN_PROGRESS | Another spawn/kill operation is already in progress for cluster ' + this.id);
+
+		this.ready = false;
+		this.exited = false;
+
 		if (this.thread) await this.kill();
 		if (delay > 0) await ShardingUtils.delayFor(delay);
 
@@ -181,6 +217,7 @@ export class Cluster<
 	/** EvalOnClient function that evaluates a script on a specific cluster. */
 	public async evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#4).'));
+
 		const nonce = ShardingUtils.generateNonce();
 
 		this.thread.send<BaseMessage<'eval'>>({
@@ -201,7 +238,7 @@ export class Cluster<
 		return this.manager.evalOnGuild(guildId, script, options);
 	}
 
-	/** Function that allows you to constuct you'r own BaseMessage and send it to the cluster. */
+	/** Function that allows you to construct your own BaseMessage and send it to the cluster. */
 	public _sendInstance<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#6).'));
 
@@ -214,12 +251,17 @@ export class Cluster<
 		if (!message || '_data' in message) return this.manager.broker.handleMessage(message);
 		else if (!this.messageHandler) throw new Error('CLUSTERING_NO_MESSAGE_HANDLER | Cluster ' + this.id + ' does not have a message handler.');
 
-		if (this.manager.options.advanced?.logMessagesInDebug) this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);
+		if (this.manager.options.advanced?.logMessagesInDebug) {
+			this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);
+		}
+
 		this.messageHandler.handleMessage(message);
 
 		if ([MessageTypes.CustomMessage, MessageTypes.CustomRequest].includes(message._type)) {
 			const ipcMessage = new ProcessMessage(this, message);
-			if (message._type === MessageTypes.CustomRequest) this.manager.emit('clientRequest', ipcMessage);
+			if (message._type === MessageTypes.CustomRequest) {
+				this.manager.emit('clientRequest', ipcMessage);
+			}
 
 			this.emit('message', ipcMessage);
 			this.manager.emit('message', ipcMessage);

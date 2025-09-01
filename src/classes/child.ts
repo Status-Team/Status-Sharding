@@ -1,7 +1,7 @@
+import { ChildProcessEventMap, ListenerManager } from './listen';
 import { ChildProcess, fork, ForkOptions } from 'child_process';
 import { SerializableInput, Serializable } from '../types';
 
-/** Options for the child process. */
 export interface ChildProcessOptions extends ForkOptions {
 	/** Data to send to the cluster. */
 	clusterData?: NodeJS.ProcessEnv | undefined;
@@ -9,19 +9,20 @@ export interface ChildProcessOptions extends ForkOptions {
 	args?: string[] | undefined;
 }
 
-/** Child class. */
 export class Child {
 	/** The child process. */
 	public process: ChildProcess | null = null;
 	/** The options for the child process. */
 	public processOptions: ForkOptions & { args?: string[] } = {};
 
-	/** Creates an instance of Child. */
-	constructor(private file: string, options: ChildProcessOptions) {
-		this.processOptions = {};
+	/** Track if we're currently killing the process */
+	private _isKilling = false;
+	/** Type-safe listener manager */
+	private _listeners = new ListenerManager<ChildProcessEventMap>();
 
+	/** Creates an instance of Child. */
+	constructor (private file: string, options: ChildProcessOptions) {
 		this.processOptions = {
-			...this.processOptions,
 			cwd: options.cwd,
 			detached: options.detached,
 			execArgv: options.execArgv,
@@ -42,7 +43,10 @@ export class Child {
 
 	/** Spawns the child process. */
 	public spawn(): ChildProcess {
+		if (this.process) throw new Error('Process already exists. Call kill() first before spawning a new one.');
+
 		this.process = fork(this.file, this.processOptions.args, this.processOptions);
+		this._isKilling = false;
 		return this.process;
 	}
 
@@ -52,41 +56,109 @@ export class Child {
 		return this.spawn();
 	}
 
-	/** Kills the child process. */
+	/** Kills the child process with proper cleanup. */
 	public async kill(): Promise<boolean> {
-		if (!this.process || !this.process.pid) {
-			console.warn('No process to kill.');
-			return false;
-		}
+		if (!this.process || !this.process.pid || this._isKilling) return false;
+
+		this._isKilling = true;
 
 		try {
-			this.process.kill();
+			const forceKillTimer = setTimeout(() => {
+				if (this.process && !this.process.killed) {
+					this.process.kill('SIGKILL');
+				}
+			}, 10000);
 
-			return new Promise((resolve, reject) => {
-				this.process?.once('exit', () => {
-					this.process?.removeAllListeners?.();
+			return new Promise<boolean>((resolve, reject) => {
+				if (!this.process) {
+					clearTimeout(forceKillTimer);
+					this._isKilling = false;
+					resolve(false);
+					return;
+				}
+
+				const cleanup = () => {
+					clearTimeout(forceKillTimer);
+					this._cleanupListeners();
+					this.process = null;
+					this._isKilling = false;
+				};
+
+				const onExit: ChildProcessEventMap['exit'] = () => {
+					cleanup();
 					resolve(true);
-				});
+				};
 
-				this.process?.once('error', (err) => {
-					console.error('Error with child process:', err);
+				const onError: ChildProcessEventMap['error'] = (err) => {
+					console.error('Error with child process during kill:', err);
+					cleanup();
 					reject(err);
-				});
+				};
+
+				this.process.removeAllListeners('exit');
+				this.process.removeAllListeners('error');
+
+				this.process.once('exit', onExit);
+				this.process.once('error', onError);
+
+				this.process.kill('SIGTERM');
 			});
 		} catch (error) {
 			console.error('Child termination failed:', error);
+			this._isKilling = false;
 			return false;
 		}
+	}
+
+	/** Clean up all event listeners */
+	private _cleanupListeners(): void {
+		if (this.process) this.process.removeAllListeners();
+		this._listeners.clear();
 	}
 
 	/** Sends a message to the child process. */
 	public send<T extends Serializable>(message: SerializableInput<T, true>): Promise<void> {
 		return new Promise<void>((resolve, reject) => {
-			this.process?.send(message as object, (err) => {
+			if (!this.process || this._isKilling) {
+				reject(new Error('No active process to send message to'));
+				return;
+			}
+
+			this.process.send(message as object, (err) => {
 				if (err) reject(err);
 				else resolve();
 			});
 		});
+	}
+
+	/** Add event listener with proper cleanup tracking */
+	public addListener<K extends keyof ChildProcessEventMap>(event: K, listener: ChildProcessEventMap[K]): void {
+		if (!this.process) return;
+
+		const existingListener = this._listeners.get(event);
+		if (existingListener) this.process.removeListener(event, existingListener);
+
+		this._listeners.set(event, listener);
+		this.process.on(event, listener);
+	}
+
+	/** Remove specific event listener */
+	public removeListener<K extends keyof ChildProcessEventMap>(event: K): void {
+		const listener = this._listeners.get(event);
+		if (this.process && listener) {
+			this.process.removeListener(event, listener);
+			this._listeners.delete(event);
+		}
+	}
+
+	/** Get current listener for an event */
+	public getListener<K extends keyof ChildProcessEventMap>(event: K): ChildProcessEventMap[K] | undefined {
+		return this._listeners.get(event);
+	}
+
+	/** Check if listener exists for event */
+	public hasListener<K extends keyof ChildProcessEventMap>(event: K): boolean {
+		return this._listeners.has(event);
 	}
 }
 
@@ -96,7 +168,7 @@ export class ChildClient {
 	readonly ipc: NodeJS.Process;
 
 	/** Creates an instance of ChildClient. */
-	constructor() {
+	constructor () {
 		this.ipc = process;
 	}
 
@@ -109,9 +181,5 @@ export class ChildClient {
 			});
 		});
 	}
-
-	/** Gets the data of the child process. */
-	public getData(): NodeJS.ProcessEnv {
-		return this.ipc.env;
-	}
 }
+
