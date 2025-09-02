@@ -1,3 +1,4 @@
+// core/cluster.ts
 import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, Serializable } from '../types';
 import { ProcessMessage, BaseMessage, DataType } from '../other/message';
 import { Worker as WorkerThread } from 'worker_threads';
@@ -38,9 +39,6 @@ export class Cluster<
 		CLUSTER_MANAGER_MODE: 'process' | 'worker';
 	};
 
-	/** Track active spawn/kill operations to prevent race conditions */
-	private _operationInProgress = false;
-
 	/** Creates an instance of Cluster. */
 	constructor (public manager: InternalManager, public id: number, public shardList: number[]) {
 		super();
@@ -70,11 +68,8 @@ export class Cluster<
 
 	/** Spawn function that spawns the cluster's child process/worker with proper event management. */
 	public async spawn(spawnTimeout: number = -1): Promise<ChildProcess | WorkerThread> {
-		if (this._operationInProgress) throw new Error('CLUSTER_OPERATION_IN_PROGRESS | Another spawn/kill operation is already in progress for cluster ' + this.id);
-		else if (this.thread) throw new Error('CLUSTER_ALREADY_SPAWNED | Cluster ' + this.id + ' has already been spawned.');
-		else if (!this.manager.file) throw new Error('NO_FILE_PROVIDED | Cluster ' + this.id + ' does not have a file provided.');
-
-		this._operationInProgress = true;
+		if (!this.manager.file) throw new Error('NO_FILE_PROVIDED | Cluster ' + this.id + ' does not have a file provided.');
+		if (this.thread?.process) return this.thread.process;
 
 		try {
 			const options = {
@@ -95,45 +90,45 @@ export class Cluster<
 			this._setupEventListeners(thread);
 			this.emit('spawn', this, this.thread.process);
 
-			const shouldAbort = spawnTimeout > 0 && spawnTimeout !== Infinity;
+			const shouldWaitForReady = spawnTimeout > 0 && spawnTimeout !== Infinity;
 
-			await new Promise<void>((resolve, reject) => {
-				const cleanup = (isDeath: boolean = false) => {
-					if (spawnTimeoutTimer !== -1) clearTimeout(spawnTimeoutTimer);
+			if (shouldWaitForReady) {
+				await new Promise<void>((resolve, reject) => {
+					const cleanup = (removeListeners: boolean = false) => {
+						if (spawnTimeoutTimer) clearTimeout(spawnTimeoutTimer);
+						if (removeListeners) {
+							this.off('ready', onReady);
+							this.off('death', onDeath);
+						}
+					};
 
-					if (isDeath) {
-						this.off('ready', onReady);
-						this.off('death', onDeath);
-					}
-				};
+					const onReady = () => {
+						this.manager.emit('clusterReady', this);
+						cleanup(true);
+						resolve();
+					};
 
-				const onReady = () => {
-					this.manager.emit('clusterReady', this);
-					cleanup();
-					resolve();
-				};
+					const onDeath = () => {
+						cleanup(true);
+						reject(new Error('CLUSTERING_READY_DIED | Cluster ' + this.id + ' died.'));
+					};
 
-				const onDeath = () => {
-					cleanup(true);
-					reject(new Error('CLUSTERING_READY_DIED | Cluster ' + this.id + ' died.'));
-				};
+					const onTimeout = () => {
+						cleanup();
+						reject(new Error('CLUSTERING_READY_TIMEOUT | Cluster ' + this.id + ' took too long to get ready.'));
+					};
 
-				const onTimeout = () => {
-					cleanup();
-					reject(new Error('CLUSTERING_READY_TIMEOUT | Cluster ' + this.id + ' took too long to get ready.'));
-				};
+					const spawnTimeoutTimer = setTimeout(onTimeout, spawnTimeout);
 
-				const spawnTimeoutTimer = shouldAbort ? setTimeout(onTimeout, spawnTimeout) : -1;
-
-				this.once('ready', onReady);
-				this.once('death', onDeath);
-
-				if (!shouldAbort) resolve();
-			});
+					this.once('ready', onReady);
+					this.once('death', onDeath);
+				});
+			}
 
 			return this.thread.process as ChildProcess | WorkerThread;
-		} finally {
-			this._operationInProgress = false;
+		} catch (error) {
+			console.error(`Failed to spawn cluster ${this.id}:`, error);
+			throw error;
 		}
 	}
 
@@ -146,30 +141,34 @@ export class Cluster<
 	}
 
 	public async kill(options?: ClusterKillOptions): Promise<void> {
-		if (this._operationInProgress) throw new Error('CLUSTER_OPERATION_IN_PROGRESS | Another spawn/kill operation is already in progress for cluster ' + this.id);
-		else if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#1).'));
-
-		this._operationInProgress = true;
+		if (!this.thread) {
+			console.warn(`Cluster ${this.id} has no thread to kill.`);
+			return;
+		}
 
 		try {
-			const check = await this.thread.kill();
-			if (!check) throw new Error('CLUSTERING_KILL_FAILED | Cluster ' + this.id + ' failed to kill the child process/worker.');
+			const killResult = await this.thread.kill();
 
 			this.thread = null;
 			this.ready = false;
 			this.exited = true;
 
 			this.manager.heartbeat?.removeCluster(this.id);
-			this.manager._debug('[KILL] Cluster killed with reason: ' + (options?.reason || 'Unknown reason.'));
-		} finally {
-			this._operationInProgress = false;
+			this.manager._debug('[KILL] Cluster ' + this.id + ' killed with reason: ' + (options?.reason || 'Unknown reason.'));
+
+			if (!killResult) console.warn(`Cluster ${this.id} kill operation completed but process may not have terminated cleanly.`);
+		} catch (error) {
+			console.error(`Error killing cluster ${this.id}:`, error);
+
+			this.thread = null;
+			this.ready = false;
+			this.exited = true;
+			this.manager.heartbeat?.removeCluster(this.id);
 		}
 	}
 
 	/** Respawn function that respawns the cluster's child process/worker. */
 	public async respawn(delay: number = this.manager.options.spawnOptions.delay || 5500, timeout: number = this.manager.options.spawnOptions.timeout || -1): Promise<ChildProcess | WorkerThread> {
-		if (this._operationInProgress) throw new Error('CLUSTER_OPERATION_IN_PROGRESS | Another spawn/kill operation is already in progress for cluster ' + this.id);
-
 		this.ready = false;
 		this.exited = false;
 

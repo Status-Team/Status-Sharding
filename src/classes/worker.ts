@@ -13,8 +13,6 @@ export class Worker {
 	/** The options for the worker process. */
 	public workerOptions: WorkerOptions;
 
-	/** Track if we're currently killing the process */
-	private _isTerminating = false;
 	/** Type-safe listener manager */
 	private _listeners = new ListenerManager<WorkerThreadEventMap>();
 
@@ -28,10 +26,9 @@ export class Worker {
 
 	/** Spawns the worker. */
 	public spawn(): WorkerThread {
-		if (this.process) throw new Error('Worker already exists. Call kill() first before spawning a new one.');
+		if (this.process && this.process.threadId) return this.process;
 
 		this.process = new WorkerThread(this.file, this.workerOptions);
-		this._isTerminating = false;
 		return this.process;
 	}
 
@@ -43,42 +40,38 @@ export class Worker {
 
 	/** Kills the worker with proper cleanup. */
 	public async kill(): Promise<boolean> {
-		if (!this.process || !this.process.threadId || this._isTerminating) return false;
-
-		this._isTerminating = true;
+		if (!this.process || !this.process.threadId) return false;
 
 		try {
 			const forceTerminateTimer = setTimeout(() => {
 				if (this.process && this.process.threadId) {
-					console.warn('Force terminating worker due to timeout');
+					console.warn('Force terminating worker thread.');
 					this.process.terminate();
 				}
-			}, 10000);
+			}, 5000);
 
-			return new Promise<boolean>((resolve, reject) => {
-				if (!this.process) {
+			return new Promise<boolean>((resolve) => {
+				if (!this.process || !this.process.threadId) {
 					clearTimeout(forceTerminateTimer);
-					this._isTerminating = false;
+					this._cleanup();
 					resolve(false);
 					return;
 				}
 
 				const cleanup = () => {
 					clearTimeout(forceTerminateTimer);
-					this._cleanupListeners();
-					this.process = null;
-					this._isTerminating = false;
+					this._cleanup();
 				};
 
-				const onExit: WorkerThreadEventMap['exit'] = () => {
+				const onExit = () => {
 					cleanup();
 					resolve(true);
 				};
 
-				const onError: WorkerThreadEventMap['error'] = (err) => {
-					console.error('Error with worker thread during termination:', err);
+				const onError = (err: Error) => {
+					console.error('Error during worker termination:', err);
 					cleanup();
-					reject(err);
+					resolve(false);
 				};
 
 				this.process.removeAllListeners('exit');
@@ -91,21 +84,22 @@ export class Worker {
 			});
 		} catch (error) {
 			console.error('Worker termination failed:', error);
-			this._isTerminating = false;
+			this._cleanup();
 			return false;
 		}
 	}
 
-	/** Clean up all event listeners */
-	private _cleanupListeners(): void {
+	/** Clean up worker and listeners */
+	private _cleanup(): void {
 		if (this.process) this.process.removeAllListeners();
 		this._listeners.clear();
+		this.process = null;
 	}
 
 	/** Sends a message to the worker. */
 	public send<T extends Serializable>(message: SerializableInput<T, true> | unknown): Promise<void> {
 		return new Promise<void>((resolve, reject) => {
-			if (!this.process || this._isTerminating) {
+			if (!this.process || !this.process.threadId) {
 				reject(new Error('No active worker to send message to'));
 				return;
 			}
@@ -124,13 +118,9 @@ export class Worker {
 	public addListener<K extends keyof WorkerThreadEventMap>(event: K, listener: WorkerThreadEventMap[K]): void {
 		if (!this.process) return;
 
-		// Remove existing listener for this event if it exists
 		const existingListener = this._listeners.get(event);
-		if (existingListener) {
-			this.process.removeListener(event, existingListener);
-		}
+		if (existingListener) this.process.removeListener(event, existingListener);
 
-		// Store and add the new listener
 		this._listeners.set(event, listener);
 		this.process.on(event, listener);
 	}

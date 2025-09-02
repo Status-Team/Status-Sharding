@@ -15,8 +15,6 @@ export class Child {
 	/** The options for the child process. */
 	public processOptions: ForkOptions & { args?: string[] } = {};
 
-	/** Track if we're currently killing the process */
-	private _isKilling = false;
 	/** Type-safe listener manager */
 	private _listeners = new ListenerManager<ChildProcessEventMap>();
 
@@ -43,10 +41,9 @@ export class Child {
 
 	/** Spawns the child process. */
 	public spawn(): ChildProcess {
-		if (this.process) throw new Error('Process already exists. Call kill() first before spawning a new one.');
+		if (this.process && !this.process.killed) return this.process;
 
 		this.process = fork(this.file, this.processOptions.args, this.processOptions);
-		this._isKilling = false;
 		return this.process;
 	}
 
@@ -58,41 +55,38 @@ export class Child {
 
 	/** Kills the child process with proper cleanup. */
 	public async kill(): Promise<boolean> {
-		if (!this.process || !this.process.pid || this._isKilling) return false;
-
-		this._isKilling = true;
+		if (!this.process || !this.process.pid || this.process.killed) return false;
 
 		try {
 			const forceKillTimer = setTimeout(() => {
 				if (this.process && !this.process.killed) {
+					console.warn('Force killing process with SIGKILL.');
 					this.process.kill('SIGKILL');
 				}
-			}, 10000);
+			}, 5000);
 
-			return new Promise<boolean>((resolve, reject) => {
-				if (!this.process) {
+			return new Promise<boolean>((resolve) => {
+				if (!this.process || this.process.killed) {
 					clearTimeout(forceKillTimer);
-					this._isKilling = false;
+					this._cleanup();
 					resolve(false);
 					return;
 				}
 
 				const cleanup = () => {
 					clearTimeout(forceKillTimer);
-					this._cleanupListeners();
-					this.process = null;
-					this._isKilling = false;
+					this._cleanup();
 				};
 
-				const onExit: ChildProcessEventMap['exit'] = () => {
+				const onExit = () => {
 					cleanup();
 					resolve(true);
 				};
 
-				const onError: ChildProcessEventMap['error'] = (err) => {
-					console.error('Error with child process during kill:', err);
+				const onError = (err: Error) => {
+					console.error('Error during child process kill:', err);
 					cleanup();
-					reject(err);
+					resolve(false);
 				};
 
 				this.process.removeAllListeners('exit');
@@ -105,21 +99,22 @@ export class Child {
 			});
 		} catch (error) {
 			console.error('Child termination failed:', error);
-			this._isKilling = false;
+			this._cleanup();
 			return false;
 		}
 	}
 
-	/** Clean up all event listeners */
-	private _cleanupListeners(): void {
+	/** Clean up process and listeners */
+	private _cleanup(): void {
 		if (this.process) this.process.removeAllListeners();
 		this._listeners.clear();
+		this.process = null;
 	}
 
 	/** Sends a message to the child process. */
 	public send<T extends Serializable>(message: SerializableInput<T, true>): Promise<void> {
 		return new Promise<void>((resolve, reject) => {
-			if (!this.process || this._isKilling) {
+			if (!this.process || this.process.killed) {
 				reject(new Error('No active process to send message to'));
 				return;
 			}
@@ -182,4 +177,3 @@ export class ChildClient {
 		});
 	}
 }
-
