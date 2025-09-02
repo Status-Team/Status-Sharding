@@ -16,7 +16,8 @@ export class ClusterHandler {
 	public async handleMessage<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
 		switch (message._type) {
 			case MessageTypes.ClientReady: {
-				if (this.cluster.ready) throw new Error('Cluster already ready, if autoLogin is enabled, check if you are not using .login() in your code.');
+				const alreadyReady = Boolean(this.cluster.ready);
+
 				this.cluster.ready = true;
 				this.cluster.exited = false;
 
@@ -27,7 +28,7 @@ export class ClusterHandler {
 				this.cluster.manager._debug(`[Cluster ${this.cluster.id}] Cluster is ready.`);
 
 				const allReady = this.cluster.manager.clusters.every((cluster) => cluster.ready);
-				if (!this.cluster.manager.ready && allReady && this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {
+				if (!alreadyReady && !this.cluster.manager.ready && allReady && this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {
 					this.cluster.manager.ready = true;
 					this.cluster.manager.emit('ready', this.cluster.manager);
 					this.cluster.manager._debug('All clusters are ready.');
