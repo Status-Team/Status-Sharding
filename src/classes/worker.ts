@@ -40,7 +40,10 @@ export class Worker {
 
 	/** Kills the worker with proper cleanup. */
 	public async kill(): Promise<boolean> {
-		if (!this.process || !this.process.threadId) return false;
+		if (!this.process || !this.process.threadId) {
+			this._cleanup();
+			return false;
+		}
 
 		try {
 			const forceTerminateTimer = setTimeout(() => {
@@ -112,36 +115,6 @@ export class Worker {
 				reject(error);
 			}
 		});
-	}
-
-	/** Add event listener with proper cleanup tracking */
-	public addListener<K extends keyof WorkerThreadEventMap>(event: K, listener: WorkerThreadEventMap[K]): void {
-		if (!this.process) return;
-
-		const existingListener = this._listeners.get(event);
-		if (existingListener) this.process.removeListener(event, existingListener);
-
-		this._listeners.set(event, listener);
-		this.process.on(event, listener);
-	}
-
-	/** Remove specific event listener */
-	public removeListener<K extends keyof WorkerThreadEventMap>(event: K): void {
-		const listener = this._listeners.get(event);
-		if (this.process && listener) {
-			this.process.removeListener(event, listener);
-			this._listeners.delete(event);
-		}
-	}
-
-	/** Get current listener for an event */
-	public getListener<K extends keyof WorkerThreadEventMap>(event: K): WorkerThreadEventMap[K] | undefined {
-		return this._listeners.get(event);
-	}
-
-	/** Check if listener exists for event */
-	public hasListener<K extends keyof WorkerThreadEventMap>(event: K): boolean {
-		return this._listeners.has(event);
 	}
 }
 

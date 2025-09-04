@@ -16,20 +16,23 @@ export class ClusterHandler {
 	public async handleMessage<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
 		switch (message._type) {
 			case MessageTypes.ClientReady: {
-				const alreadyReady = Boolean(this.cluster.ready);
+				if (this.cluster.ready) {
+					this.cluster.manager._debug(`[Cluster ${this.cluster.id}] Received duplicate ready signal, ignoring.`);
+					return;
+				}
 
 				this.cluster.ready = true;
 				this.cluster.exited = false;
-
 				this.cluster.lastHeartbeatReceived = Date.now();
 
-				// Emitted upon the cluster's ready event.
 				this.cluster.emit('ready', this.cluster);
 				this.cluster.manager._debug(`[Cluster ${this.cluster.id}] Cluster is ready.`);
 
 				const allReady = this.cluster.manager.clusters.every((cluster) => cluster.ready);
-				if (!alreadyReady && !this.cluster.manager.ready && allReady && this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {
+
+				if (!this.cluster.manager.ready && allReady && this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {
 					this.cluster.manager.ready = true;
+
 					this.cluster.manager.emit('ready', this.cluster.manager);
 					this.cluster.manager._debug('All clusters are ready.');
 

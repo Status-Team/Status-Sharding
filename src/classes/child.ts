@@ -55,7 +55,10 @@ export class Child {
 
 	/** Kills the child process with proper cleanup. */
 	public async kill(): Promise<boolean> {
-		if (!this.process || !this.process.pid || this.process.killed) return false;
+		if (!this.process || this.process.killed) {
+			this._cleanup();
+			return false;
+		}
 
 		try {
 			const forceKillTimer = setTimeout(() => {
@@ -124,36 +127,6 @@ export class Child {
 				else resolve();
 			});
 		});
-	}
-
-	/** Add event listener with proper cleanup tracking */
-	public addListener<K extends keyof ChildProcessEventMap>(event: K, listener: ChildProcessEventMap[K]): void {
-		if (!this.process) return;
-
-		const existingListener = this._listeners.get(event);
-		if (existingListener) this.process.removeListener(event, existingListener);
-
-		this._listeners.set(event, listener);
-		this.process.on(event, listener);
-	}
-
-	/** Remove specific event listener */
-	public removeListener<K extends keyof ChildProcessEventMap>(event: K): void {
-		const listener = this._listeners.get(event);
-		if (this.process && listener) {
-			this.process.removeListener(event, listener);
-			this._listeners.delete(event);
-		}
-	}
-
-	/** Get current listener for an event */
-	public getListener<K extends keyof ChildProcessEventMap>(event: K): ChildProcessEventMap[K] | undefined {
-		return this._listeners.get(event);
-	}
-
-	/** Check if listener exists for event */
-	public hasListener<K extends keyof ChildProcessEventMap>(event: K): boolean {
-		return this._listeners.has(event);
 	}
 }
 

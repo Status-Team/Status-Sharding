@@ -6,6 +6,7 @@ import { ShardingUtils } from '../other/shardingUtils';
 import { RefClusterManager } from './clusterManager';
 import { ClusterHandler } from '../handlers/message';
 import { BrokerMessage } from '../handlers/broker';
+import { isChildProcess } from '../other/utils';
 import { RefShardingClient } from './client';
 import { ChildProcess } from 'child_process';
 import { Worker } from '../classes/worker';
@@ -135,9 +136,27 @@ export class Cluster<
 	private _setupEventListeners(thread: ChildProcess | WorkerThread): void {
 		if (!thread) return;
 
-		thread.addListener('message', this._handleMessage.bind(this));
-		thread.addListener('error', this._handleError.bind(this));
-		thread.addListener('exit', this._handleExit.bind(this));
+		if (isChildProcess(thread)) {
+			// Child process.
+			thread.on('disconnect', this._handleDisconnect.bind(this));
+			thread.on('message', this._handleMessage.bind(this));
+			thread.on('error', this._handleError.bind(this));
+			thread.on('exit', this._handleExit.bind(this));
+		} else {
+			// Worker thread.
+			thread.on('messageerror', this._handleError.bind(this));
+			thread.on('message', this._handleMessage.bind(this));
+			thread.on('error', this._handleError.bind(this));
+			thread.on('exit', this._handleExit.bind(this));
+
+			const healthCheck = setInterval(() => {
+				if (!this.thread?.process || ('threadId' in this.thread.process && !this.thread.process.threadId)) {
+					clearInterval(healthCheck);
+					this._handleUnexpectedExit();
+				}
+			}, 5000);
+
+		}
 	}
 
 	public async kill(options?: ClusterKillOptions): Promise<void> {
@@ -268,19 +287,56 @@ export class Cluster<
 	}
 
 	/** Exit handler function that handles the cluster's child process/worker exiting. */
-	private _handleExit(exitCode: number): void {
-		this.emit('death', this, this.thread?.process || null);
-
-		this.manager._debug('[Death] [Cluster ' + this.id + '] Cluster died with exit code ' + exitCode + '.');
+	private _handleExit(exitCode: number | null, signal: NodeJS.Signals | null): void {
+		this.manager._debug(`[Cluster ${this.id}] Process exited with code ${exitCode}, signal ${signal}`);
+		if (!this.exited) this.emit('death', this, this.thread?.process || null);
 
 		this.ready = false;
-		this.thread = null;
 		this.exited = true;
+		this.thread = null;
+
+		this.manager.heartbeat?.removeCluster(this.id);
+
+		if (!this.manager.heartbeat) {
+			if (this.manager.options.respawn && exitCode !== 0 && exitCode !== null) {
+				this.respawn().catch((err) => {
+					this.manager._debug(`[Cluster ${this.id}] Failed to respawn: ${err.message}`);
+				});
+			}
+		}
 	}
 
 	/** Error handler function that handles errors from the cluster's child process/worker/manager. */
 	private _handleError(error: Error): void {
 		this.manager.emit('error', error);
+	}
+
+	/** Handle unexpected disconnection. */
+	private _handleDisconnect(): void {
+		this.manager._debug(`[Cluster ${this.id}] Process disconnected unexpectedly.`);
+		this._handleUnexpectedExit();
+	}
+
+	/** Handle unexpected exit/crash. */
+	private _handleUnexpectedExit(): void {
+		if (!this.exited && this.ready) {
+			this.manager._debug(`[Cluster ${this.id}] Detected unexpected exit/crash.`);
+			this.emit('death', this, this.thread?.process || null);
+
+			this.ready = false;
+			this.exited = true;
+			this.thread = null;
+
+			this.manager.heartbeat?.removeCluster(this.id);
+
+			if (this.manager.options.respawn) {
+				this.manager._debug(`[Cluster ${this.id}] Scheduling respawn after crash.`);
+
+				this.respawn().catch((err) => {
+					this.manager._debug(`[Cluster ${this.id}] Failed to respawn after crash: ${err.message}`);
+				});
+			}
+		}
 	}
 }
 

@@ -1,5 +1,6 @@
+import { Worker as WorkerThread, workerData } from 'worker_threads';
 import { ClusterClientData } from '../types';
-import { workerData } from 'worker_threads';
+import { ChildProcess } from 'child_process';
 
 export function getInfo(): ClusterClientData {
 	const clusterMode = process.env.CLUSTER_MANAGER_MODE;
@@ -49,4 +50,12 @@ export async function getDiscordVersion() {
 	} catch (error) {
 		throw new Error('Discord.js is not installed or not accessible');
 	}
+}
+
+export function isWorkerThread(process: ChildProcess | WorkerThread): process is WorkerThread {
+	return 'threadId' in process;
+}
+
+export function isChildProcess(process: ChildProcess | WorkerThread): process is ChildProcess {
+	return 'pid' in process;
 }
