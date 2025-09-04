@@ -1,5 +1,7 @@
 import { Worker as WorkerThread, workerData } from 'worker_threads';
-import { ClusterClientData } from '../types';
+import { RefShardingCoreClient } from 'src/core/coreClient';
+import { ClusterClientData, PackageType } from '../types';
+import { ClientRefType } from 'src/core/clusterClient';
 import { ChildProcess } from 'child_process';
 
 export function getInfo(): ClusterClientData {
@@ -41,15 +43,39 @@ export function getInfo(): ClusterClientData {
 	return data;
 }
 
-export async function getDiscordVersion() {
+export async function getDiscordVersion(type: PackageType) {
 	try {
-		const { version } = await import('discord.js');
+		const { version } = await import(type);
 		const [major = 0, minor = 0, patch = 0] = version.split('.').map(Number) as [number, number, number];
 
 		return { major, minor, patch, raw: version };
 	} catch (error) {
-		throw new Error('Discord.js is not installed or not accessible');
+		throw new Error(`Failed to get version of ${type}: ${(error as Error).message}`);
 	}
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function detectLibraryFromClient(client: any): PackageType | null {
+	if (!client) return null;
+
+	if (client.constructor?.name === 'Client' && 'guilds' in client && 'users' in client && 'channels' in client && typeof client.login === 'function' && !('api' in client)) {
+		return 'discord.js';
+	}
+
+	if (client.constructor?.name === 'Client' && 'api' in client && 'rest' in client && 'gateway' in client && typeof client.api === 'object') {
+		return '@discordjs/core';
+	}
+
+	if (client instanceof Object) {
+		if ('guilds' in client && 'users' in client && !('api' in client)) return 'discord.js';
+		if ('api' in client || (client.client && 'api' in client.client)) return '@discordjs/core';
+	}
+
+	return null;
+}
+
+export function isCoreClient(client: ClientRefType): client is RefShardingCoreClient {
+	return detectLibraryFromClient(client) === '@discordjs/core';
 }
 
 export function isWorkerThread(process: ChildProcess | WorkerThread): process is WorkerThread {

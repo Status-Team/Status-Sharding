@@ -59,6 +59,7 @@ export class ClusterManager<
 				maxRestarts: -1,
 				maxMissedHeartbeats: 2,
 			}),
+			packageType: null,
 			mode: options.mode || 'worker',
 			shardList: [], clusterList: [],
 			spawnOptions: {
@@ -344,6 +345,7 @@ export class ClusterManager<
 	public async evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		if (this.clusters.size === 0) return Promise.reject(new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned (#4).'));
 		else if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Id must be a string.'));
+		else if (this.options.packageType !== 'discord.js') return Promise.reject(new Error('CLUSTERING_EVAL_GUILD_UNSUPPORTED | evalOnGuild is only supported in discord.js package type.'));
 
 		return this.broadcastEval<T, P>(ShardingUtils.parseInput(script, options?.context, `this?.guilds?.cache?.get('${guildId}')`), { ...options, guildId }).then((e) => e?.find((r) => r !== undefined)) as Promise<ValidIfSerializable<T>>;
 	}
@@ -367,8 +369,6 @@ export class ClusterManager<
 
 export type RefClusterManager = ClusterManager;
 
-// Credits for EventEmitter typings: https://github.com/discordjs/discord.js/blob/main/packages/rest/src/lib/RequestManager.ts#L159
-/** ClusterManager Events. */
 export declare interface ClusterManager {
 	/** Emit an event. */
 	emit: (<K extends keyof ClusterManagerEvents>(event: K, ...args: ClusterManagerEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterManagerEvents>, ...args: unknown[]) => boolean);

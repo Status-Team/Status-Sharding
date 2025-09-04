@@ -253,6 +253,8 @@ export class Cluster<
 	/** EvalOnCluster function that evaluates a script on a specific cluster. */
 	public async evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#5).'));
+		else if (this.manager.options.packageType !== 'discord.js') return Promise.reject(new Error('CLUSTERING_EVAL_GUILD_UNSUPPORTED | evalOnGuild is only supported in discord.js package type.'));
+
 		return this.manager.evalOnGuild(guildId, script, options);
 	}
 
@@ -342,8 +344,6 @@ export class Cluster<
 
 export type RefCluster = Cluster;
 
-// Credits for EventEmitter typings: https://github.com/discordjs/discord.js/blob/main/packages/rest/src/lib/RequestManager.ts#L159
-/** A self-contained cluster created by the ClusterManager. */
 export declare interface Cluster {
 	/** Emit an event. */
 	emit: (<K extends keyof ClusterEvents>(event: K, ...args: ClusterEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, ...args: unknown[]) => boolean);

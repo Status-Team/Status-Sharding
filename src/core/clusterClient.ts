@@ -1,9 +1,10 @@
-import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, ClusterClientData } from '../types';
+import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, ClusterClientData, PackageType } from '../types';
+import { detectLibraryFromClient, getDiscordVersion, getInfo, isCoreClient } from '../other/utils';
 import { BaseMessage, BaseMessageInput, DataType, ProcessMessage } from '../other/message';
 import { BrokerMessage, IPCBrokerClient } from '../handlers/broker';
-import { getDiscordVersion, getInfo } from '../other/utils';
 import { ClusterClientHandler } from '../handlers/message';
 import { ShardingUtils } from '../other/shardingUtils';
+import { RefShardingCoreClient } from './coreClient';
 import { RefClusterManager } from './clusterManager';
 import { PromiseHandler } from '../handlers/promise';
 import { WorkerClient } from '../classes/worker';
@@ -13,9 +14,12 @@ import { RefShardingClient } from './client';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 
+export type OnReady<T> = (client: T, callback: () => void) => void;
+export type ClientRefType = RefShardingClient | RefShardingCoreClient;
+
 /** Simplified Cluster instance available on the {@link ClusterClient}. */
 export class ClusterClient<
-	InternalClient extends RefShardingClient = RefShardingClient,
+	InternalClient extends ClientRefType = ClientRefType,
 	InternalManager extends RefClusterManager = RefClusterManager,
 > extends EventEmitter {
 	/** Ready state of the cluster. */
@@ -29,11 +33,28 @@ export class ClusterClient<
 	/** Handler that handles messages from the ClusterManager and the Cluster. */
 	private messageHandler: ClusterClientHandler<InternalClient>;
 
+	/** Package type. */
+	private packageType: PackageType | null;
+
 	/** Creates an instance of ClusterClient. */
-	constructor (public client: InternalClient) {
+	constructor (public client: InternalClient, onReady?: OnReady<InternalClient>) {
 		super();
 
 		this.ready = false;
+		this.packageType = detectLibraryFromClient(client);
+
+		if (!onReady) onReady = async (c, r) => {
+			const core = isCoreClient(c);
+
+			if (core) c.once('READY', r);
+			else if (c.isReady()) r();
+			else {
+				const { major, minor, patch } = await getDiscordVersion('discord.js');
+				const useClientReady = major > 14 || (major === 14 && (minor > 22 || (minor === 22 && patch >= 0)));
+
+				c.once(useClientReady ? 'clientReady' : 'ready', r);
+			}
+		};
 
 		this.broker = new IPCBrokerClient(this);
 		this.process = (this.info.ClusterManagerMode === 'process' ? new ChildClient() : this.info.ClusterManagerMode === 'worker' ? new WorkerClient() : null);
@@ -44,17 +65,7 @@ export class ClusterClient<
 		this.process.ipc.on('message', this._handleMessage.bind(this));
 		this.promise = new PromiseHandler(this);
 
-		this.setupReadyEvent();
-	}
-
-	private async setupReadyEvent(): Promise<void> {
-		const { major, minor, patch } = await getDiscordVersion();
-		const useClientReady = major > 14 || (major === 14 && (minor > 22 || (minor === 22 && patch >= 0)));
-
-		// @ts-ignore
-		if ('once' in this.client) {
-			this.client.once(useClientReady ? 'clientReady' : 'ready', () => setTimeout(() => this.triggerReady(), 1500));
-		}
+		onReady?.(this.client, () => this.triggerReady());
 	}
 
 	/** Current cluster id. */
@@ -162,6 +173,7 @@ export class ClusterClient<
 		else if (!this.ready) return Promise.reject(new Error('CLUSTERING_NOT_READY | Cluster is not ready yet (#6).'));
 		else if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function (#2).'));
 		else if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Id must be a string.'));
+		else if (this.packageType !== 'discord.js') return Promise.reject(new Error('CLUSTERING_EVAL_GUILD_UNSUPPORTED | evalOnGuild is only supported in discord.js package type.'));
 
 		const nonce = ShardingUtils.generateNonce();
 
@@ -296,8 +308,6 @@ export class ClusterClient<
 
 export type RefClusterClient = ClusterClient;
 
-// Credits for EventEmitter typings: https://github.com/discordjs/discord.js/blob/main/packages/rest/src/lib/RequestManager.ts#L159
-/** Modified ClusterClient with bunch of new methods. */
 export declare interface ClusterClient {
 	/** Emit an event. */
 	emit: (<K extends keyof ClusterClientEvents>(event: K, ...args: ClusterClientEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterClientEvents>, ...args: unknown[]) => boolean);

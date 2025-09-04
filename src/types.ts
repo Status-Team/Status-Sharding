@@ -49,6 +49,8 @@ export enum MessageTypes {
 
 /** Recursive array of strings. */
 export type RecursiveStringArray = (RecursiveStringArray | string)[];
+/** Supported library packages. */
+export type PackageType = 'discord.js' | '@discordjs/core';
 
 /** Awaitable type. */
 export type Awaitable<T> = T | PromiseLike<T>;
@@ -121,6 +123,8 @@ export interface ClusterManagerOptions<T extends ClusteringMode> extends Cluster
 	spawnOptions: Required<ClusterSpawnOptions>;
 	/** Heartbeat options. */
 	heartbeat: Required<ClusterHeartbeatOptions>;
+	/** Package type. */
+	packageType: PackageType | null;
 }
 
 /** Advanced options for cluster manager. */

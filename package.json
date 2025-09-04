@@ -36,6 +36,9 @@
 		"discord.js-bot-sharding-example"
 	],
 	"devDependencies": {
+		"@discordjs/core": "^2.2.1",
+		"@discordjs/rest": "^2.6.0",
+		"@discordjs/ws": "^2.0.3",
 		"@types/node": "20.14.8",
 		"@typescript-eslint/eslint-plugin": "7.13.1",
 		"@typescript-eslint/parser": "7.13.1",
@@ -44,11 +47,23 @@
 		"typescript": "5.5.2"
 	},
 	"peerDependencies": {
+		"@discordjs/core": ">=2.2.1",
+		"@discordjs/rest": ">=2.6.0",
+		"@discordjs/ws": ">=2.0.3",
 		"discord.js": ">=14.14.1"
 	},
 	"peerDependenciesMeta": {
 		"discord.js": {
 			"optional": false
+		},
+		"@discordjs/core": {
+			"optional": true
+		},
+		"@discordjs/rest": {
+			"optional": true
+		},
+		"@discordjs/ws": {
+			"optional": true
 		}
 	},
 	"engines": {
