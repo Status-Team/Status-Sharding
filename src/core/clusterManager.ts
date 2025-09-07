@@ -5,7 +5,7 @@ import { ShardingUtils } from '../other/shardingUtils';
 import { IPCBrokerManager } from '../handlers/broker';
 import { PromiseHandler } from '../handlers/promise';
 import { Cluster, RefCluster } from './cluster';
-import { RefShardingClient } from './client';
+import { ClientRefType } from './clusterClient';
 import { Queue } from '../handlers/queue';
 import CustomMap from '../other/map';
 import { Guild } from 'discord.js';
@@ -16,7 +16,7 @@ import fs from 'fs';
 
 /** Manager for the Clusters. */
 export class ClusterManager<
-	InternalClient extends RefShardingClient = RefShardingClient,
+	InternalClient extends ClientRefType = ClientRefType,
 	InternalCluster extends RefCluster = RefCluster
 > extends EventEmitter {
 	/** Check if all clusters are ready. */
