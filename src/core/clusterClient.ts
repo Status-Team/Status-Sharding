@@ -3,8 +3,8 @@ import { detectLibraryFromClient, getDiscordVersion, getInfo, isCoreClient } fro
 import { BaseMessage, BaseMessageInput, DataType, ProcessMessage } from '../other/message';
 import { BrokerMessage, IPCBrokerClient } from '../handlers/broker';
 import { ClusterClientHandler } from '../handlers/message';
+import type { RefShardingCoreClient } from './coreClient';
 import { ShardingUtils } from '../other/shardingUtils';
-import { RefShardingCoreClient } from './coreClient';
 import { RefClusterManager } from './clusterManager';
 import { PromiseHandler } from '../handlers/promise';
 import { WorkerClient } from '../classes/worker';

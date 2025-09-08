@@ -7,7 +7,7 @@ import { RefClusterManager } from './clusterManager';
 import { ClusterHandler } from '../handlers/message';
 import { BrokerMessage } from '../handlers/broker';
 import { isChildProcess } from '../other/utils';
-import { RefShardingClient } from './client';
+import { ClientRefType } from './clusterClient';
 import { ChildProcess } from 'child_process';
 import { Worker } from '../classes/worker';
 import { Child } from '../classes/child';
@@ -18,7 +18,7 @@ import path from 'path';
 /** A self-contained cluster created by the ClusterManager. */
 export class Cluster<
 	InternalManager extends RefClusterManager = RefClusterManager,
-	InternalClient extends RefShardingClient = RefShardingClient,
+	InternalClient extends ClientRefType = ClientRefType,
 > extends EventEmitter {
 	/** Represents whether the cluster is ready. */
 	public ready: boolean;

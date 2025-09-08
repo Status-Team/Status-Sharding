@@ -1,5 +1,5 @@
 import { Worker as WorkerThread, workerData } from 'worker_threads';
-import { RefShardingCoreClient } from 'src/core/coreClient';
+import type { RefShardingCoreClient } from 'src/core/coreClient';
 import { ClusterClientData, PackageType } from '../types';
 import { ClientRefType } from 'src/core/clusterClient';
 import { ChildProcess } from 'child_process';

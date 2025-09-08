@@ -3,7 +3,6 @@ export * from './classes/worker';
 
 export * from './core/clusterManager';
 export * from './core/clusterClient';
-export * from './core/coreClient';
 export * from './core/cluster';
 export * from './core/client';
 
