@@ -95,9 +95,9 @@ This setup ensures your bot scales efficiently without requiring manual shard ma
 For developers using **@discordjs/core**, Status Sharding provides `ShardingCoreClient` to integrate seamlessly with the core library and REST API.
 
 ```javascript
-// import { ShardingCoreClient } from 'status-sharding';
+// import { ShardingCoreClient } from 'status-sharding/core';
 // import { GatewayDispatchEvents, GatewayIntentBits } from '@discordjs/core';
-const { ShardingCoreClient } = require("status-sharding");
+const { ShardingCoreClient } = require("status-sharding/core");
 const { GatewayDispatchEvents, GatewayIntentBits } = require("@discordjs/core");
 
 const client = new ShardingCoreClient({
