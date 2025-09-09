@@ -1,5 +1,5 @@
 import { CreateWebSocketManagerOptions, WebSocketManager } from '@discordjs/ws';
-import { Client as DiscordCoreClient } from '@discordjs/core';
+import { Client as DiscordCoreClient, MappedEvents } from '@discordjs/core';
 import { RefClusterManager } from './clusterManager';
 import { REST, RESTOptions } from '@discordjs/rest';
 import { ClusterClient } from './clusterClient';
@@ -46,3 +46,16 @@ export class ShardingCoreClient<
 }
 
 export type RefShardingCoreClient = ShardingCoreClient;
+
+export declare interface ShardingCoreClient {
+	/** Emit an event. */
+	emit: (<K extends keyof MappedEvents>(event: K, ...args: MappedEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof MappedEvents>, ...args: unknown[]) => boolean);
+	/** Remove an event listener. */
+	off: (<K extends keyof MappedEvents>(event: K, listener: (...args: MappedEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof MappedEvents>, listener: (...args: unknown[]) => void) => this);
+	/** Listen for an event. */
+	on: (<K extends keyof MappedEvents>(event: K, listener: (...args: MappedEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof MappedEvents>, listener: (...args: unknown[]) => void) => this);
+	/** Listen for an event once. */
+	once: (<K extends keyof MappedEvents>(event: K, listener: (...args: MappedEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof MappedEvents>, listener: (...args: unknown[]) => void) => this);
+	/** Remove all listeners for an event. */
+	removeAllListeners: (<K extends keyof MappedEvents>(event?: K) => this) & (<S extends string | symbol>(event?: Exclude<S, keyof MappedEvents>) => this);
+}

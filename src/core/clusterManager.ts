@@ -347,7 +347,7 @@ export class ClusterManager<
 		else if (typeof guildId !== 'string') return Promise.reject(new TypeError('CLUSTERING_GUILD_ID_INVALID | Guild Id must be a string.'));
 		else if (this.options.packageType !== 'discord.js') return Promise.reject(new Error('CLUSTERING_EVAL_GUILD_UNSUPPORTED | evalOnGuild is only supported in discord.js package type.'));
 
-		return this.broadcastEval<T, P>(ShardingUtils.parseInput(script, options?.context, `this?.guilds?.cache?.get('${guildId}')`), { ...options, guildId }).then((e) => e?.find((r) => r !== undefined)) as Promise<ValidIfSerializable<T>>;
+		return this.broadcastEval<T, P>(ShardingUtils.parseInput(script, options?.context, this.options.packageType, `this?.guilds?.cache?.get('${guildId}')`), { ...options, guildId }).then((e) => e?.find((r) => r !== undefined)) as Promise<ValidIfSerializable<T>>;
 	}
 
 	/** Creates a new cluster. (Using this method is usually not necessary if you use the spawn method.) */

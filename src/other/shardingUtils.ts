@@ -1,4 +1,4 @@
-import { DefaultOptions, Endpoints, ValidIfSerializable } from '../types';
+import { DefaultOptions, Endpoints, PackageType, ValidIfSerializable } from '../types';
 import { randomBytes } from 'crypto';
 
 /** Sharding utils. */
@@ -120,10 +120,14 @@ export class ShardingUtils {
 		return response.shards * (1000 / guildsPerShard);
 	}
 
-	public static parseInput<T>(input: string | T, context?: unknown, ...args: string[]): string {
-		if (typeof input === 'function') return `(${input.toString()})(this,${context ? JSON.stringify(context) : undefined}${args.length ? ',' + args.join(',') : ''})`;
-		else if (typeof input === 'string') return input;
-		else throw new Error('INVALID_INPUT_TYPE | The input provided was not a string or a function.');
+	public static parseInput<T>(input: string | T, context?: unknown, packageType?: PackageType | null, ...args: string[]): string {
+		if (typeof input === 'string') return input;
+		else if (typeof input === 'function') {
+			if (packageType === '@discordjs/core') return `(${input.toString()})(client,${context ? JSON.stringify(context) : undefined}${args.length ? ',' + args.join(',') : ''})`;
+			return `(${input.toString()})(this,${context ? JSON.stringify(context) : undefined}${args.length ? ',' + args.join(',') : ''})`;
+		}
+
+		throw new Error('INVALID_INPUT_TYPE | The input provided was not a string or a function.');
 	}
 
 	public static boolProp<T extends string>(input: unknown, key: T): T | `not ${T}` {

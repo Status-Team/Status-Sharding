@@ -229,7 +229,7 @@ export class Cluster<
 
 	/** Eval function that evaluates a script on the current cluster. */
 	public async eval<T, P extends object, C = Cluster<InternalManager, InternalClient>>(script: string | ((cluster: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
-		return eval(ShardingUtils.parseInput(script, options?.context));
+		return eval(ShardingUtils.parseInput(script, options?.context, this.manager.options.packageType, 'this'));
 	}
 
 	/** EvalOnClient function that evaluates a script on a specific cluster. */

@@ -181,7 +181,7 @@ export class ClusterClient<
 			_type: MessageTypes.ClientBroadcastRequest,
 			_nonce: nonce,
 			data: {
-				script: ShardingUtils.parseInput(script, options?.context, `this?.guilds?.cache?.get('${guildId}')`),
+				script: ShardingUtils.parseInput(script, options?.context, this.packageType, `this?.guilds?.cache?.get('${guildId}')`),
 				options: { ...options, guildId },
 			},
 		} as BaseMessage<'eval'>);
@@ -193,12 +193,24 @@ export class ClusterClient<
 	public async evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		type EvalObject = { _eval: <T>(script: string) => T; };
 
-		const parsedScript = ShardingUtils.parseInput(script, options?.context);
+		switch (this.packageType) {
+			case 'discord.js': {
+				const parsedScript = ShardingUtils.parseInput(script, options?.context, this.packageType);
 
-		if ((this.client as unknown as EvalObject)._eval) return await (this.client as unknown as EvalObject)._eval(parsedScript);
-		(this.client as unknown as EvalObject)._eval = function (_: string) { return (0, eval)(_); }.bind(this.client);
+				if (!(this.client as unknown as EvalObject)._eval) (this.client as unknown as EvalObject)._eval = function (_: string) { return (0, eval)(_); }.bind(this.client);
+				return await (this.client as unknown as EvalObject)._eval(parsedScript);
+			}
+			case '@discordjs/core': {
+				if (typeof script === 'function') return await script(this.client as unknown as C, options?.context as Serialized<P>) as Promise<ValidIfSerializable<T>>;
 
-		return await (this.client as unknown as EvalObject)._eval(parsedScript);
+				const fixedScript = script.replace(/\(this,/, '(client,');
+				const evalFunction = new Function('client', `return (${fixedScript})`);
+				return await evalFunction(this.client, options?.context);
+			}
+			default: {
+				return Promise.reject(new Error('CLUSTERING_EVAL_CLIENT_UNSUPPORTED | evalOnClient is only supported in discord.js and @discordjs/core package types.'));
+			}
+		}
 	}
 
 	/** Sends a request to the Cluster (cluster has to respond with a reply (cluster.on('message', (message) => message.reply('reply')))). */
