@@ -1,5 +1,5 @@
 {
-	"version": "1.9.3",
+	"version": "1.9.4",
 	"name": "status-sharding",
 	"author": "Digital39999",
 	"scripts": {
@@ -27,6 +27,13 @@
 			"types": "./dist/core.d.ts",
 			"require": "./dist/core.js",
 			"import": "./dist/core.js"
+		}
+	},
+	"typesVersions": {
+		"*": {
+			"core": [
+				"./dist/core.d.ts"
+			]
 		}
 	},
 	"keywords": [
