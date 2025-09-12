@@ -1,8 +1,8 @@
 import { CreateWebSocketManagerOptions, WebSocketManager } from '@discordjs/ws';
 import { Client as DiscordCoreClient, MappedEvents } from '@discordjs/core';
+import { ClusterClient, OnReady } from './clusterClient';
 import { RefClusterManager } from './clusterManager';
 import { REST, RESTOptions } from '@discordjs/rest';
-import { ClusterClient } from './clusterClient';
 import { getInfo } from '../other/utils';
 
 export type ShardingCoreClientOptions = {
@@ -24,7 +24,7 @@ export class ShardingCoreClient<
 	rest: REST;
 
 	/** Creates an instance of ShardingCoreClient. */
-	constructor (options: ShardingCoreClientOptions) {
+	constructor (options: ShardingCoreClientOptions, onReady?: OnReady<ShardingCoreClient> | null) {
 		const info = getInfo();
 
 		const rest = new REST(options.rest).setToken(options.token);
@@ -41,7 +41,7 @@ export class ShardingCoreClient<
 		this.rest = rest;
 		this.gateway = gateway;
 
-		this.cluster = new ClusterClient<this, InternalManager>(this);
+		this.cluster = new ClusterClient<this, InternalManager>(this, onReady || (() => void 0));
 	}
 }
 

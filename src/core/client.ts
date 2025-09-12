@@ -1,6 +1,6 @@
 import { ClientEvents, ClientOptions, Client as DiscordClient } from 'discord.js';
+import { ClusterClient, OnReady } from './clusterClient';
 import { RefClusterManager } from './clusterManager';
-import { ClusterClient } from './clusterClient';
 import { getInfo } from '../other/utils';
 
 /** Modified ClientEvents such that the ready event has the ShardingClient instead of the normal Client. */
@@ -18,14 +18,14 @@ export class ShardingClient<
 	cluster: ClusterClient<this, InternalManager>;
 
 	/** Creates an instance of ShardingClient. */
-	constructor (options: ClientOptions) {
+	constructor (options: ClientOptions, onReady?: OnReady<ShardingClient> | null) {
 		super({
 			...options,
 			shards: getInfo().ShardList,
 			shardCount: getInfo().TotalShards,
 		});
 
-		this.cluster = new ClusterClient<this, InternalManager>(this);
+		this.cluster = new ClusterClient<this, InternalManager>(this, onReady || (() => void 0));
 	}
 }
 
