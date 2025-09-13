@@ -1,7 +1,7 @@
 import { ClusterClientEvents, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, ClusterClientData, PackageType } from '../types';
-import { detectLibraryFromClient, getDiscordVersion, getInfo, isCoreClient } from '../other/utils';
 import { BaseMessage, BaseMessageInput, DataType, ProcessMessage } from '../other/message';
 import { BrokerMessage, IPCBrokerClient } from '../handlers/broker';
+import { detectLibraryFromClient, getInfo } from '../other/utils';
 import { ClusterClientHandler } from '../handlers/message';
 import type { RefShardingCoreClient } from './coreClient';
 import { ShardingUtils } from '../other/shardingUtils';
@@ -14,7 +14,6 @@ import { RefShardingClient } from './client';
 import { Guild } from 'discord.js';
 import EventEmitter from 'events';
 
-export type OnReady<T> = (client: T, callback: () => void) => void;
 export type ClientRefType = RefShardingClient | RefShardingCoreClient;
 
 /** Simplified Cluster instance available on the {@link ClusterClient}. */
@@ -37,24 +36,11 @@ export class ClusterClient<
 	private packageType: PackageType | null;
 
 	/** Creates an instance of ClusterClient. */
-	constructor (public client: InternalClient, onReady?: OnReady<InternalClient>) {
+	constructor (public client: InternalClient) {
 		super();
 
 		this.ready = false;
 		this.packageType = detectLibraryFromClient(client);
-
-		if (!onReady) onReady = async (c, r) => {
-			const core = isCoreClient(c);
-
-			if (core) c.once('READY', r);
-			else if (c.isReady()) r();
-			else {
-				const { major, minor, patch } = await getDiscordVersion('discord.js');
-				const useClientReady = major > 14 || (major === 14 && (minor > 22 || (minor === 22 && patch >= 0)));
-
-				c.once(useClientReady ? 'clientReady' : 'ready', r);
-			}
-		};
 
 		this.broker = new IPCBrokerClient(this);
 		this.process = (this.info.ClusterManagerMode === 'process' ? new ChildClient() : this.info.ClusterManagerMode === 'worker' ? new WorkerClient() : null);
@@ -64,8 +50,6 @@ export class ClusterClient<
 		if (!this.process?.ipc) throw new Error('CLUSTERING_NO_PROCESS | No process to handle messages from.');
 		this.process.ipc.on('message', this._handleMessage.bind(this));
 		this.promise = new PromiseHandler(this);
-
-		onReady?.(this.client, () => this.triggerReady());
 	}
 
 	/** Current cluster id. */

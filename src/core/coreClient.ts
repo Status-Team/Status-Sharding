@@ -1,8 +1,8 @@
+import { Client as DiscordCoreClient, GatewayDispatchEvents, MappedEvents } from '@discordjs/core';
 import { CreateWebSocketManagerOptions, WebSocketManager } from '@discordjs/ws';
-import { Client as DiscordCoreClient, MappedEvents } from '@discordjs/core';
-import { ClusterClient, OnReady } from './clusterClient';
 import { RefClusterManager } from './clusterManager';
 import { REST, RESTOptions } from '@discordjs/rest';
+import { ClusterClient } from './clusterClient';
 import { getInfo } from '../other/utils';
 
 export type ShardingCoreClientOptions = {
@@ -16,15 +16,17 @@ export class ShardingCoreClient<
 	InternalManager extends RefClusterManager = RefClusterManager,
 > extends DiscordCoreClient {
 	/** Cluster associated with this client. */
-	cluster: ClusterClient<this, InternalManager>;
-
+	public cluster: ClusterClient<this, InternalManager>;
 	/* The WebSocket manager of this client. */
-	gateway: WebSocketManager;
+	public gateway: WebSocketManager;
 	/** The REST manager of this client. */
-	rest: REST;
+	public rest: REST;
+
+	/* Shards Ready Count. */
+	private shardsReady = 0;
 
 	/** Creates an instance of ShardingCoreClient. */
-	constructor (options: ShardingCoreClientOptions, onReady?: OnReady<ShardingCoreClient> | null) {
+	constructor (options: ShardingCoreClientOptions) {
 		const info = getInfo();
 
 		const rest = new REST(options.rest).setToken(options.token);
@@ -41,7 +43,11 @@ export class ShardingCoreClient<
 		this.rest = rest;
 		this.gateway = gateway;
 
-		this.cluster = new ClusterClient<this, InternalManager>(this, onReady || (() => void 0));
+		this.cluster = new ClusterClient<this, InternalManager>(this);
+		this.on(GatewayDispatchEvents.Ready, () => {
+			this.shardsReady++;
+			if (this.shardsReady === info.ShardList.length) this.cluster.triggerReady();
+		});
 	}
 }
 
