@@ -1,4 +1,4 @@
-name: Publish to npm
+name: Publish to npm (OIDC)
 
 on:
   push:
@@ -8,24 +8,29 @@ on:
     types: [published]
   workflow_dispatch:
 
-env:
-  publish: false
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   publish:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org/"
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          always-auth: true
 
-      - name: Install dependencies and latest discord.js
+      - name: Ensure latest npm
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
         run: |
           npm i -g pnpm
           pnpm install
@@ -50,12 +55,8 @@ jobs:
           fi
 
       - name: Build the project
-        run: |
-          pnpm run build
+        run: pnpm run build
 
-      - name: Publish to npm
+      - name: Publish to npm using OIDC
         if: env.publish == 'true'
-        run: |
-          npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance
