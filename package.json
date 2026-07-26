@@ -91,15 +91,5 @@
 	},
 	"dependencies": {
 		"net-ipc": "^2.2.0"
-	},
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"msgpackr-extract"
-		]
-	},
-	"files": [
-		"src/**/*",
-		"dist/**/*",
-		"README.md"
-	]
+	}
 }
