@@ -20,21 +20,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
-          always-auth: true
-
-      - name: Ensure latest npm
-        run: npm install -g npm@latest
+          cache: pnpm
 
       - name: Install dependencies
-        run: |
-          npm i -g pnpm
-          pnpm install
-          pnpm add -D discord.js@latest @discordjs/core@latest
+        run: pnpm install --frozen-lockfile
 
       - name: Check if package needs publishing
         id: check_publish

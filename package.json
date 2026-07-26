@@ -1,6 +1,7 @@
 {
 	"version": "1.9.10",
 	"name": "status-sharding",
+	"packageManager": "pnpm@10.18.2",
 	"author": "Digital39999",
 	"scripts": {
 		"ts": "pnpm install typescript --save-dev -g",
@@ -91,5 +92,15 @@
 	},
 	"dependencies": {
 		"net-ipc": "^2.2.0"
-	}
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"msgpackr-extract"
+		]
+	},
+	"files": [
+		"src/**/*",
+		"dist/**/*",
+		"README.md"
+	]
 }
