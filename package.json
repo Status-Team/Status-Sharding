@@ -1,5 +1,5 @@
 {
-	"version": "1.9.10",
+	"version": "1.9.11",
 	"name": "status-sharding",
 	"packageManager": "pnpm@10.18.2",
 	"author": "Digital39999",
@@ -9,7 +9,7 @@
 		"start": "node dist/index.js",
 		"build": "tsc --build",
 		"watch": "tsc --watch",
-		"lint": "eslint . --ext .ts",
+		"lint": "eslint .",
 		"docs": "pnpm typedoc --out docs src --validation.notExported false",
 		"updates": "pnpm npm-check-updates -i --format group",
 		"prepublish": "pnpm run build && pnpm run docs"
@@ -57,21 +57,23 @@
 		"discord.js-bot-sharding-example"
 	],
 	"devDependencies": {
-		"@discordjs/core": "^2.2.1",
-		"@discordjs/rest": "^2.6.0",
-		"@discordjs/ws": "^2.0.3",
-		"@types/node": "20.14.8",
-		"@typescript-eslint/eslint-plugin": "7.13.1",
-		"@typescript-eslint/parser": "7.13.1",
-		"discord.js": "^14.22.1",
-		"eslint": "8.57.0",
-		"typescript": "5.5.2"
+		"@discordjs/core": "^2.6.0",
+		"@discordjs/rest": "^2.6.3",
+		"@discordjs/ws": "^2.0.4",
+		"@eslint/js": "^10.0.1",
+		"@types/node": "26.1.1",
+		"@typescript-eslint/eslint-plugin": "8.65.0",
+		"@typescript-eslint/parser": "8.65.0",
+		"discord.js": "^14.27.0",
+		"eslint": "^10.8.0",
+		"typescript": "5.9.3",
+		"typescript-eslint": "^8.65.0"
 	},
 	"peerDependencies": {
-		"@discordjs/core": ">=2.2.1",
-		"@discordjs/rest": ">=2.6.0",
-		"@discordjs/ws": ">=2.0.3",
-		"discord.js": ">=14.14.1"
+		"@discordjs/core": ">=2.6.0",
+		"@discordjs/rest": ">=2.6.3",
+		"@discordjs/ws": ">=2.0.4",
+		"discord.js": ">=14.27.0"
 	},
 	"peerDependenciesMeta": {
 		"discord.js": {
@@ -96,7 +98,23 @@
 	"pnpm": {
 		"onlyBuiltDependencies": [
 			"msgpackr-extract"
-		]
+		],
+		"overrides": {
+			"minimatch@<3.1.5": "3.1.5",
+			"brace-expansion@<1.1.16": "1.1.16",
+			"cross-spawn@<7.0.6": "7.0.6",
+			"flatted@<3.4.3": "3.4.3",
+			"ajv@<6.14.0": "6.14.0",
+			"js-yaml@>=4.0.0 <5.0.0": "4.3.0",
+			"lodash@<4.18.1": "4.18.1",
+			"ws@<8.21.1": "8.21.1"
+		},
+		"auditConfig": {
+			"ignoreCves": [
+				"GHSA-mh99-v99m-4gvg",
+				"1124334"
+			]
+		}
 	},
 	"files": [
 		"src/**/*",

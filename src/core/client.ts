@@ -32,7 +32,7 @@ export class ShardingClient<
 	}
 
 	private async shardsReady() {
-		let readyEvent: 'ready' | 'clientReady' = 'ready';
+		let readyEvent: 'ready' | 'clientReady';
 
 		try {
 			const { major, minor } = await getDiscordVersion('discord.js');

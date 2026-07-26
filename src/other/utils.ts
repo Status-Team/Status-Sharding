@@ -56,7 +56,7 @@ export async function getDiscordVersion(type: PackageType) {
 
 		return { major, minor, patch, raw: version };
 	} catch (error) {
-		throw new Error(`Failed to get version of ${type}: ${(error as Error).message}`);
+		throw new Error(`Failed to get version of ${type}: ${(error as Error).message}`, { cause: error });
 	}
 }
 
