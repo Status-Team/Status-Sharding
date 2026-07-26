@@ -1,7 +1,8 @@
 import { ClusterManager } from '../core/clusterManager';
 import { ShardingUtils } from '../other/shardingUtils';
-import { ReClusterOptions } from '../types';
+import { MessageTypes, ReClusterOptions } from '../types';
 import { Cluster } from '../core/cluster';
+import { BaseMessage } from '../other/message';
 
 /** Handles re-clustering for the cluster manager. */
 export class ReClusterManager {
@@ -11,6 +12,11 @@ export class ReClusterManager {
 	/** Creates an instance of ReClusterManager. */
 	constructor (private readonly manager: ClusterManager) { }
 
+	/** Whether a re-clustering operation is active. */
+	public get active(): boolean {
+		return this.inProgress;
+	}
+
 	/** Starts re-clustering. */
 	public async start(options: ReClusterOptions): Promise<boolean> {
 		if (this.inProgress) throw new Error('RECLUSTER_IN_PROGRESS | ReClustering is already in progress.');
@@ -19,6 +25,7 @@ export class ReClusterManager {
 		const restartMode = options.restartMode || 'gracefulSwitch';
 
 		this.inProgress = true;
+		this.manager.ready = false;
 		this.manager._debug(`[ReClustering] Starting re-clustering in "${restartMode}" mode.`);
 
 		try {
@@ -95,7 +102,17 @@ export class ReClusterManager {
 				}
 			}
 
-			this.manager.ready = true;
+			this.manager.ready = this.manager.clusters.size === targetTotalClusters
+				&& Array.from(this.manager.clusters.values()).every((cluster) => cluster.ready);
+
+			if (this.manager.ready) {
+				this.manager.emit('ready', this.manager);
+				for (const cluster of this.manager.clusters.values()) {
+					void cluster._sendInstance({ _type: MessageTypes.ManagerReady } as BaseMessage<'readyOrSpawn'>).catch((error) => {
+						this.manager._debug(`[ReClustering] Failed to notify cluster ${cluster.id}: ${(error as Error).message}`);
+					});
+				}
+			}
 			this.manager._debug('[ReClustering] Finished re-clustering.');
 			return true;
 		} finally {

@@ -44,17 +44,19 @@ export class IPCBrokerManager extends IPCBrokerAbstract {
 	public async send<T extends Serializable>(channelName: string, message: SerializableInput<T>, clusterId?: number): Promise<void> {
 		if (this.instance instanceof ClusterManager) {
 			if (clusterId === undefined) {
-				for (const cluster of this.instance.clusters.values()) {
-					cluster.thread?.send({
+				await Promise.allSettled(Array.from(this.instance.clusters.values()).map(async (cluster) => {
+					if (!cluster.thread) return;
+					await cluster.thread.send({
 						_data: message,
 						broker: channelName,
 					});
-				}
+				}));
 			} else {
 				const cluster = this.instance.clusters.get(clusterId);
 				if (!cluster) return Promise.reject(new Error('BROKER_INVALID_CLUSTER_ID | Invalid cluster id provided.'));
+				if (!cluster.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + clusterId + ' does not have a child process/worker.'));
 
-				return cluster.thread?.send({
+				await cluster.thread.send({
 					_data: message,
 					broker: channelName,
 				});

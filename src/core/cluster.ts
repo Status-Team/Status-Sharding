@@ -26,6 +26,12 @@ export class Cluster<
 	public exited: boolean = false;
 	/** Indicates that this cluster is currently in a respawn flow. */
 	public respawning: boolean = false;
+	/** Indicates that the current child is being intentionally stopped. */
+	private stopping: boolean = false;
+	/** The active respawn operation, if any. */
+	private respawnPromise?: Promise<ChildProcess | WorkerThread>;
+	/** The active termination operation, if any. */
+	private killPromise?: Promise<void>;
 	/** Represents the child process/worker of the cluster. */
 	public thread: null | Worker | Child;
 	/** Represents the last time the cluster received a heartbeat. */
@@ -77,6 +83,10 @@ export class Cluster<
 		if (this.thread?.process) return this.thread.process;
 
 		try {
+			this.ready = false;
+			this.exited = false;
+			this.lastHeartbeatReceived = Date.now();
+
 			const options = {
 				...this.manager.options.clusterOptions,
 				execArgv: this.manager.options.execArgv,
@@ -118,8 +128,10 @@ export class Cluster<
 					};
 
 					const onTimeout = () => {
-						cleanup();
-						reject(new Error('CLUSTERING_READY_TIMEOUT | Cluster ' + this.id + ' took too long to get ready.'));
+						cleanup(true);
+						void this.kill({ reason: 'Cluster did not become ready before the spawn timeout.' }).finally(() => {
+							reject(new Error('CLUSTERING_READY_TIMEOUT | Cluster ' + this.id + ' took too long to get ready.'));
+						});
 					};
 
 					const spawnTimeoutTimer = setTimeout(onTimeout, spawnTimeout);
@@ -141,59 +153,76 @@ export class Cluster<
 
 		if (isChildProcess(thread)) {
 			// Child process.
-			thread.on('disconnect', this._handleDisconnect.bind(this));
-			thread.on('message', this._handleMessage.bind(this));
+			thread.on('disconnect', () => this._handleDisconnect(thread));
+			thread.on('message', (message) => this._handleMessage(thread, message));
 			thread.on('error', this._handleError.bind(this));
-			thread.on('exit', this._handleExit.bind(this));
+			thread.on('exit', (exitCode, signal) => this._handleExit(thread, exitCode, signal));
 		} else {
 			// Worker thread.
 			thread.on('messageerror', this._handleError.bind(this));
-			thread.on('message', this._handleMessage.bind(this));
+			thread.on('message', (message) => this._handleMessage(thread, message));
 			thread.on('error', this._handleError.bind(this));
-			thread.on('exit', this._handleExit.bind(this));
-
-			const healthCheck = setInterval(() => {
-				if (!this.thread?.process || ('threadId' in this.thread.process && !this.thread.process.threadId)) {
-					clearInterval(healthCheck);
-					this._handleUnexpectedExit();
-				}
-			}, 5000);
-
+			thread.on('exit', (exitCode) => this._handleExit(thread, exitCode, null));
 		}
 	}
 
-	public async kill(options?: ClusterKillOptions): Promise<void> {
+	public kill(options?: ClusterKillOptions): Promise<void> {
+		if (this.killPromise) return this.killPromise;
+
+		this.killPromise = this.killCluster(options).finally(() => {
+			this.killPromise = undefined;
+		});
+
+		return this.killPromise;
+	}
+
+	/** Terminates the current child process or worker. */
+	private async killCluster(options?: ClusterKillOptions): Promise<void> {
 		if (!this.thread) {
 			console.warn(`Cluster ${this.id} has no thread to kill.`);
 			return;
 		}
 
 		try {
+			this.stopping = true;
 			const killResult = await this.thread.kill();
+			if (!killResult) throw new Error(`CLUSTERING_KILL_FAILED | Cluster ${this.id} process did not exit.`);
 
 			this.thread = null;
 			this.ready = false;
 			this.exited = true;
+			this.manager.ready = false;
 
 			this.manager.heartbeat?.removeCluster(this.id);
 			this.manager._debug('[KILL] Cluster ' + this.id + ' killed with reason: ' + (options?.reason || 'Unknown reason.'));
 
-			if (!killResult) console.warn(`Cluster ${this.id} kill operation completed but process may not have terminated cleanly.`);
 		} catch (error) {
 			console.error(`Error killing cluster ${this.id}:`, error);
-
-			this.thread = null;
 			this.ready = false;
-			this.exited = true;
-			this.manager.heartbeat?.removeCluster(this.id);
+			this.manager.ready = false;
+			throw error;
+		} finally {
+			this.stopping = false;
 		}
 	}
 
 	/** Respawn function that respawns the cluster's child process/worker. */
-	public async respawn(delay: number = this.manager.options.spawnOptions.delay || 5500, timeout: number = this.manager.options.spawnOptions.timeout || -1): Promise<ChildProcess | WorkerThread> {
+	public respawn(delay: number = this.manager.options.spawnOptions.delay || 5500, timeout: number = this.manager.options.spawnOptions.timeout || -1): Promise<ChildProcess | WorkerThread> {
+		if (this.respawnPromise) return this.respawnPromise;
+
+		this.respawnPromise = this.respawnCluster(delay, timeout).finally(() => {
+			this.respawnPromise = undefined;
+		});
+
+		return this.respawnPromise;
+	}
+
+	/** Performs a single cluster restart. */
+	private async respawnCluster(delay: number, timeout: number): Promise<ChildProcess | WorkerThread> {
 		this.respawning = true;
 		this.ready = false;
 		this.exited = false;
+		this.manager.ready = false;
 
 		try {
 			if (this.thread) await this.kill();
@@ -275,7 +304,8 @@ export class Cluster<
 	}
 
 	/** Message handler function that handles messages from the cluster's child process/worker/manager. */
-	private _handleMessage(message: BaseMessage<'normal'> | BrokerMessage | unknown): void {
+	private _handleMessage(thread: ChildProcess | WorkerThread, message: BaseMessage<'normal'> | BrokerMessage | unknown): void {
+		if (this.thread?.process !== thread) return;
 		if (!message || typeof message !== 'object') return;
 		if ('_data' in message) return this.manager.broker.handleMessage(message as BrokerMessage);
 		if (!('_type' in message)) return;
@@ -287,7 +317,7 @@ export class Cluster<
 			this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);
 		}
 
-		this.messageHandler.handleMessage(ipcMessage);
+		void this.messageHandler.handleMessage(ipcMessage).catch((error) => this._handleError(error as Error));
 
 		if ([MessageTypes.CustomMessage, MessageTypes.CustomRequest].includes(ipcMessage._type)) {
 			const processMessage = new ProcessMessage(this, ipcMessage);
@@ -301,54 +331,59 @@ export class Cluster<
 	}
 
 	/** Exit handler function that handles the cluster's child process/worker exiting. */
-	private _handleExit(exitCode: number | null, signal: NodeJS.Signals | null): void {
-		this.manager._debug(`[Cluster ${this.id}] Process exited with code ${exitCode}, signal ${signal}`);
-		if (!this.exited) this.emit('death', this, this.thread?.process || null);
+	private _handleExit(thread: ChildProcess | WorkerThread, exitCode: number | null, signal: NodeJS.Signals | null): void {
+		if (this.thread?.process !== thread) return;
 
+		this.manager._debug(`[Cluster ${this.id}] Process exited with code ${exitCode}, signal ${signal}`);
 		this.ready = false;
 		this.exited = true;
-		this.respawning = false;
 		this.thread = null;
+		this.manager.ready = false;
+
+		if (this.stopping) return;
+
+		this.emit('death', this, thread);
 
 		if (!this.manager.heartbeat) {
-			if (this.manager.options.respawn && exitCode !== 0 && exitCode !== null) {
-				this.respawn().catch((err) => {
-					this.manager._debug(`[Cluster ${this.id}] Failed to respawn: ${err.message}`);
-				});
-			}
+			this._scheduleRecovery();
 		}
 	}
 
 	/** Error handler function that handles errors from the cluster's child process/worker/manager. */
 	private _handleError(error: Error): void {
-		this.manager.emit('error', error);
+		this.emit('error', error);
+		this.manager._debug(`[Cluster ${this.id}] Process error: ${error.message}`);
+
+		if (this.manager.listenerCount('error') > 0) this.manager.emit('error', error);
 	}
 
 	/** Handle unexpected disconnection. */
-	private _handleDisconnect(): void {
+	private _handleDisconnect(thread: ChildProcess | WorkerThread): void {
 		this.manager._debug(`[Cluster ${this.id}] Process disconnected unexpectedly.`);
-		this._handleUnexpectedExit();
+		this._handleUnexpectedExit(thread);
 	}
 
 	/** Handle unexpected exit/crash. */
-	private _handleUnexpectedExit(): void {
-		if (!this.exited && this.ready) {
-			this.manager._debug(`[Cluster ${this.id}] Detected unexpected exit/crash.`);
-			this.emit('death', this, this.thread?.process || null);
+	private _handleUnexpectedExit(thread: ChildProcess | WorkerThread): void {
+		if (this.thread?.process !== thread || this.exited || this.stopping) return;
 
-			this.ready = false;
-			this.exited = true;
-			this.respawning = false;
-			this.thread = null;
+		this.manager._debug(`[Cluster ${this.id}] Detected unexpected exit/crash.`);
+		this.ready = false;
+		this.exited = true;
+		this.thread = null;
+		this.manager.ready = false;
+		this.emit('death', this, thread);
 
-			if (this.manager.options.respawn) {
-				this.manager._debug(`[Cluster ${this.id}] Scheduling respawn after crash.`);
+		if (!this.manager.heartbeat) this._scheduleRecovery();
+	}
 
-				this.respawn().catch((err) => {
-					this.manager._debug(`[Cluster ${this.id}] Failed to respawn after crash: ${err.message}`);
-				});
-			}
-		}
+	/** Schedules one recovery attempt when heartbeat supervision is disabled. */
+	private _scheduleRecovery(): void {
+		if (!this.manager.options.respawn || this.respawning) return;
+
+		void this.respawn().catch((error) => {
+			this.manager._debug(`[Cluster ${this.id}] Failed to respawn after crash: ${(error as Error).message}`);
+		});
 	}
 }
 

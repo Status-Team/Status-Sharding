@@ -41,7 +41,7 @@ export class Child {
 
 	/** Spawns the child process. */
 	public spawn(): ChildProcess {
-		if (this.process && !this.process.killed) return this.process;
+		if (this.process && this.process.exitCode === null && this.process.signalCode === null) return this.process;
 
 		this.process = fork(this.file, this.processOptions.args, this.processOptions);
 		return this.process;
@@ -55,29 +55,45 @@ export class Child {
 
 	/** Kills the child process with proper cleanup. */
 	public async kill(): Promise<boolean> {
-		if (!this.process || this.process.killed) {
+		if (!this.process) {
 			this._cleanup();
 			return false;
+		}
+		if (this.process.exitCode !== null || this.process.signalCode !== null) {
+			this._cleanup();
+			return true;
 		}
 
 		try {
 			const forceKillTimer = setTimeout(() => {
-				if (this.process && !this.process.killed) {
+				if (this.process && this.process.exitCode === null && this.process.signalCode === null) {
 					console.warn('Force killing process with SIGKILL.');
-					this.process.kill('SIGKILL');
+					try {
+						this.process.kill('SIGKILL');
+						if (this.process.pid) process.kill(this.process.pid, 'SIGKILL');
+					} catch {
+						return;
+					}
 				}
 			}, 5000);
+			let killTimeout: NodeJS.Timeout;
 
 			return new Promise<boolean>((resolve) => {
-				if (!this.process || this.process.killed) {
+				if (!this.process) {
 					clearTimeout(forceKillTimer);
 					this._cleanup();
 					resolve(false);
 					return;
 				}
-
+				if (this.process.exitCode !== null || this.process.signalCode !== null) {
+					clearTimeout(forceKillTimer);
+					this._cleanup();
+					resolve(true);
+					return;
+				}
 				const cleanup = () => {
 					clearTimeout(forceKillTimer);
+					clearTimeout(killTimeout);
 					this._cleanup();
 				};
 
@@ -88,21 +104,24 @@ export class Child {
 
 				const onError = (err: Error) => {
 					console.error('Error during child process kill:', err);
-					cleanup();
+					if ((this.process?.exitCode ?? null) !== null || (this.process?.signalCode ?? null) !== null) cleanup();
 					resolve(false);
 				};
 
-				this.process.removeAllListeners('exit');
-				this.process.removeAllListeners('error');
-
 				this.process.once('exit', onExit);
 				this.process.once('error', onError);
+				killTimeout = setTimeout(() => {
+					if (this.process && this.process.exitCode === null && this.process.signalCode === null) {
+						this.process.removeListener('exit', onExit);
+						this.process.removeListener('error', onError);
+						resolve(false);
+					}
+				}, 15000);
 
 				this.process.kill('SIGTERM');
 			});
 		} catch (error) {
 			console.error('Child termination failed:', error);
-			this._cleanup();
 			return false;
 		}
 	}
@@ -138,6 +157,7 @@ export class ChildClient {
 	/** Creates an instance of ChildClient. */
 	constructor () {
 		this.ipc = process;
+		this.ipc.once('disconnect', () => process.exit(0));
 	}
 
 	/** Sends a message to the child process. */

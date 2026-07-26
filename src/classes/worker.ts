@@ -40,16 +40,20 @@ export class Worker {
 
 	/** Kills the worker with proper cleanup. */
 	public async kill(): Promise<boolean> {
-		if (!this.process || !this.process.threadId) {
+		if (!this.process) {
 			this._cleanup();
 			return false;
+		}
+		if (!this.process.threadId) {
+			this._cleanup();
+			return true;
 		}
 
 		try {
 			const forceTerminateTimer = setTimeout(() => {
 				if (this.process && this.process.threadId) {
 					console.warn('Force terminating worker thread.');
-					this.process.terminate();
+					void this.process.terminate().catch((error) => console.error('Force worker termination failed:', error));
 				}
 			}, 5000);
 
@@ -73,21 +77,17 @@ export class Worker {
 
 				const onError = (err: Error) => {
 					console.error('Error during worker termination:', err);
-					cleanup();
+					if (!this.process?.threadId) cleanup();
 					resolve(false);
 				};
-
-				this.process.removeAllListeners('exit');
-				this.process.removeAllListeners('error');
 
 				this.process.once('exit', onExit);
 				this.process.once('error', onError);
 
-				this.process.terminate();
+				void this.process.terminate().catch(onError);
 			});
 		} catch (error) {
 			console.error('Worker termination failed:', error);
-			this._cleanup();
 			return false;
 		}
 	}

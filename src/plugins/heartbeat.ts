@@ -140,9 +140,6 @@ export class HeartbeatManager {
 				`Initiating restart (attempt ${cluster.restarts + 1})`,
 			);
 
-			if (targetCluster.thread) await targetCluster.kill({ reason: 'Missed too many heartbeats.' });
-			this.beats.set(id, { ...cluster, killing: false });
-
 			if (cluster.restarts < this.manager.options.heartbeat.maxRestarts || this.manager.options.heartbeat.maxRestarts === -1) {
 				const remaining = this.manager.options.heartbeat.maxRestarts !== -1
 					? this.manager.options.heartbeat.maxRestarts - cluster.restarts
@@ -150,18 +147,18 @@ export class HeartbeatManager {
 
 				this.manager._debug(`Restarting cluster ${id} (${remaining} restarts remaining)`);
 
-				if (!targetCluster.thread && !targetCluster.respawning) {
-					try {
-						await targetCluster.spawn();
-						cluster.missedBeats = 0;
-						cluster.restarts++;
-					} catch (error) {
-						this.manager._debug(`Failed to restart cluster ${id}: ${(error as Error).message}`);
-					}
+				try {
+					await targetCluster.respawn(this.manager.options.spawnOptions.delay, this.manager.options.spawnOptions.timeout);
+					cluster.missedBeats = 0;
+					cluster.restarts++;
+				} catch (error) {
+					this.manager._debug(`Failed to restart cluster ${id}: ${(error as Error).message}`);
 				}
 			} else {
 				this.manager._debug(`Cluster ${id} reached maximum restarts (${cluster.restarts}). No longer restarting.`);
 			}
+
+			this.beats.set(id, { ...cluster, killing: false });
 		}
 
 		this.beats.set(id, cluster);
@@ -174,8 +171,8 @@ export class HeartbeatManager {
 		const process = cluster.thread.process;
 
 		// Check child process
-		if ('killed' in process && process.killed) return false;
 		if ('exitCode' in process && process.exitCode !== null) return false;
+		if ('signalCode' in process && process.signalCode !== null) return false;
 
 		// Check worker thread
 		if ('threadId' in process && !process.threadId) return false;
@@ -192,8 +189,8 @@ export class HeartbeatManager {
 
 		cluster.ready = false;
 		cluster.exited = true;
-		cluster.respawning = false;
 		cluster.thread = null;
+		this.manager.ready = false;
 
 		const clusterData = this.getClusterStats(clusterId);
 		clusterData.missedBeats = 0;
@@ -208,7 +205,7 @@ export class HeartbeatManager {
 			this.beats.set(clusterId, clusterData);
 
 			try {
-				await cluster.spawn();
+				await cluster.respawn(this.manager.options.spawnOptions.delay, this.manager.options.spawnOptions.timeout);
 			} catch (err) {
 				this.manager._debug(`[Heartbeat] Failed to respawn crashed cluster ${clusterId}: ${(err as Error).message}`);
 			}

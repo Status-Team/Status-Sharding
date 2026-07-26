@@ -35,6 +35,8 @@ export class ClusterManager<
 	readonly heartbeat: HeartbeatManager | null;
 	/** Queue for the ClusterManager */
 	readonly clusterQueue: Queue;
+	/** The initial spawn operation, shared by concurrent callers. */
+	private spawnPromise?: Promise<Queue>;
 
 	/** Creates an instance of ClusterManager. */
 	constructor (public file: string, options: ClusterManagerCreateOptions<ClusteringMode>) {
@@ -92,7 +94,19 @@ export class ClusterManager<
 	}
 
 	/** Spawns multiple internal clusters. */
-	public async spawn(): Promise<Queue> {
+	public spawn(): Promise<Queue> {
+		if (this.spawnPromise) return this.spawnPromise;
+
+		this.spawnPromise = this.spawnClusters().catch((error) => {
+			this.spawnPromise = undefined;
+			throw error;
+		});
+
+		return this.spawnPromise;
+	}
+
+	/** Creates the initial cluster topology. */
+	private async spawnClusters(): Promise<Queue> {
 		if (this.options.spawnOptions.delay < 6000) process.emitWarning('Spawn Delay is smaller than 6s, this can cause global rate limits on /gateway/bot', {
 			code: 'SHARDING_DELAY',
 		});
@@ -148,26 +162,27 @@ export class ClusterManager<
 		if (this.options.shardsPerClusters < 1) throw new Error('CLIENT_INVALID_OPTION | Shards Per Cluster must be at least 1.');
 		if (this.options.totalShards < this.options.shardList.length) throw new Error('CLIENT_INVALID_OPTION | Shard List is bigger than Total Shards.');
 		if (this.options.totalClusters < this.options.clusterList.length) throw new Error('CLIENT_INVALID_OPTION | Cluster List is bigger than Total Clusters.');
-		if (this.options.shardList.some((shard) => shard < 0)) throw new Error('CLIENT_INVALID_OPTION | Shard List has invalid shards.');
-		if (this.options.clusterList.some((cluster) => cluster < 0)) throw new Error('CLIENT_INVALID_OPTION | Cluster List has invalid clusters.');
+		if (this.options.shardList.some((shard) => !Number.isInteger(shard) || shard < 0 || shard >= this.options.totalShards)) throw new Error('CLIENT_INVALID_OPTION | Shard List has invalid shards.');
+		if (new Set(this.options.shardList).size !== this.options.shardList.length) throw new Error('CLIENT_INVALID_OPTION | Shard List contains duplicate shards.');
+		if (this.options.clusterList.some((cluster) => !Number.isInteger(cluster) || cluster < 0)) throw new Error('CLIENT_INVALID_OPTION | Cluster List has invalid clusters.');
+		if (new Set(this.options.clusterList).size !== this.options.clusterList.length) throw new Error('CLIENT_INVALID_OPTION | Cluster List contains duplicate clusters.');
 
 		this._debug(`[ClusterManager] Spawning ${this.options.totalClusters} clusters with ${this.options.totalShards} shards in total (${this.options.shardsPerClusters} shards per cluster)`);
 
 		const listOfShardsForCluster = ShardingUtils.chunkArray(this.options.shardList || [], this.options.shardsPerClusters || this.options.totalShards);
 		if (listOfShardsForCluster.length !== this.options.totalClusters) this.options.totalClusters = listOfShardsForCluster.length;
 
-		this.options.totalShards = listOfShardsForCluster.reduce((acc, curr) => acc + curr.length, 0);
 		this.options.totalClusters = listOfShardsForCluster.length;
-		this.options.shardsPerClusters = Math.ceil(this.options.totalShards / this.options.totalClusters);
+		this.options.shardsPerClusters = Math.ceil(this.options.shardList.length / this.options.totalClusters);
 
 		for (let i = 0; i < this.options.totalClusters; i++) {
 			if (listOfShardsForCluster[i]) {
-				this._debug(`[ClusterManager] Added Cluster ${this.options.clusterList?.[i] || i} to the queue with ${listOfShardsForCluster[i]} shards.`);
+				this._debug(`[ClusterManager] Added Cluster ${this.options.clusterList?.[i] ?? i} to the queue with ${listOfShardsForCluster[i]} shards.`);
 
 				this.clusterQueue.add({
 					timeout: this.options.spawnOptions.delay * (listOfShardsForCluster[i]?.length ?? 0),
 					args: [this.options.spawnOptions.timeout !== -1 ? this.options.spawnOptions.timeout + this.options.spawnOptions.delay * (listOfShardsForCluster[i]?.length ?? 0) : this.options.spawnOptions.timeout],
-					run: (...timeout: number[]) => this.createCluster(this.options.clusterList?.[i] || i, listOfShardsForCluster[i] || []).spawn(...timeout),
+					run: (...timeout: number[]) => this.createCluster(this.options.clusterList?.[i] ?? i, listOfShardsForCluster[i] || []).spawn(...timeout),
 				});
 			}
 		}

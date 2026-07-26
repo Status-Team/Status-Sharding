@@ -281,7 +281,7 @@ export class ClusterClient<
 
 		// Debug.
 		this.emit('debug', `[IPC] [Child ${this.id}] Received message from cluster.`);
-		this.messageHandler.handleMessage(ipcMessage);
+		void this.messageHandler.handleMessage(ipcMessage).catch((error) => this._debug(`[IPC] Failed to handle manager message: ${(error as Error).message}`));
 
 		// Emitted upon receiving a message from the child process/worker.
 		if ([MessageTypes.CustomMessage, MessageTypes.CustomRequest].includes(ipcMessage._type)) {

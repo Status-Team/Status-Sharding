@@ -36,7 +36,7 @@ export class ClusterHandler {
 
 				const allReady = this.cluster.manager.clusters.every((cluster) => cluster.ready);
 
-				if (!this.cluster.manager.ready && allReady && this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {
+				if (!this.cluster.manager.reCluster.active && !this.cluster.manager.ready && allReady && this.cluster.manager.clusters.size === this.cluster.manager.options.totalClusters) {
 					this.cluster.manager.ready = true;
 
 					this.cluster.manager.emit('ready', this.cluster.manager);
@@ -101,17 +101,23 @@ export class ClusterHandler {
 			}
 			case MessageTypes.ClientRespawnAll: {
 				const { clusterDelay, respawnDelay, timeout, except } = message.data as DataTypes['respawnAll'];
-				this.cluster.manager.respawnAll(clusterDelay, respawnDelay, timeout, except);
+				void this.cluster.manager.respawnAll(clusterDelay, respawnDelay, timeout, except).catch((error) => {
+					this.cluster.manager._debug(`[ClusterManager] Failed to respawn all clusters: ${(error as Error).message}`);
+				});
 				break;
 			}
 			case MessageTypes.ClientRespawnSpecific: {
 				const { clusterDelay, respawnDelay, timeout, clusterIds } = message.data as DataTypes['respawnSome'];
-				this.cluster.manager.respawnClusters(clusterIds, clusterDelay, respawnDelay, timeout);
+				void this.cluster.manager.respawnClusters(clusterIds, clusterDelay, respawnDelay, timeout).catch((error) => {
+					this.cluster.manager._debug(`[ClusterManager] Failed to respawn requested clusters: ${(error as Error).message}`);
+				});
 				break;
 			}
 			case MessageTypes.ClientRespawn: {
 				const { respawnDelay, timeout } = message.data as Omit<DataTypes['respawnAll'], 'clusterDelay' | 'except'>;
-				this.cluster.respawn(respawnDelay, timeout);
+				void this.cluster.respawn(respawnDelay, timeout).catch((error) => {
+					this.cluster.manager._debug(`[Cluster ${this.cluster.id}] Failed to respawn: ${(error as Error).message}`);
+				});
 				break;
 			}
 			case MessageTypes.ClientSpawnNextCluster: {
