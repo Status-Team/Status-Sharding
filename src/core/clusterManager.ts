@@ -354,6 +354,7 @@ export class ClusterManager<
 	public async evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		const shard = ShardingUtils.shardIdForGuildId(guildId, this.options.totalShards);
 		const clusterId = ShardingUtils.clusterIdForShardId(shard, this.options.totalShards, this.options.totalClusters);
+		this._debug(`Guild ${guildId} maps to shard ${shard} and cluster ${clusterId} for evaluation.`);
 
 		const cluster = this.clusters.get(clusterId);
 		if (!cluster) return Promise.reject(new Error(`CLUSTER_NOT_FOUND | Cluster ${clusterId} does not exist.`));
@@ -721,10 +722,16 @@ function evalOptionsFromValue(value: unknown): EvalOptions | undefined {
 	if (numberOrArray(value.cluster)) options.cluster = value.cluster;
 	if (numberOrArray(value.shard)) options.shard = value.shard;
 	if (typeof value.guildId === 'string') options.guildId = value.guildId;
-	if (isRecord(value.context)) options.context = value.context;
+	const context = contextFromValue(value.context);
+	if (context) options.context = context;
 	if (numberValue(value.timeout) !== undefined) options.timeout = numberValue(value.timeout);
 	if (typeof value.useAllSettled === 'boolean') options.useAllSettled = value.useAllSettled;
 	return options;
+}
+
+function contextFromValue(value: unknown): object | undefined {
+	if (!ShardingUtils.isSerializable(value) || value === null || typeof value !== 'object') return undefined;
+	return value;
 }
 
 function respawnDataFromMessage(value: unknown): {

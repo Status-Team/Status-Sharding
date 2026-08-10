@@ -186,7 +186,7 @@ export class ClusterClient<
 	/* ----------------------------------- Evaluation ----------------------------------- */
 
 	private async evaluateScript<T>(script: string, context?: unknown, options?: EvalOptions): Promise<T> {
-		const callable = /^\s*(?:async\s+)?function\b/.test(script) || script.includes('=>');
+		const callable = isCallableScript(script);
 		const guild =
 			options?.guildId && this.packageType === 'discord.js'
 				? `(client?.guilds?.cache?.get(${JSON.stringify(options.guildId)}))`
@@ -201,9 +201,10 @@ export class ClusterClient<
 
 		if (this.packageType === 'discord.js') {
 			const candidate = evalFunction<T>(this.client);
+			const contextSource = context === undefined ? 'undefined' : JSON.stringify(context);
 			const source = callable
-				? `(${script})(this,${context === undefined ? 'undefined' : JSON.stringify(context)},${discordGuild})`
-				: script;
+				? `(${script})(this,${contextSource},${discordGuild})`
+				: `(() => { const context = ${contextSource}; return (${script}); })()`;
 
 			if (candidate) return await candidate.call(this.client, source);
 			return await new Function('client', 'context', functionBody).call(this.client, this.client, context);
@@ -308,6 +309,7 @@ export class ClusterClient<
 		return this.ensureReady('evalOnGuild', async () => {
 			if (this.packageType !== 'discord.js') throw new Error('CLUSTERING_EVAL_GUILD_UNSUPPORTED | evalOnGuild requires discord.js.');
 			const guild = guildFor(this.client, guildId);
+			this._debug(`Guild ${guildId} is ${guild ? 'present' : 'not present'} in this cluster cache for evaluation.`);
 
 			if (typeof script === 'string') return await this.evaluateScript<T>(script, options?.context, { ...options, guildId });
 			return script(this.client, options?.context, guild);
@@ -474,11 +476,22 @@ function evalOptionsFromValue(value: unknown): EvalOptions | undefined {
 	if (numberOrArray(value.cluster)) options.cluster = value.cluster;
 	if (numberOrArray(value.shard)) options.shard = value.shard;
 	if (typeof value.guildId === 'string') options.guildId = value.guildId;
-	if (isRecord(value.context)) options.context = value.context;
+	const context = contextFromValue(value.context);
+	if (context) options.context = context;
 	if (typeof value.timeout === 'number' && Number.isFinite(value.timeout)) options.timeout = value.timeout;
 	if (typeof value.useAllSettled === 'boolean') options.useAllSettled = value.useAllSettled;
 
 	return options;
+}
+
+function contextFromValue(value: unknown): object | undefined {
+	if (!ShardingUtils.isSerializable(value) || value === null || typeof value !== 'object') return undefined;
+	return value;
+}
+
+function isCallableScript(script: string): boolean {
+	const source = script.trim();
+	return /^(?:async\s+)?function\b/.test(source) || /^(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/.test(source);
 }
 
 function numberOrArray(value: unknown): value is number | number[] {
