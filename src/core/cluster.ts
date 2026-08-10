@@ -249,14 +249,15 @@ export class Cluster<
 	public async request<T extends Serializable, O>(message: SerializableInput<T>, options: { timeout?: number; } = {}): Promise<Serialized<O>> {
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#3).'));
 		const nonce = ShardingUtils.generateNonce();
+		const response = this.manager.promise.create<Serialized<O>>(nonce, options.timeout);
 
-		this.thread.send<BaseMessage<'reply'>>({
+		void this.thread.send<BaseMessage<'reply'>>({
 			_type: MessageTypes.CustomRequest,
 			_nonce: nonce,
 			data: message,
-		});
+		}).catch((error) => this.manager.promise.reject(nonce, error instanceof Error ? error : new Error(String(error))));
 
-		return this.manager.promise.create(nonce, options.timeout);
+		return response;
 	}
 
 	/** Broadcast function that sends a message to all clusters. */
@@ -274,17 +275,18 @@ export class Cluster<
 		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#4).'));
 
 		const nonce = ShardingUtils.generateNonce();
+		const response = this.manager.promise.create<ValidIfSerializable<T>>(nonce, options?.timeout);
 
-		this.thread.send<BaseMessage<'eval'>>({
+		void this.thread.send<BaseMessage<'eval'>>({
 			_type: MessageTypes.ClientEvalRequest,
 			_nonce: nonce,
 			data: {
 				script: ShardingUtils.parseInput(script, options?.context),
 				options: options,
 			},
-		});
+		}).catch((error) => this.manager.promise.reject(nonce, error instanceof Error ? error : new Error(String(error))));
 
-		return this.manager.promise.create(nonce, options?.timeout);
+		return response;
 	}
 
 	/** EvalOnCluster function that evaluates a script on a specific cluster. */
@@ -351,8 +353,8 @@ export class Cluster<
 
 	/** Error handler function that handles errors from the cluster's child process/worker/manager. */
 	private _handleError(error: Error): void {
-		this.emit('error', error);
 		this.manager._debug(`[Cluster ${this.id}] Process error: ${error.message}`);
+		if (this.listenerCount('error') > 0) this.emit('error', error);
 
 		if (this.manager.listenerCount('error') > 0) this.manager.emit('error', error);
 	}
@@ -360,21 +362,37 @@ export class Cluster<
 	/** Handle unexpected disconnection. */
 	private _handleDisconnect(thread: ChildProcess | WorkerThread): void {
 		this.manager._debug(`[Cluster ${this.id}] Process disconnected unexpectedly.`);
-		this._handleUnexpectedExit(thread);
-	}
-
-	/** Handle unexpected exit/crash. */
-	private _handleUnexpectedExit(thread: ChildProcess | WorkerThread): void {
 		if (this.thread?.process !== thread || this.exited || this.stopping) return;
 
-		this.manager._debug(`[Cluster ${this.id}] Detected unexpected exit/crash.`);
-		this.ready = false;
-		this.exited = true;
-		this.thread = null;
-		this.manager.ready = false;
-		this.emit('death', this, thread);
+		void this._verifyDisconnectedProcess(thread);
+	}
 
-		if (!this.manager.heartbeat) this._scheduleRecovery();
+	private async _verifyDisconnectedProcess(thread: ChildProcess | WorkerThread): Promise<void> {
+		const runtime = this.thread;
+		if (!runtime || runtime.process !== thread) return;
+
+		try {
+			const terminated = await runtime.kill();
+			if (!terminated) {
+				const error = new Error(`CLUSTERING_TERMINATION_UNVERIFIED | Cluster ${this.id} disconnected but its runtime could not be terminated.`);
+				this.manager._debug(`[Cluster ${this.id}] Automatic respawn was suppressed because the disconnected runtime is still alive.`);
+				this._handleError(error);
+				return;
+			}
+
+			if (this.thread !== runtime || this.exited || this.stopping) return;
+
+			this.manager._debug(`[Cluster ${this.id}] Disconnected runtime termination was verified.`);
+			this.ready = false;
+			this.exited = true;
+			this.thread = null;
+			this.manager.ready = false;
+			this.emit('death', this, thread);
+
+			if (!this.manager.heartbeat) this._scheduleRecovery();
+		} catch (error) {
+			this._handleError(error instanceof Error ? error : new Error(String(error)));
+		}
 	}
 
 	/** Schedules one recovery attempt when heartbeat supervision is disabled. */

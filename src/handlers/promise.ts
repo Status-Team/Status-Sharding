@@ -42,6 +42,16 @@ export class PromiseHandler {
 		console.error('An error occurred while resolving an IPC promise:', data);
 	}
 
+	/** Rejects a stored promise when its IPC message could not be sent. */
+	public reject(nonce: string, error: Error): void {
+		const promise = this.nonces.get(nonce);
+		if (!promise) return this.instance._debug(`Failed to reject an unknown IPC nonce: ${nonce}`);
+
+		if (promise.timeout) clearTimeout(promise.timeout);
+		this.nonces.delete(nonce);
+		promise.reject(error);
+	}
+
 	/** Creates a promise and stores it in the map. */
 	public async create<T>(nonce: string, timeout?: number): Promise<T> {
 		return await new Promise<T>((resolve, reject) => {

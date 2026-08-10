@@ -157,7 +157,11 @@ export class ChildClient {
 	/** Creates an instance of ChildClient. */
 	constructor () {
 		this.ipc = process;
-		this.ipc.once('disconnect', () => process.exit(0));
+		this.ipc.once('disconnect', () => {
+			process.exitCode = 1;
+			const exitTimer = setTimeout(() => process.exit(1), 1_000);
+			exitTimer.unref();
+		});
 	}
 
 	/** Sends a message to the child process. */

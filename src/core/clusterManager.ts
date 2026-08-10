@@ -59,7 +59,7 @@ export class ClusterManager<
 				enabled: true,
 				timeout: 8000,
 				interval: 2000,
-				maxRestarts: -1,
+				maxRestarts: 5,
 				maxMissedHeartbeats: 2,
 			}),
 			packageType: null,
@@ -201,7 +201,6 @@ export class ClusterManager<
 
 	/** Kills all running clusters and respawns them. */
 	public async respawnAll(clusterDelay: number = 8000, respawnDelay: number = 5500, timeout: number = -1, except: number[] = []): Promise<Map<number, InternalCluster>> {
-		this.promise.nonces.clear();
 		this._debug('[ClusterManager] Respawning all clusters.');
 
 		const listOfShardsForCluster = ShardingUtils.chunkArray(
@@ -235,7 +234,6 @@ export class ClusterManager<
 
 	/** Kills specific clusters and respawns them. */
 	public async respawnClusters(clusters: number[], clusterDelay: number = 8000, respawnDelay: number = 5500, timeout: number = -1): Promise<Map<number, InternalCluster>> {
-		this.promise.nonces.clear();
 		this._debug('[ClusterManager] Respawning specific clusters.');
 
 		const listOfShardsForCluster = ShardingUtils.chunkArray(

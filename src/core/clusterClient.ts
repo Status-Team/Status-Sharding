@@ -139,17 +139,18 @@ export class ClusterClient<
 		else if (typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function (#1).'));
 
 		const nonce = ShardingUtils.generateNonce();
+		const response = this.promise.create<ValidIfSerializable<T>>(nonce, options?.timeout);
 
-		this.process.send<BaseMessage<'eval'>>({
+		void this.process.send<BaseMessage<'eval'>>({
 			data: {
 				options,
 				script: `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`,
 			},
 			_nonce: nonce,
 			_type: MessageTypes.ClientManagerEvalRequest,
-		});
+		}).catch((error) => this.promise.reject(nonce, error instanceof Error ? error : new Error(String(error))));
 
-		return this.promise.create(nonce, options?.timeout);
+		return response;
 	}
 
 	/** Evaluates a script on all clusters in parallel. */
@@ -159,17 +160,18 @@ export class ClusterClient<
 		else if (typeof script !== 'string' && typeof script !== 'function') return Promise.reject(new Error('CLUSTERING_INVALID_EVAL_SCRIPT | Eval script is not a function or string.'));
 
 		const nonce = ShardingUtils.generateNonce();
+		const response = this.promise.create<ValidIfSerializable<T>[]>(nonce, options?.timeout);
 
-		this.process.send({
+		void this.process.send({
 			data: {
 				options,
 				script: typeof script === 'string' ? script : `(${script})(this,${options?.context ? JSON.stringify(options.context) : undefined})`,
 			},
 			_nonce: nonce,
 			_type: MessageTypes.ClientBroadcastRequest,
-		} as BaseMessage<'eval'>);
+		} as BaseMessage<'eval'>).catch((error) => this.promise.reject(nonce, error instanceof Error ? error : new Error(String(error))));
 
-		return this.promise.create(nonce, options?.timeout);
+		return response;
 	}
 
 	/** Evaluates a script on specific guild. */
@@ -181,17 +183,18 @@ export class ClusterClient<
 		else if (this.packageType !== 'discord.js') return Promise.reject(new Error('CLUSTERING_EVAL_GUILD_UNSUPPORTED | evalOnGuild is only supported in discord.js package type.'));
 
 		const nonce = ShardingUtils.generateNonce();
+		const response = this.promise.create<ValidIfSerializable<T>[]>(nonce, options?.timeout);
 
-		this.process.send({
+		void this.process.send({
 			_type: MessageTypes.ClientBroadcastRequest,
 			_nonce: nonce,
 			data: {
 				script: ShardingUtils.parseInput(script, options?.context, this.packageType, `this?.guilds?.cache?.get('${guildId}')`),
 				options: { ...options, guildId },
 			},
-		} as BaseMessage<'eval'>);
+		} as BaseMessage<'eval'>).catch((error) => this.promise.reject(nonce, error instanceof Error ? error : new Error(String(error))));
 
-		return this.promise.create(nonce, options?.timeout).then((data) => (data as unknown as T[])?.find((v) => v !== undefined)) as Promise<ValidIfSerializable<T>>;
+		return response.then((data) => (data as unknown as T[])?.find((value) => value !== undefined)) as Promise<ValidIfSerializable<T>>;
 	}
 
 	/** Evaluates a script on a current client, in the context of the {@link ShardingClient}. */
@@ -225,14 +228,15 @@ export class ClusterClient<
 
 		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
 		const nonce = ShardingUtils.generateNonce();
+		const response = this.promise.create<ValidIfSerializable<T>>(nonce, options.timeout);
 
-		this.process.send<BaseMessage<'normal'>>({
+		void this.process.send<BaseMessage<'normal'>>({
 			_type: MessageTypes.CustomRequest,
 			_nonce: nonce,
 			data: message,
-		});
+		}).catch((error) => this.promise.reject(nonce, error instanceof Error ? error : new Error(String(error))));
 
-		return this.promise.create(nonce, options.timeout);
+		return response;
 	}
 
 	/** Kills all running clusters and respawns them. */
