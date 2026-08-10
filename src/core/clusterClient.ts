@@ -1,5 +1,5 @@
 import { MessageTypes, type Awaitable, type BaseMessage, type ClusterClientData, type ClusterClientEvents, type DataType, type EvalOptions, type PackageType, type RefClusterManager, type Serializable, type SerializableInput, type Serialized, type ValidIfSerializable, type ClientRefType } from '../types.js';
-import { ProcessMessage, isBaseMessage } from '../other/message.js';
+import { ProcessMessage, brokerPayloadFromValue, isBaseMessage } from '../other/message.js';
 import { ShardingUtils } from '../other/shardingUtils.js';
 import { PromiseHandler } from '../handlers/promise.js';
 import { IPCBrokerClient } from '../handlers/broker.js';
@@ -40,7 +40,7 @@ export class ClusterClient<
 			: new WorkerClient({ ipcMaxPayload: this.infoData.IpcMaxPayload });
 
 		this.promise = new PromiseHandler(this.infoData.IpcTimeout, this.infoData.IpcMaxPending);
-		this.broker = new IPCBrokerClient(this);
+		this.broker = new IPCBrokerClient((channelName, message) => this.sendBroker(channelName, message), (message) => this._debug(message));
 
 		this.attachTransport();
 	}
@@ -104,6 +104,12 @@ export class ClusterClient<
 				this.emitSafe('managerReady');
 				return;
 
+			case MessageTypes.BrokerMessage: {
+				const data = brokerPayloadFromValue(wire.data);
+				if (data) this.broker._receive(data.broker, data.message);
+				return;
+			}
+
 			case MessageTypes.CustomMessage:
 			case MessageTypes.CustomRequest:
 				this.emitSafe('message', new ProcessMessage(this, wire));
@@ -138,7 +144,13 @@ export class ClusterClient<
 		const data = heartbeatRequestFromData(message.data);
 		if (!data) return;
 
-		const healthy = await this.isReadyForHeartbeatAck();
+		let healthy = false;
+		try {
+			healthy = await this.isReadyForHeartbeatAck();
+		} catch (error: unknown) {
+			this._debug(`The heartbeat health check failed with ${error instanceof Error ? error.message : String(error)}; the cluster will report unhealthy.`);
+		}
+
 		await this._respond({
 			_type: MessageTypes.HeartbeatAck,
 			_nonce: message._nonce,
@@ -256,6 +268,12 @@ export class ClusterClient<
 				_type: MessageTypes.ClientBroadcast,
 				data: { message, ignore: sendSelf ? undefined : this.id },
 			});
+		});
+	}
+
+	private sendBroker<T extends Serializable>(channelName: string, message: SerializableInput<T>): Promise<void> {
+		return this.ensureReady('broker.send', async () => {
+			await this.process.send({ _type: MessageTypes.BrokerMessage, data: { broker: channelName, _data: message } });
 		});
 	}
 

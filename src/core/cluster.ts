@@ -315,8 +315,12 @@ export class Cluster<
 		return this.killPromise;
 	}
 
-	public respawn(delay = this.manager.options.spawnOptions.delay, timeout = this.manager.options.spawnOptions.timeout): Promise<ChildProcess | WorkerThreadHandle> {
-		if (this.restartPromise) return this.restartPromise.then(() => this.processAfterRespawn());
+	public async respawn(delay = this.manager.options.spawnOptions.delay, timeout = this.manager.options.spawnOptions.timeout): Promise<ChildProcess | WorkerThreadHandle> {
+		if (this.restartPromise) {
+			await this.restartPromise;
+			return this.processAfterRespawn();
+		}
+
 		this.debug(`Cluster ${this.id} received a respawn request with a ${delay} millisecond delay and a ${timeout} millisecond timeout.`);
 
 		this.restartCancelled = false;
@@ -335,7 +339,8 @@ export class Cluster<
 			this.restartPromise = undefined;
 		});
 
-		return this.restartPromise.then(() => this.processAfterRespawn());
+		await this.restartPromise;
+		return this.processAfterRespawn();
 	}
 
 	private processAfterSpawn(): ChildProcess | WorkerThreadHandle {

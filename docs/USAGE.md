@@ -108,6 +108,21 @@ await client.cluster.broadcast({ type: 'configuration-updated' });
 
 Send only JSON-like values through IPC: strings, numbers, booleans, `null`, `undefined`, arrays, and plain objects containing the same values.
 
+## Broker channels
+
+The broker is a dedicated channel transport and is separate from normal `message` and `clientRequest` IPC and from evaluation traffic.
+
+```ts
+manager.broker.listen('configuration-invalidated', (data) => reloadConfiguration(data));
+client.cluster.broker.listen('configuration-invalidated', (data) => reloadConfiguration(data));
+
+await manager.broker.send('configuration-invalidated', { revision: 42 });
+await manager.broker.send('configuration-invalidated', { revision: 42 }, 2);
+await client.cluster.broker.send('configuration-invalidated', { revision: 42 });
+```
+
+`manager.broker.send()` delivers from the manager to all children or one selected cluster and does not call manager listeners; `client.cluster.broker.send()` delivers from one child to manager listeners and does not fan out to other children. A broker listener failure emits a sentence through `debug` and does not break IPC routing.
+
 ## Evaluating code
 
 Use `manager.eval()` for manager-local code, `manager.evalOnCluster()` for a cluster object, `manager.evalOnClusterClient()` for one child client, and `manager.broadcastEval()` for selected child clients.

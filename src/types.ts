@@ -33,6 +33,7 @@ export enum MessageTypes {
 	Kill = 25,
 	ClientRespawnSpecific = 26,
 	ClientUnready = 27,
+	BrokerMessage = 28,
 }
 
 export type Serializable = string | number | boolean | null | undefined | Serializable[] | { [key: string]: Serializable };

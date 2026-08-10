@@ -1,4 +1,5 @@
 import { MessageTypes, type BaseMessage, type DataType, type DataTypes, type Serializable, type SerializableInput } from '../types.js';
+import { ShardingUtils } from './shardingUtils.js';
 
 export { MessageTypes };
 export type { BaseMessage, DataType, DataTypes };
@@ -12,6 +13,13 @@ export function isBaseMessage(value: unknown): value is BaseMessage<DataType> {
 	if ('_nonce' in value && value._nonce !== undefined && (typeof value._nonce !== 'string' || value._nonce.length > 256)) return false;
 	
 	return true;
+}
+
+export function brokerPayloadFromValue(value: unknown): { broker: string; message: Serializable } | undefined {
+	if (!value || typeof value !== 'object' || Array.isArray(value) || !('broker' in value) || !('_data' in value)) return undefined;
+	if (typeof value.broker !== 'string' || !value.broker.length || !ShardingUtils.isSerializable(value._data)) return undefined;
+
+	return { broker: value.broker, message: value._data };
 }
 
 interface MessageEndpoint {

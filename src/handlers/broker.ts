@@ -1,29 +1,51 @@
 import type { Serializable, SerializableInput } from '../types.js';
 
-interface BrokerManager {
-	broadcast<T extends Serializable>(message: SerializableInput<T>, ignore?: number[]): Promise<void>;
+export type BrokerMessage = { _data: Serializable; broker: string };
+export type BrokerMessageHandler = (message: Serializable) => void;
+
+abstract class IPCBrokerAbstract {
+	private readonly listeners = new Map<string, BrokerMessageHandler[]>();
+
+	constructor (private readonly debug: (message: string) => void) { }
+
+	public listen(channelName: string, callback: BrokerMessageHandler): void {
+		if (!channelName.length) throw new Error('BROKER_CHANNEL_INVALID | A broker channel name is required.');
+
+		const listeners = this.listeners.get(channelName) ?? [];
+		listeners.push(callback);
+		this.listeners.set(channelName, listeners);
+	}
+
+	public _receive(channelName: string, message: Serializable): void {
+		const listeners = this.listeners.get(channelName);
+		if (!listeners) return;
+
+		for (const listener of listeners) {
+			try {
+				listener(message);
+			} catch (error: unknown) {
+				this.debug(`A broker listener on channel ${channelName} failed with ${error instanceof Error ? error.message : String(error)}.`);
+			}
+		}
+	}
 }
 
-export class IPCBrokerManager {
-	constructor (private readonly manager: BrokerManager) { }
-
-	public listen(): this {
-		return this;
+export class IPCBrokerManager extends IPCBrokerAbstract {
+	constructor (private readonly sendToClusters: <T extends Serializable>(channelName: string, message: SerializableInput<T>, clusterId?: number) => Promise<void>, debug: (message: string) => void) {
+		super(debug);
 	}
 
-	public send<T extends Serializable>(message: SerializableInput<T>, ignore?: number[]): Promise<void> {
-		return this.manager.broadcast(message, ignore);
+	public send<T extends Serializable>(channelName: string, message: SerializableInput<T>, clusterId?: number): Promise<void> {
+		return this.sendToClusters(channelName, message, clusterId);
 	}
 }
 
-export class IPCBrokerClient {
-	constructor (private readonly client: { broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf?: boolean): Promise<void> }) { }
-
-	public listen(): this {
-		return this;
+export class IPCBrokerClient extends IPCBrokerAbstract {
+	constructor (private readonly sendToManager: <T extends Serializable>(channelName: string, message: SerializableInput<T>) => Promise<void>, debug: (message: string) => void) {
+		super(debug);
 	}
 
-	public send<T extends Serializable>(message: SerializableInput<T>, sendSelf = false): Promise<void> {
-		return this.client.broadcast(message, sendSelf);
+	public send<T extends Serializable>(channelName: string, message: SerializableInput<T>): Promise<void> {
+		return this.sendToManager(channelName, message);
 	}
 }

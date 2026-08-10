@@ -1,5 +1,5 @@
 import { MessageTypes, type BaseMessage, type ClusterManagerCreateOptions, type ClusterManagerOptions, type DataType, type EvalOptions, type RefCluster, type Serializable, type SerializableInput, type Serialized, type ValidIfSerializable, type Awaitable, type ClientRefType, type ClusterManagerEvents, type ClusterLifecycleRecord } from '../types.js';
-import { ProcessMessage, isBaseMessage } from '../other/message.js';
+import { ProcessMessage, brokerPayloadFromValue, isBaseMessage } from '../other/message.js';
 import { ReClusterManager } from '../plugins/reCluster.js';
 import { HeartbeatManager } from '../plugins/heartbeat.js';
 import { ShardingUtils } from '../other/shardingUtils.js';
@@ -87,7 +87,7 @@ export class ClusterManager<
 		this.validateOptions();
 		this.clusters = new ClusterMap<number, InternalCluster>();
 		this.promise = new PromiseHandler(this.options.advanced.ipcTimeout, this.options.advanced.ipcMaxPayload > 0 ? 10_000 : 1);
-		this.broker = new IPCBrokerManager(this);
+		this.broker = new IPCBrokerManager((channelName, message, clusterId) => this.sendBroker(channelName, message, clusterId), (message) => this._debug(message));
 		this.heartbeat = new HeartbeatManager(this);
 		this.reCluster = new ReClusterManager(this);
 		this.clusterQueue = new Queue({
@@ -296,6 +296,25 @@ export class ClusterManager<
 		if (failures.length && !this.options.advanced.logMessagesInDebug) throw new AggregateError(failures, 'CLUSTER_BROADCAST_FAILED | One or more clusters rejected the message.');
 	}
 
+	private async sendBroker<T extends Serializable>(channelName: string, message: SerializableInput<T>, clusterId?: number): Promise<void> {
+		const targets = clusterId === undefined ? [...this.clusters.values()] : [this.clusters.get(clusterId)];
+		if (clusterId !== undefined && !targets[0]) throw new Error(`BROKER_INVALID_CLUSTER_ID | Cluster ${clusterId} does not exist.`);
+
+		this._debug(`The broker is delivering a message on channel ${channelName} to ${targets.length} cluster${targets.length === 1 ? '' : 's'}.`);
+		const failures: Error[] = [];
+
+		for (const cluster of targets) {
+			if (!cluster) continue;
+			try {
+				await cluster._sendInstance({ _type: MessageTypes.BrokerMessage, data: { broker: channelName, _data: message } });
+			} catch (error: unknown) {
+				failures.push(error instanceof Error ? error : new Error(String(error)));
+			}
+		}
+
+		if (failures.length) throw new AggregateError(failures, 'CLUSTER_BROKER_FAILED | One or more clusters rejected the broker message.');
+	}
+
 	public async eval<T, P extends object>(script: string | ((manager: this, context: Serialized<P> | undefined) => Awaitable<T>), options?: { context?: P }): Promise<ValidIfSerializable<T>> {
 		if (typeof script === 'function') return await script(this, options?.context);
 		return await new Function('manager', 'context', `return (${script})`).call(this, this, options?.context);
@@ -445,6 +464,9 @@ export class ClusterManager<
 			case MessageTypes.ClientBroadcast:
 				return this.handleClientBroadcast(wire);
 
+			case MessageTypes.BrokerMessage:
+				return this.handleBrokerMessage(cluster, wire);
+
 			case MessageTypes.ClientRespawnAll:
 				return this.respawnAllMessage(cluster, wire);
 
@@ -525,6 +547,14 @@ export class ClusterManager<
 		await this.broadcast(data.message, data.ignore);
 	}
 
+	private async handleBrokerMessage(cluster: RefCluster<InternalClient>, message: BaseMessage<DataType>): Promise<void> {
+		const data = brokerPayloadFromValue(message.data);
+		if (!data) return;
+
+		this._debug(`Cluster ${cluster.id} delivered a broker message on channel ${data.broker}.`);
+		this.broker._receive(data.broker, data.message);
+	}
+
 	private async respawnAllMessage(_cluster: RefCluster<InternalClient>, message: BaseMessage<DataType>): Promise<void> {
 		const data = respawnDataFromMessage(message.data);
 		await this.respawnAll(data?.clusterDelay, data?.respawnDelay, data?.timeout, data?.except);
@@ -558,16 +588,18 @@ export class ClusterManager<
 
 	/* ----------------------------------- Internal ----------------------------------- */
 
-	public requestFromCluster<T>(cluster: RefCluster<InternalClient>, message: BaseMessage<DataType>, timeout = this.options.advanced.ipcTimeout): Promise<T> {
+	public async requestFromCluster<T>(cluster: RefCluster<InternalClient>, message: BaseMessage<DataType>, timeout = this.options.advanced.ipcTimeout): Promise<T> {
 		const nonce = message._nonce ?? ShardingUtils.generateNonce();
 		message._nonce = nonce;
 		const pending = this.promise.create<T>(this.promiseKey(cluster, nonce), timeout);
-		return cluster
-			._sendInstance(message)
-			.catch((error: unknown) => {
-				this.promise.reject(this.promiseKey(cluster, nonce), error instanceof Error ? error : new Error(String(error)));
-			})
-			.then(() => pending);
+
+		try {
+			await cluster._sendInstance(message);
+		} catch (error: unknown) {
+			this.promise.reject(this.promiseKey(cluster, nonce), error instanceof Error ? error : new Error(String(error)));
+		}
+
+		return await pending;
 	}
 
 	private promiseKey(cluster: RefCluster<InternalClient>, nonce: string): string {
