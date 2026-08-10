@@ -1,5 +1,5 @@
 {
-	"version": "2.0.0",
+	"version": "2.0.0-next.0",
 	"name": "status-sharding",
 	"description": "A sharding manager that is easy to use and has a lot of features.",
 	"repository": "https://github.com/Status-Team/Status-Sharding",
