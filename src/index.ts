@@ -1,20 +1,15 @@
-export * from './classes/child';
-export * from './classes/worker';
-
-export * from './core/clusterManager';
-export * from './core/clusterClient';
-export * from './core/cluster';
-export * from './core/client';
-
-export * from './handlers/message';
-export * from './handlers/promise';
-export * from './handlers/queue';
-
-export * from './other/shardingUtils';
-export * from './other/message';
-export * from './other/utils';
-
-export * from './plugins/heartbeat';
-export * from './plugins/reCluster';
-
-export * from './types';
+export * from './classes/child.js';
+export * from './classes/listen.js';
+export * from './classes/worker.js';
+export * from './core.js';
+export * from './handlers/broker.js';
+export * from './handlers/message.js';
+export * from './handlers/promise.js';
+export * from './handlers/queue.js';
+export * from './other/map.js';
+export * from './other/message.js';
+export * from './other/shardingUtils.js';
+export * from './other/utils.js';
+export * from './plugins/heartbeat.js';
+export * from './plugins/reCluster.js';
+export * from './types.js';

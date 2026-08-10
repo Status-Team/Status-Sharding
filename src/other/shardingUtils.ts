@@ -1,153 +1,122 @@
-import { DefaultOptions, Endpoints, PackageType, ValidIfSerializable } from '../types';
-import { randomBytes } from 'crypto';
+import type { GatewayBotInfo, PackageType, Serializable } from '../types.js';
+import { performance } from 'node:perf_hooks';
+import { randomBytes } from 'node:crypto';
 
-/** Sharding utils. */
+export const MAX_TIMER_DELAY = 2_147_483_647;
+
 export class ShardingUtils {
-	/** Generates a nonce. */
-	public static generateNonce(): string {
-		return randomBytes(10).toString('hex');
+	public static monotonicNow(): number {
+		return performance.now();
 	}
 
-	/** Chunks an array into smaller arrays. */
-	public static chunkArray<T>(array: T[], chunkSize: number, equalize = false): T[][] {
-		const R = [] as T[][];
+	public static generateNonce(): string {
+		return randomBytes(16).toString('hex');
+	}
 
-		if (equalize) chunkSize = Math.ceil(array.length / (Math.ceil(array.length / chunkSize)));
+	public static async delayFor(milliseconds: number): Promise<void> {
+		if (!Number.isFinite(milliseconds) || milliseconds < 0) throw new RangeError('TIMER_DELAY_INVALID | Delay must be non-negative.');
 
-		for (let i = 0; i < array.length; i += chunkSize) {
-			R.push(array.slice(i, i + chunkSize));
+		let remaining = milliseconds;
+		while (remaining > MAX_TIMER_DELAY) {
+			await new Promise<void>((resolve) => setTimeout(resolve, MAX_TIMER_DELAY));
+			remaining -= MAX_TIMER_DELAY;
 		}
 
-		return R;
+		await new Promise<void>((resolve) => setTimeout(resolve, remaining));
 	}
 
-	/** Delays for a certain amount of time. */
-	public static delayFor(ms: number): Promise<void> {
-		return new Promise<void>((resolve) => {
-			setTimeout(resolve, ms);
+	public static validateTimerDelay(value: number, name: string, minimum = 0): number {
+		if (!Number.isFinite(value) || value < minimum || value > MAX_TIMER_DELAY) throw new RangeError(`${name} must be between ${minimum} and ${MAX_TIMER_DELAY} milliseconds.`);
+		return value;
+	}
+
+	public static chunkArray<T>(values: readonly T[], chunkSize: number): T[][] {
+		if (!Number.isInteger(chunkSize) || chunkSize < 1) throw new RangeError('CHUNK_SIZE_INVALID | Chunk size must be a positive integer.');
+
+		const chunks: T[][] = [];
+		for (let index = 0; index < values.length; index += chunkSize) chunks.push(values.slice(index, index + chunkSize));
+
+		return chunks;
+	}
+
+	public static shardIdForGuildId(guildId: string, totalShards: number): number {
+		if (!/^\d+$/.test(guildId) || !Number.isInteger(totalShards) || totalShards < 1) throw new TypeError('GUILD_SHARD_INPUT_INVALID | Guild ID and total shard count are invalid.');
+		return Number((BigInt(guildId) >> 22n) % BigInt(totalShards));
+	}
+
+	public static clusterIdForShardId(shardId: number, totalShards: number, totalClusters: number): number {
+		if (!Number.isInteger(shardId) || shardId < 0 || shardId >= totalShards) throw new RangeError('SHARD_ID_INVALID | Shard ID is outside the configured topology.');
+		if (!Number.isInteger(totalShards) || totalShards < 1 || !Number.isInteger(totalClusters) || totalClusters < 1) throw new RangeError('TOPOLOGY_INVALID | Shard and cluster counts must be positive integers.');
+
+		return Math.min(totalClusters - 1, Math.floor(shardId / Math.ceil(totalShards / totalClusters)));
+	}
+
+	public static clusterIdForGuildId(guildId: string, totalShards: number, totalClusters: number): number {
+		return this.clusterIdForShardId(this.shardIdForGuildId(guildId, totalShards), totalShards, totalClusters);
+	}
+
+	public static isSerializable(value: unknown): value is Serializable {
+		const seen = new Set<object>();
+
+		const visit = (candidate: unknown): boolean => {
+			if (candidate === null || candidate === undefined || typeof candidate === 'string' || typeof candidate === 'boolean') return true;
+			if (typeof candidate === 'number') return Number.isFinite(candidate);
+			if (typeof candidate !== 'object' || seen.has(candidate)) return false;
+			seen.add(candidate);
+
+			if (Array.isArray(candidate)) return candidate.every(visit);
+			if (Object.getPrototypeOf(candidate) !== Object.prototype && Object.getPrototypeOf(candidate) !== null) return false;
+			return Object.values(candidate).every(visit);
+		};
+
+		return visit(value);
+	}
+
+	public static parseInput<T>(input: string | ((...args: unknown[]) => T), context?: unknown, packageType?: PackageType | null, ...argumentsList: string[]): string {
+		if (typeof input === 'string') return input;
+		const receiver = packageType === '@discordjs/core' ? 'client' : 'this';
+		const contextSource = context === undefined ? 'undefined' : JSON.stringify(context);
+		return `(${input.toString()})(${receiver},${contextSource}${argumentsList.length ? `,${argumentsList.join(',')}` : ''})`;
+	}
+
+	public static async getGatewayBotInfo(token: string, api = 'https://discord.com/api', timeout = 10_000): Promise<GatewayBotInfo> {
+		if (!token?.trim()) throw new Error('DISCORD_TOKEN_MISSING | A bot token is required when shard counts are automatic.');
+		const response = await fetch(`${api}/v10/gateway/bot`, {
+			headers: { Authorization: `Bot ${token.replace(/^Bot\s+/i, '')}` },
+			signal: AbortSignal.timeout(timeout),
 		});
-	}
 
-	/** Checks if a value is serializable. */
-	public static isSerializable<T>(value: T): value is T & ValidIfSerializable<T> {
-		if (typeof value === 'object' && value !== null && value.constructor !== Object && value.constructor !== Array) return false;
-		else if (typeof value === 'function') return false;
-		else if (typeof value === 'symbol') return false;
+		if (response.status === 401) throw new Error('DISCORD_TOKEN_INVALID | Discord rejected the bot token.');
+		if (!response.ok) throw new Error(`DISCORD_GATEWAY_BOT_FAILED | Discord returned HTTP ${response.status}.`);
+		
+		const body = await response.json();
+		if (!isRecord(body)) throw new Error('DISCORD_GATEWAY_BOT_INVALID | Discord returned incomplete gateway metadata.');
 
-		return true;
-	}
-
-	/** Removes all non-existing values from an array. */
-	public static removeNonExisting<T>(array: (T | undefined)[]): T[] | undefined {
-		return array.reduce((acc: T[], item: T | undefined) => {
-			if (item !== undefined && item !== null) acc.push(item);
-			return acc;
-		}, []);
-	}
-
-	/** Makes an error plain. */
-	public static makePlainError(err: Error): { name: string; message: string; stack: string; } {
-		const removeStuff = <T extends string>(v: T) => v.replace(/(\n|\r|\t)/g, '').replace(/( )+/g, ' ').replace(/(\/\/.*)/g, '');
-
+		const limit = body.session_start_limit;
+		if (typeof body.url !== 'string' || !Number.isInteger(body.shards) || Number(body.shards) < 1 || !isRecord(limit) || !Number.isInteger(limit.total) || !Number.isInteger(limit.remaining) || !Number.isFinite(limit.reset_after) || !Number.isInteger(limit.max_concurrency)) throw new Error('DISCORD_GATEWAY_BOT_INVALID | Discord returned incomplete gateway metadata.');
+		
 		return {
-			name: removeStuff(err.name),
-			message: removeStuff(err.message),
-			stack: removeStuff(err.stack?.replace(': ' + err.message, '') || ''),
+			url: body.url,
+			shards: Number(body.shards),
+			sessionStartLimit: {
+				total: Number(limit.total),
+				remaining: Number(limit.remaining),
+				resetAfter: Number(limit.reset_after),
+				maxConcurrency: Number(limit.max_concurrency),
+			},
 		};
 	}
 
-	/** Merges two objects. */
-	public static mergeObjects<T extends object>(main: Partial<T>, toMerge: Partial<T>): T {
-		const merged: Partial<T> = { ...toMerge };
-
-		for (const key in main) {
-			if (Object.prototype.hasOwnProperty.call(main, key)) {
-				if (typeof main[key] === 'object' && !Array.isArray(main[key])) {
-					merged[key] = ShardingUtils.mergeObjects(toMerge[key] ?? {}, main[key] ?? {}) as T[Extract<keyof T, string>];
-				} else {
-					merged[key] = main[key];
-				}
-			}
-		}
-
-		return merged as T;
+	public static makePlainError(error: unknown): { name: string; message: string; stack?: string } {
+		const normalized = error instanceof Error ? error : new Error(String(error));
+		return {
+			name: normalized.name.slice(0, 128),
+			message: normalized.message.slice(0, 4_096),
+			stack: normalized.stack?.slice(0, 8_192),
+		};
 	}
-	/** Gets the shard id for a guild id. */
-	public static shardIdForGuildId(guildId: string, totalShards: number): number {
-		if (!guildId?.match(/^[0-9]+$/)) throw new Error('No valid GuildId Provided (#1).');
-		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided (#1).');
+}
 
-		const shard = Number(BigInt(guildId) >> BigInt(22)) % totalShards;
-		if (shard < 0) throw new Error('SHARD_MISCALCULATION_SHARDID_SMALLER_THAN_0 ' + `Calculated Shard: ${shard}, guildId: ${guildId}, totalShards: ${totalShards}`);
-
-		return shard;
-	}
-
-	/** Gets the cluster id for a shard id. */
-	public static clusterIdForShardId(shardId: string, totalShards: number, totalClusters: number): number {
-		if (!shardId?.match(/^[0-9]+$/)) throw new Error('No valid Shard Id Provided.');
-		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided (#2).');
-		else if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided (#1).');
-
-		const middlePart = Number(shardId) === 0 ? 0 : Number(shardId) / Math.ceil(totalShards / totalClusters);
-		return Number(shardId) === 0 ? 0 : (Math.ceil(middlePart) - (middlePart % 1 !== 0 ? 1 : 0));
-	}
-
-	/** Gets the cluster id for a guild id. */
-	public static clusterIdForGuildId(guildId: string, totalShards: number, totalClusters: number): number {
-		if (!guildId?.match(/^[0-9]+$/)) throw new Error('No valid GuildId Provided (#2).');
-		else if (isNaN(totalShards) || totalShards < 1) throw new Error('No valid TotalShards Provided (#3).');
-		else if (isNaN(totalClusters) || totalClusters < 1) throw new Error('No valid TotalClusters Provided (#2).');
-
-		const shardId = this.shardIdForGuildId(guildId, totalShards);
-		return this.clusterIdForShardId(shardId.toString(), totalShards, totalClusters);
-	}
-
-	/** Gets the cluster id for a shard id. */
-	public static async getRecommendedShards(token: string, guildsPerShard: number = 1000, options = DefaultOptions): Promise<number> {
-		if (!token) throw new Error('DISCORD_TOKEN_MISSING | No token was provided to ClusterManager options.');
-
-		const response = await fetch(`${options.http.api}/v${options.http.version}${Endpoints.botGateway}`, {
-			method: 'GET',
-			headers: { Authorization: `Bot ${token.replace(/^Bot\s*/i, '')}` },
-		}).then((res) => {
-			if (res.ok) return res.json() as Promise<{ shards: number }>;
-			else if (res.status === 401) throw new Error('DISCORD_TOKEN_INVALID | The provided token was invalid.');
-
-			throw res;
-		});
-
-		return response.shards * (1000 / guildsPerShard);
-	}
-
-	public static parseInput<T>(input: string | T, context?: unknown, packageType?: PackageType | null, ...args: string[]): string {
-		if (typeof input === 'string') return input;
-		else if (typeof input === 'function') {
-			if (packageType === '@discordjs/core') return `(${input.toString()})(client,${context ? JSON.stringify(context) : undefined}${args.length ? ',' + args.join(',') : ''})`;
-			return `(${input.toString()})(this,${context ? JSON.stringify(context) : undefined}${args.length ? ',' + args.join(',') : ''})`;
-		}
-
-		throw new Error('INVALID_INPUT_TYPE | The input provided was not a string or a function.');
-	}
-
-	public static boolProp<T extends string>(input: unknown, key: T): T | `not ${T}` {
-		return input ? key : `not ${key}` as T | `not ${T}`;
-	}
-
-	public static relativeTime(time?: number): string {
-		if (!time) return 'never';
-
-		const date = new Date(time);
-		const now = new Date();
-
-		const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-		const minutes = Math.floor(seconds / 60);
-		const hours = Math.floor(minutes / 60);
-		const days = Math.floor(hours / 24);
-
-		if (seconds < 60) return `${seconds} seconds ago`;
-		else if (minutes < 60) return `${minutes} minutes ago`;
-		else if (hours < 24) return `${hours} hours ago`;
-		else return `${days} days ago`;
-	}
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

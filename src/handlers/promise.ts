@@ -1,58 +1,67 @@
-import { MessageTypes, Serializable, StoredPromise } from '../types';
-import { BaseMessage, DataType } from '../other/message';
-import { ClusterManager } from '../core/clusterManager';
-import { ClusterClient } from '../core/clusterClient';
-
-/** Handles promises by storing them in a map and resolving them when the response is received. */
 export class PromiseHandler {
-	/** List of promises and their unique identifiers. */
-	nonces: Map<string, StoredPromise> = new Map();
+	private readonly pending = new Map<
+		string,
+		{ timer: NodeJS.Timeout; resolve(value: unknown): void; reject: (error: Error) => void }
+	>();
 
-	/** Creates an instance of PromiseHandler. */
-	constructor(private instance: ClusterManager | ClusterClient) {}
+	constructor (private readonly defaultTimeout = 30_000, private readonly maxPending = 10_000) { }
 
-	/** Resolves the promise with the data received. */
-	public resolve<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): void {
-		const promise = this.nonces.get(message._nonce);
-		if (!promise) return this.instance._debug(`Received a message with an unknown nonce: ${message._nonce}`);
+	public create<T>(nonce: string, timeout = this.defaultTimeout): Promise<T> {
+		if (this.pending.has(nonce)) throw new Error('IPC_NONCE_DUPLICATE | A request with this nonce is already pending.');
+		if (this.pending.size >= this.maxPending) throw new Error('IPC_PENDING_LIMIT | Too many pending IPC requests.');
 
-		if (promise.timeout) clearTimeout(promise.timeout);
-		this.nonces.delete(message._nonce);
+		return new Promise<T>((resolve, reject) => {
+			const timer = setTimeout(() => {
+				this.pending.delete(nonce);
+				reject(new Error(`IPC_TIMEOUT | Request ${nonce} timed out.`));
+			}, timeout);
 
-		const errorTypes = [
-			MessageTypes.ClientEvalResponseError,
-			MessageTypes.ClientManagerEvalResponseError,
-			MessageTypes.ClientBroadcastResponseError,
-		];
-
-		if (!errorTypes.includes(message._type)) {
-			promise.resolve(message.data);
-			return;
-		}
-
-		const data = message.data as Partial<BaseMessage<'error'>['data']>;
-		const error = new Error([data.message, data.stack].filter(Boolean).join('\n') || 'Unknown IPC error');
-
-		if (data.script) error.cause = data.script;
-		if (data.stack) error.stack = data.stack;
-		if (data.name) error.name = data.name;
-
-		promise.reject(error);
-
-		console.error('An error occurred while resolving an IPC promise:', data);
-	}
-
-	/** Creates a promise and stores it in the map. */
-	public async create<T>(nonce: string, timeout?: number): Promise<T> {
-		return await new Promise<T>((resolve, reject) => {
-			if (timeout === undefined || timeout < 0) this.nonces.set(nonce, { resolve, reject });
-			else this.nonces.set(nonce, {
-				resolve, reject,
-				timeout: setTimeout(() => {
-					this.nonces.delete(nonce);
-					reject(new Error('Promise timed out.'));
-				}, timeout) as NodeJS.Timeout,
+			this.pending.set(nonce, {
+				timer,
+				resolve(value: T): void {
+					resolve(value);
+				},
+				reject,
 			});
 		});
+	}
+
+	public resolve<T>(nonce: string, value: T): boolean {
+		const entry = this.pending.get(nonce);
+		if (!entry) return false;
+
+		clearTimeout(entry.timer);
+		this.pending.delete(nonce);
+		entry.resolve(value);
+		return true;
+	}
+
+	public reject(nonce: string, error: Error): boolean {
+		const entry = this.pending.get(nonce);
+		if (!entry) return false;
+
+		clearTimeout(entry.timer);
+		this.pending.delete(nonce);
+		entry.reject(error);
+
+		return true;
+	}
+
+	public rejectAll(error: Error): void {
+		for (const entry of this.pending.values()) {
+			clearTimeout(entry.timer);
+			entry.reject(error);
+		}
+		
+		this.pending.clear();
+	}
+
+	public rejectMatching(predicate: (nonce: string) => boolean, error: Error): void {
+		for (const [nonce, entry] of this.pending) {
+			if (!predicate(nonce)) continue;
+			clearTimeout(entry.timer);
+			this.pending.delete(nonce);
+			entry.reject(error);
+		}
 	}
 }

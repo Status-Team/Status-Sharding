@@ -1,285 +1,357 @@
-import { ChildProcess, Serializable as ChildSerializable } from 'child_process';
-import { WorkerThreadOptions } from './classes/worker';
-import { ClusterManager } from './core/clusterManager';
-import { ChildProcessOptions } from './classes/child';
-import { ClusterClient } from './core/clusterClient';
-import { ProcessMessage } from './other/message';
-import { Cluster } from './core/cluster';
-import { Worker } from 'worker_threads';
+import type { ChildProcess, ForkOptions } from 'node:child_process';
+import type { Worker, WorkerOptions } from 'node:worker_threads';
+import type { ProcessMessage } from './other/message.js';
 
-/** Default options for fetching the bot gateway. */
-export const DefaultOptions = {
-	http: {
-		api: 'https://discord.com/api',
-		version: '10',
-	},
-};
+/* ----------------------------------- Core ----------------------------------- */
 
-/** Endpoints for the discord api. */
-export const Endpoints = {
-	botGateway: '/gateway/bot',
-};
-
-/** The types of data that can be sent. */
-export enum MessageTypes {
-	'MissingType' = 0,
-	'CustomRequest' = 1,
-	'CustomMessage' = 2,
-	'CustomReply' = 3,
-	'Heartbeat' = 4,
-	'HeartbeatAck' = 5,
-	'ClientBroadcast' = 6,
-	'ClientBroadcastRequest' = 7,
-	'ClientBroadcastResponse' = 8,
-	'ClientBroadcastResponseError' = 9,
-	'ClientRespawn' = 10,
-	'ClientRespawnAll' = 11,
-	'ClientSpawnNextCluster' = 16,
-	'ClientReady' = 17,
-	'ClientEvalRequest' = 18,
-	'ClientEvalResponse' = 19,
-	'ClientEvalResponseError' = 20,
-	'ClientManagerEvalRequest' = 21,
-	'ClientManagerEvalResponse' = 22,
-	'ClientManagerEvalResponseError' = 23,
-	'ManagerReady' = 24,
-	'Kill' = 25,
-	'ClientRespawnSpecific' = 26,
-}
-
-/** Recursive array of strings. */
-export type RecursiveStringArray = (RecursiveStringArray | string)[];
-/** Supported library packages. */
+export type ClusteringMode = 'process' | 'worker';
 export type PackageType = 'discord.js' | '@discordjs/core';
-
-/** Awaitable type. */
 export type Awaitable<T> = T | PromiseLike<T>;
-/** Mode for clustering. */
-export type ClusteringMode = 'worker' | 'process';
-/** Any function. */
-export type UnknownFunction = (...args: unknown[]) => unknown;
-/** Data for restart sysytem. */
-export type HeartbeatData = { restarts: number; missedBeats: number; killing: boolean; };
-/** Type that removes null and undefined from a type. */
-export type DeepNonNullable<T> = T extends NonNullable<T> ? T : DeepNonNullable<NonNullable<T>>;
-/** Check for function's outputs. */
-export type ValidIfSerializable<T> = T extends NonNullable<Serializable> ? (T | undefined) : never;
-/** Check if input is serializable. */
-export type SerializableInput<T, U = false> = T extends Serializable ? T : T extends unknown ? U : never;
-/** Output of guild function parser. */
-export type DeconstructedFunction = { args: (string | string[])[], body: string, wrapScope: boolean, wrapArgs: boolean; isAsync: boolean; };
-/** Any object or data. */
-export type Serializable = string | number | boolean | null | undefined | Serializable[] | { [key: string]: Serializable } | object | ChildSerializable;
-/** Already serialized data. */
-export type Serialized<T> = T extends symbol | bigint | UnknownFunction ? never : T extends ValidIfSerializable<T> ? T : (T extends { toJSON(): infer R } ? R : T extends ReadonlyArray<infer V> ? Serialized<V>[] : (T extends ReadonlyMap<unknown, unknown> | ReadonlySet<unknown> ? object : (T extends object ? { [K in keyof T]: Serialized<T[K]> } : T)));
 
-/** Options for the cluster manager. */
-export interface ClusterManagerCreateOptions<T extends ClusteringMode> {
-	/** What mode to use for clustering. */
-	mode?: T;
-	/** The token of the discord bot. */
-	token?: string;
-	/** Number of total internal shards or -1. */
-	totalShards?: number;
-	/** Number of total Clusters/Process to spawn. */
-	totalClusters?: number;
-	/** Number of shards per cluster. */
-	shardsPerClusters?: number;
-	/** Arguments to pass to the clustered script when spawning (only available when using the `process` mode). */
-	shardArgs?: string[];
-	/** Arguments to pass to the clustered script executable when spawning. */
-	execArgv?: string[];
-	/** Whether clusters should automatically respawn upon exiting. */
-	respawn?: boolean;
-	/** Whether a cluster should acknowledge heartbeat while the internal client is not ready. Defaults to `true`. */
-	respondToHeartbeatWhenNotReady?: boolean;
-	/** Heartbeat options. */
-	heartbeat?: ClusterHeartbeatOptions;
-	/** Control the Spawn Queue. */
-	queueOptions?: QueueOptions;
-	/** Options to pass to the spawn, respawn method. */
-	spawnOptions?: ClusterSpawnOptions;
-	/** Data, which is passed to the Cluster. */
-	clusterData?: object;
-	/** Options, which is passed when forking a child or creating a thread. */
-	clusterOptions?: T extends 'worker' ? WorkerThreadOptions : ChildProcessOptions;
-	/** Advanced. */
-	advanced?: Partial<ClusterManagerAdvancedOptions>;
+export enum MessageTypes {
+	MissingType = 0,
+	CustomRequest = 1,
+	CustomMessage = 2,
+	CustomReply = 3,
+	Heartbeat = 4,
+	HeartbeatAck = 5,
+	ClientBroadcast = 6,
+	ClientBroadcastRequest = 7,
+	ClientBroadcastResponse = 8,
+	ClientBroadcastResponseError = 9,
+	ClientRespawn = 10,
+	ClientRespawnAll = 11,
+	ClientSpawnNextCluster = 16,
+	ClientReady = 17,
+	ClientEvalRequest = 18,
+	ClientEvalResponse = 19,
+	ClientEvalResponseError = 20,
+	ClientManagerEvalRequest = 21,
+	ClientManagerEvalResponse = 22,
+	ClientManagerEvalResponseError = 23,
+	ManagerReady = 24,
+	Kill = 25,
+	ClientRespawnSpecific = 26,
+	ClientUnready = 27,
 }
 
-/** Options for the cluster manager. */
-export interface ClusterManagerOptions<T extends ClusteringMode> extends ClusterManagerCreateOptions<T> {
-	/** Which mode to use for clustering. */
-	mode: T;
-	/** Number of total internal shards or -1. */
+export type Serializable = string | number | boolean | null | undefined | Serializable[] | { [key: string]: Serializable };
+
+export type SerializableInput<T> = T extends Serializable ? T : Serializable;
+
+export type Serialized<T> = T;
+
+export type ValidIfSerializable<T> = Serialized<T>;
+
+/* ----------------------------------- Gateway ----------------------------------- */
+
+export interface GatewaySessionStartLimit {
+	total: number;
+	remaining: number;
+	resetAfter: number;
+	maxConcurrency: number;
+}
+
+export interface GatewayBotInfo {
+	url: string;
+	shards: number;
+	sessionStartLimit: GatewaySessionStartLimit;
+}
+
+export interface ClusterHeartbeatOptions {
+	enabled?: boolean;
+	interval?: number;
+	timeout?: number;
+	maxMissedHeartbeats?: number;
+	maxRestarts?: number;
+	restartWindow?: number;
+	restartBackoff?: number;
+	maxRestartBackoff?: number;
+}
+
+export interface ClusterSpawnOptions {
+	delay?: number;
+	timeout?: number;
+}
+
+export interface QueueOptions {
+	mode?: 'auto' | 'manual';
+	timeout?: number;
+}
+
+export interface AdvancedOptions {
+	ipcTimeout?: number;
+	ipcMaxPayload?: number;
+	terminationTimeout?: number;
+	forceKillAfter?: number;
+	queueUntilReady?: boolean;
+	logMessagesInDebug?: boolean;
+}
+
+/* ----------------------------------- Manager ----------------------------------- */
+
+export interface ClusterManagerCreateOptions<Mode extends ClusteringMode = ClusteringMode> {
+	mode?: Mode;
+	token?: string;
+
+	totalShards?: number;
+	totalClusters?: number;
+	shardsPerClusters?: number;
+	shardArgs?: string[];
+	execArgv?: string[];
+	respawn?: boolean;
+
+	heartbeat?: ClusterHeartbeatOptions;
+	spawnOptions?: ClusterSpawnOptions;
+	queueOptions?: QueueOptions;
+
+	clusterData?: Record<string, string | number | boolean>;
+	clusterOptions?: Mode extends 'worker' ? WorkerOptions : ForkOptions;
+	advanced?: AdvancedOptions;
+}
+
+export interface ClusterManagerOptions extends Omit<
+	ClusterManagerCreateOptions,
+	'clusterOptions' | 'clusterData' | 'heartbeat' | 'spawnOptions' | 'queueOptions' | 'mode'
+> {
+	mode: ClusteringMode;
+
 	totalShards: number;
-	/** Number of total Clusters/Process to spawn. */
 	totalClusters: number;
-	/** Number of shards per cluster. */
 	shardsPerClusters: number;
-	/** Whether a cluster should acknowledge heartbeat while the internal client is not ready. */
-	respondToHeartbeatWhenNotReady: boolean;
-	/** An Array of Internal Shards Ids, which should get spawned. */
-	shardList: number[];
-	/** An Array of Ids to assign to the spawned Clusters, when the default id scheme is not wanted. */
-	clusterList: number[];
-	/** Options to pass to the spawn, respawn method. */
-	spawnOptions: Required<ClusterSpawnOptions>;
-	/** Heartbeat options. */
+	shardArgs: string[];
+	execArgv: string[];
+
+	clusterData: Record<string, string | number | boolean>;
+	clusterOptions?: ForkOptions | WorkerOptions;
+
 	heartbeat: Required<ClusterHeartbeatOptions>;
-	/** Package type. */
+	spawnOptions: Required<ClusterSpawnOptions>;
+	queueOptions: Required<QueueOptions>;
+	advanced: Required<AdvancedOptions>;
 	packageType: PackageType | null;
 }
 
-/** Advanced options for cluster manager. */
-export interface ClusterManagerAdvancedOptions {
-	/** Whether to spam when debugging. */
-	logMessagesInDebug: boolean;
-	/** Whether to ignore dead clusters, WARNING: If you have null-checks in your code, this might false trigger that whatever you want to do results in null (ei. getting guild from cluster that is dead). */
-	proceedBroadcastIfClusterDead: boolean;
-}
-
-/** Data of ClusterClient. */
 export interface ClusterClientData {
-	/** List of shards that are assigned to this cluster. */
 	ShardList: number[];
-	/** The total amount of shards. */
 	TotalShards: number;
-	/** The total amount of clusters. */
 	ClusterCount: number;
-	/** The id of the cluster. */
 	ClusterId: number;
-	/** Mode of the manager. */
 	ClusterManagerMode: ClusteringMode;
-	/** Mode of the queue. */
-	ClusterQueueMode?: 'auto' | 'manual';
-	/** Whether the client should acknowledge heartbeat while not ready. */
-	RespondToHeartbeatWhenNotReady: boolean;
-	/** First shard id of the cluster. */
+
+	ClusterQueueMode: 'auto' | 'manual';
+	QueueUntilReady: boolean;
+	IpcTimeout: number;
+	IpcMaxPending: number;
+	IpcMaxPayload: number;
+
 	FirstShardId: number;
-	/** Last shard id of the cluster. */
 	LastShardId: number;
 }
 
-/** Spawn options for the cluster. */
-export interface ClusterSpawnOptions {
-	/** How long to wait between spawning each cluster. */
-	delay?: number;
-	/** How long to wait for a cluster to become ready before killing it and retrying. */
-	timeout?: number;
+/* ----------------------------------- Lifecycle ----------------------------------- */
+
+export type ClusterLifecycleState = 'stopped' | 'starting' | 'ready' | 'running' | 'degraded' | 'stopping' | 'failed';
+export type ClusterLifecycleReason =
+	| 'spawn'
+	| 'ready'
+	| 'heartbeat-timeout'
+	| 'client-unready'
+	| 'ipc-disconnect'
+	| 'process-exit'
+	| 'spawn-timeout'
+	| 'spawn-error'
+	| 'termination-unverified'
+	| 'manual-kill'
+	| 'manual-respawn'
+	| 'automatic-recovery'
+	| 'manager-shutdown'
+	| 'restart-budget-exhausted'
+	| 'recluster'
+	| 'unknown';
+
+export interface ClusterLifecycleRecord {
+	clusterId: number;
+	generation: number;
+	state: ClusterLifecycleState;
+	previousState: ClusterLifecycleState;
+	desired: 'running' | 'stopped';
+	reason: ClusterLifecycleReason;
+	timestamp: number;
+	pid: number | null;
+	exitCode: number | null;
+	signal: NodeJS.Signals | null;
+	restartAttempt: number;
+	error?: Error;
 }
 
-/** Data for the heartbeat system. */
-export interface ClusterHeartbeatOptions {
-	/** Whether the heartbeat system is enabled. */
-	enabled: boolean;
-	/** Maximum amount of missed heartbeats a cluster can have in the interval. */
-	maxMissedHeartbeats?: number;
-	/** Maximum amount of restarts a cluster can have in the interval. */
-	maxRestarts?: number;
-	/** Interval in milliseconds between each heartbeat. */
-	interval?: number;
-	/** Timeout in milliseconds after which a cluster will be considered as unresponsive. */
-	timeout?: number;
-}
-
-/** Options for the queue. */
-export interface QueueOptions {
-	/** Whether the spawn queue be automatically managed. */
-	mode?: 'auto' | 'manual';
-	/** Time to wait until next item. */
-	timeout?: number;
-}
-
-/** Kill options for the cluster. */
 export interface ClusterKillOptions {
-	/** The reason for killing the cluster. */
-	reason: string;
+	reason?: string;
+	lifecycleReason?: 'manual-kill' | 'manager-shutdown' | 'recluster';
 }
 
-/** Eval options for the cluster. */
-export interface EvalOptions<T extends object = object> {
-	/** Only run the script in a single cluster or set of clusters. */
+export interface EvalOptions<Context extends object = object> {
 	cluster?: number | number[];
-	/** On what shard to run the script. */
 	shard?: number | number[];
-	/** On what guild to run the script. */
 	guildId?: string;
-	/** Context to use for the script. */
-	context?: T;
-	/** Timeout before the script is cancelled. */
+	context?: Context;
 	timeout?: number;
-	/** Whether to continue running the script even if one of the clusters returns an error. */
 	useAllSettled?: boolean;
 }
 
-/** Mode for reclustering. */
 export type ReClusterRestartMode = 'gracefulSwitch' | 'rolling';
 
-/** Options for reclustering. */
 export interface ReClusterOptions {
-	/** The new totalShards of the bot. */
 	totalShards?: number;
-	/** The amount of totalClusters to spread the shards over all clusters. */
 	totalClusters?: number;
-	/** The amount of shards per cluster. */
 	shardsPerClusters?: number;
-
-	/** The restartMode of the clusterManager, gracefulSwitch = waits until all new clusters have spawned, rolling = once the Cluster is ready, the old cluster will be killed. */
 	restartMode?: ReClusterRestartMode;
 }
 
-/** Options for storing promises. */
-export interface StoredPromise {
-	/** Timeout before promise is canceled. */
-	timeout?: NodeJS.Timeout;
+/* ----------------------------------- Events ----------------------------------- */
 
-	/** Resolves the promise. */
-	resolve(value: unknown): void;
-	/** Return an error if failed. */
-	reject(error: Error): void;
-}
-
-/** Events that manager emits. */
-export interface ClusterManagerEvents {
-	/** Emits when client sends a request via IPC. */
-	clientRequest: [message: ProcessMessage];
-	/** Emits when cluster is created. */
-	clusterCreate: [cluster: Cluster];
-	/** Emits when cluster is ready. */
-	clusterReady: [cluster: Cluster];
-	/** Emits when any message is sent from IPC. */
-	message: [message: ProcessMessage];
-	/** Debug events. */
-	debug: [debugMessage: string];
-	/** When all manager's clsuters are ready. */
-	ready: [manager: ClusterManager];
-}
-
-/** Events that cluster emits. */
-export interface ClusterEvents {
-	/** Emits when any message is sent from IPC. */
-	message: [message: ProcessMessage];
-	/** Emits when cluster dies. */
-	death: [cluster: Cluster, thread: ChildProcess | Worker | null];
-	/** Emits when cluster is spawned. */
-	spawn: [cluster: Cluster, thread: ChildProcess | Worker | null];
-	/** Emits when cluster is ready. */
-	ready: [cluster: Cluster];
-	/** Emits when debug message is sent. */
+export interface ClusterManagerEvents<
+	InternalManager extends RefClusterManager = RefClusterManager,
+	InternalCluster extends RefCluster = RefCluster,
+> {
+	clientRequest: [message: ProcessMessage<DataType>];
+	clusterCreate: [cluster: InternalCluster];
+	clusterReady: [cluster: InternalCluster];
+	clusterDeath: [cluster: InternalCluster, record: ClusterLifecycleRecord];
+	clusterLifecycle: [cluster: InternalCluster, record: ClusterLifecycleRecord];
+	clusterRestart: [cluster: InternalCluster, record: ClusterLifecycleRecord];
+	clusterError: [cluster: InternalCluster, error: Error];
+	message: [message: ProcessMessage<DataType>];
 	debug: [message: string];
-	/** Emits when there is an error. */
+	ready: [manager: InternalManager];
+	shutdown: [manager: InternalManager];
+}
+
+export interface ClusterEvents<
+	InternalManager extends RefClusterManager = RefClusterManager,
+	InternalCluster extends RefCluster = RefCluster,
+> {
+	spawn: [cluster: InternalCluster, thread: ChildProcess | Worker | null];
+	ready: [cluster: InternalCluster];
+	death: [cluster: InternalCluster, thread: ChildProcess | Worker | null];
+	restart: [record: ClusterLifecycleRecord];
+	lifecycle: [record: ClusterLifecycleRecord];
+	degraded: [record: ClusterLifecycleRecord];
+	message: [message: ProcessMessage<DataType>];
+	debug: [message: string];
 	error: [error: Error];
+	manager: [manager: InternalManager];
 }
 
-/** Events that cluster client emits. */
-export interface ClusterClientEvents {
-	/** Emits when all clusters are ready. */
+export interface ClusterClientEvents<InternalClient extends ClientRefType = ClientRefType> {
+	ready: [client: InternalClient];
 	managerReady: [];
-	/** Emits when message is sent from IPC. */
-	message: [message: ProcessMessage];
-	/** Emits when cluster is ready. */
-	ready: [clusterClient: ClusterClient];
-	/** Emits when debug message is sent. */
+	unready: [client: InternalClient];
+	message: [message: ProcessMessage<DataType>];
 	debug: [message: string];
 }
+
+/* ----------------------------------- References ----------------------------------- */
+
+export interface RefClusterManager {
+	readonly options: ClusterManagerOptions;
+	ready: boolean;
+	readonly clusters: ReadonlyMap<number, RefCluster>;
+	_debug(message: string): void;
+}
+
+export interface RefCluster<InternalClient extends ClientRefType = ClientRefType> {
+	readonly id: number;
+	readonly shardList: number[];
+	readonly thread: { process: ChildProcess | Worker | null } | null;
+	readonly exited: boolean;
+	readonly respawning: boolean;
+	readonly ready: boolean;
+	readonly generationNumber: number;
+	readonly lifecycleState?: string;
+	spawn(timeout?: number): Promise<ChildProcess | Worker>;
+
+	kill(options?: ClusterKillOptions): Promise<void>;
+
+	respawn(delay?: number, timeout?: number): Promise<ChildProcess | Worker>;
+
+	send<T extends Serializable>(message: SerializableInput<T>): Promise<void>;
+
+	request<T extends Serializable, O = unknown>(message: SerializableInput<T>, options?: { timeout?: number }): Promise<Serialized<O>>;
+
+	evalOnClient<T, P extends object>(script: string | ((client: InternalClient, context: Serialized<P> | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+
+	evalOnGuild<T, P extends object>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P> | undefined, guild: unknown) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+
+	eval<T, P extends object>(script: string | ((cluster: unknown, context: Serialized<P> | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+
+	_sendInstance(message: BaseMessage<DataType>): Promise<void>;
+
+	_setHeartbeat(timestamp: number): void;
+
+	_markDegraded(reason: ClusterLifecycleReason): void;
+
+	_setReady(generation: number, packageType?: PackageType | null): void;
+
+	_unexpectedExit(generation: number, exitCode: number | null, signal: NodeJS.Signals | null, reason: ClusterLifecycleReason): void;
+
+	emit(event: string | symbol, ...args: unknown[]): boolean;
+
+	on<K extends keyof ClusterEvents>(event: K, listener: (...args: ClusterEvents[K]) => void): this;
+}
+
+/* ----------------------------------- Messages ----------------------------------- */
+
+export type DataType = 'normal' | 'reply' | 'eval' | 'respawnAll' | 'respawnSome' | 'readyOrSpawn' | 'heartbeat' | 'heartbeatAck' | 'error';
+
+export interface EvalMessage<Context extends object = object> {
+	script: string;
+	options?: EvalOptions<Context>;
+}
+
+export interface RespawnMessage {
+	clusterDelay?: number;
+	respawnDelay?: number;
+	timeout?: number;
+	except?: number[];
+}
+
+export interface RespawnSomeMessage extends RespawnMessage {
+	clusterIds: number[];
+}
+
+export interface DataTypes<Value = Serializable, Context extends object = object> {
+	normal: Value;
+	reply: Value;
+
+	eval: EvalMessage<Context>;
+	respawnAll: RespawnMessage;
+	respawnSome: RespawnSomeMessage;
+
+	readyOrSpawn: { packageType?: PackageType | null; reason?: string } | undefined;
+	heartbeat: { nonce: string; sentAt: number };
+	heartbeatAck: { nonce: string; receivedAt: number; ready: boolean; error?: string };
+	error: { name: string; message: string; stack?: string };
+}
+
+export interface BaseMessage<D extends DataType, Value = Serializable, Context extends object = object> {
+	_type: MessageTypes;
+	_nonce?: string;
+	_clusterId?: number;
+	_generation?: number;
+	data?: DataTypes<Value, Context>[D];
+}
+
+export type BaseMessageInput<D extends DataType, Value extends Serializable = Serializable> = Omit<BaseMessage<D, Value>, '_nonce'>;
+
+export interface RefShardingClient {
+	readonly cluster: unknown;
+	login(...args: unknown[]): Promise<unknown>;
+}
+
+export interface RefShardingCoreClient {
+	readonly cluster: unknown;
+}
+
+export type ClientRefType = RefShardingClient | RefShardingCoreClient;
+export type ClientRefTypeLike = ClientRefType;

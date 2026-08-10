@@ -1,93 +1,77 @@
-import { Worker as WorkerThread, workerData } from 'worker_threads';
-import type { RefShardingCoreClient } from 'src/core/coreClient';
-import { ClusterClientData, PackageType } from '../types';
-import { ClientRefType } from 'src/core/clusterClient';
-import { ChildProcess } from 'child_process';
+import type { ClusterClientData, ClusteringMode } from '../types.js';
+import { Worker, workerData } from 'node:worker_threads';
+import type { ChildProcess } from 'node:child_process';
+
+function integer(value: unknown, name: string, minimum: number): number {
+	const result = Number(value);
+	if (!Number.isInteger(result) || result < minimum) throw new Error(`INVALID_CLUSTER_METADATA | ${name} must be an integer >= ${minimum}.`);
+	return result;
+}
 
 export function getInfo(): ClusterClientData {
-	const clusterMode = process.env.CLUSTER_MANAGER_MODE;
-	if (clusterMode !== 'worker' && clusterMode !== 'process') throw new Error('NO_CLUSTER_MANAGER_MODE | ClusterManager Mode is not defined in the environment variables.');
+	const workerMetadata = isRecord(workerData) ? workerData : undefined;
+	const modeValue = stringValue(workerMetadata?.STATUS_CLUSTER_MODE) ?? process.env.STATUS_CLUSTER_MODE;
+	const mode: ClusteringMode = modeValue === 'worker' ? 'worker' : 'process';
+	
+	const source: unknown = mode === 'worker' ? workerMetadata : process.env;
+	if (mode !== 'process' && mode !== 'worker') throw new Error('NO_CLUSTER_MANAGER_MODE | Cluster metadata is missing.');
 
-	let data: ClusterClientData;
+	if (!source || typeof source !== 'object') throw new Error('NO_CLUSTER_MANAGER_MODE | Cluster metadata is missing.');
+	const record: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(source)) record[key] = value;
 
-	if (clusterMode === 'process') {
-		const shardList = (process.env.SHARD_LIST || '')
-			.replace(/\[|\]/g, '')
-			.split(',')
-			.map((value) => Number(value.trim()))
-			.filter((value) => Number.isInteger(value) && value >= 0);
+	const shards = Array.isArray(record.STATUS_SHARD_LIST) ? record.STATUS_SHARD_LIST.map(Number) : JSON.parse(String(record.STATUS_SHARD_LIST ?? '[]'));
+	if (!Array.isArray(shards) || shards.length === 0) throw new Error('INVALID_CLUSTER_METADATA | No shard IDs were assigned.');
 
-		data = {
-			ShardList: shardList,
-			TotalShards: Number(process.env.TOTAL_SHARDS),
-			ClusterCount: Number(process.env.CLUSTER_COUNT),
-			ClusterId: Number(process.env.CLUSTER),
-			ClusterManagerMode: clusterMode,
-			ClusterQueueMode: process.env.CLUSTER_QUEUE_MODE as 'auto' | 'manual',
-			RespondToHeartbeatWhenNotReady: process.env.RESPOND_TO_HEARTBEAT_WHEN_NOT_READY === 'true',
-			FirstShardId: shardList[0] ?? 0,
-			LastShardId: shardList[shardList.length - 1] ?? 0,
-		};
-	} else {
-		const shardList = Array.isArray(workerData.SHARD_LIST) ? workerData.SHARD_LIST : [];
-		const respondToHeartbeatWhenNotReady = workerData.RESPOND_TO_HEARTBEAT_WHEN_NOT_READY === true
-			|| workerData.RESPOND_TO_HEARTBEAT_WHEN_NOT_READY === 'true';
+	const totalShards = integer(record.STATUS_TOTAL_SHARDS, 'STATUS_TOTAL_SHARDS', 1);
+	const shardList = shards.map((shard) => integer(shard, 'STATUS_SHARD_LIST', 0));
+	if (shardList.some((shard) => shard >= totalShards) || new Set(shardList).size !== shardList.length) throw new Error('INVALID_CLUSTER_METADATA | Shard list contains an invalid or duplicate ID.');
+	
+	const clusterCount = integer(record.STATUS_CLUSTER_COUNT, 'STATUS_CLUSTER_COUNT', 1);
+	const clusterId = integer(record.STATUS_CLUSTER_ID, 'STATUS_CLUSTER_ID', 0);
+	const queueMode = record.STATUS_QUEUE_MODE === 'manual' ? 'manual' : 'auto';
+	const queueUntilReady = record.STATUS_QUEUE_UNTIL_READY === true || record.STATUS_QUEUE_UNTIL_READY === 'true';
 
-		data = {
-			ShardList: shardList,
-			TotalShards: workerData.TOTAL_SHARDS,
-			ClusterCount: workerData.CLUSTER_COUNT,
-			ClusterId: workerData.CLUSTER,
-			ClusterManagerMode: clusterMode,
-			ClusterQueueMode: workerData.CLUSTER_QUEUE_MODE,
-			RespondToHeartbeatWhenNotReady: respondToHeartbeatWhenNotReady,
-			FirstShardId: shardList[0] ?? 0,
-			LastShardId: shardList[shardList.length - 1] ?? 0,
-		};
-	}
-
-	return data;
+	return {
+		ShardList: shardList,
+		TotalShards: totalShards,
+		ClusterCount: clusterCount,
+		ClusterId: clusterId,
+		ClusterManagerMode: mode,
+		ClusterQueueMode: queueMode,
+		QueueUntilReady: queueUntilReady,
+		IpcTimeout: integer(record.STATUS_IPC_TIMEOUT ?? 30_000, 'STATUS_IPC_TIMEOUT', 1_000),
+		IpcMaxPending: integer(record.STATUS_IPC_MAX_PENDING ?? 10_000, 'STATUS_IPC_MAX_PENDING', 1),
+		IpcMaxPayload: integer(record.STATUS_IPC_MAX_PAYLOAD ?? 8 * 1024 * 1024, 'STATUS_IPC_MAX_PAYLOAD', 1_024),
+		FirstShardId: first(shardList),
+		LastShardId: last(shardList),
+	};
 }
 
-export async function getDiscordVersion(type: PackageType) {
-	try {
-		const { version } = await import(type);
-		const [major = 0, minor = 0, patch = 0] = version.split('.').map(Number) as [number, number, number];
-
-		return { major, minor, patch, raw: version };
-	} catch (error) {
-		throw new Error(`Failed to get version of ${type}: ${(error as Error).message}`, { cause: error });
-	}
+function first<T>(values: T[]): T {
+	const value = values[0];
+	if (value === undefined) throw new Error('INVALID_CLUSTER_METADATA | No first value exists.');
+	return value;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function detectLibraryFromClient(client: any): PackageType | null {
-	if (!client) return null;
-
-	if (client.constructor?.name === 'Client' && 'guilds' in client && 'users' in client && 'channels' in client && typeof client.login === 'function' && !('api' in client)) {
-		return 'discord.js';
-	}
-
-	if (client.constructor?.name === 'Client' && 'api' in client && 'rest' in client && 'gateway' in client && typeof client.api === 'object') {
-		return '@discordjs/core';
-	}
-
-	if (client instanceof Object) {
-		if ('guilds' in client && 'users' in client && !('api' in client)) return 'discord.js';
-		if ('api' in client || (client.client && 'api' in client.client)) return '@discordjs/core';
-	}
-
-	return null;
+function last<T>(values: T[]): T {
+	const value = values[values.length - 1];
+	if (value === undefined) throw new Error('INVALID_CLUSTER_METADATA | No last value exists.');
+	return value;
 }
 
-export function isCoreClient(client: ClientRefType): client is RefShardingCoreClient {
-	return detectLibraryFromClient(client) === '@discordjs/core';
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function isWorkerThread(process: ChildProcess | WorkerThread): process is WorkerThread {
-	return 'threadId' in process;
+function stringValue(value: unknown): string | undefined {
+	return typeof value === 'string' ? value : undefined;
 }
 
-export function isChildProcess(process: ChildProcess | WorkerThread): process is ChildProcess {
-	return 'pid' in process;
+export function isWorkerThread(value: ChildProcess | Worker): value is Worker {
+	return value instanceof Worker;
+}
+
+export function isChildProcess(value: ChildProcess | Worker): value is ChildProcess {
+	return !isWorkerThread(value);
 }

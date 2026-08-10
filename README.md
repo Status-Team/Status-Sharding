@@ -1,143 +1,221 @@
-## Introduction
+# Status Sharding 2
 
-Welcome to Status Sharding! This package is designed to provide an efficient and flexible solution for sharding Discord bots, allowing you to scale your bot across multiple processes or workers.
+Status Sharding is a process/worker cluster manager for Discord bots. It keeps
+shard ownership deterministic, gives every cluster a generation-scoped IPC
+channel, and recovers failed runtimes without spawning a replacement beside a
+live one.
 
-## Features
+## Highlights
 
-- **Efficient Sharding**: The sharding package utilizes an optimized sharding algorithm to distribute bot functionality across multiple shards and clusters.
-- **Enhanced Performance**: Improve your bot's performance by leveraging the power of parallel processing and multi-threading.
-- **Flexible Configuration**: Easily configure the number of shards, clusters, and other parameters to suit your bot's needs.
-- **Comprehensive Documentation**: Detailed documentation and usage examples are provided to help you get started quickly.
-- **Scalability**: Scale your bot's capabilities by distributing the workload across multiple processes or workers.
-- **Customizable**: Extend and customize the sharding package to adapt it to your specific requirements.
-- **Discord.js Core Library Support**: Works seamlessly with **discord.js** as well as its **core sub-libraries** (e.g., `@discordjs/rest`, `@discordjs/ws`, etc.).
-- **Cross Hosting Support**: _Comming soon!_
+- Process (`child_process.fork`) and worker-thread runtimes.
+- Discord.js and `@discordjs/core` child clients.
+- Automatic shard/cluster topology calculation.
+- Serialized spawn, kill, and respawn operations.
+- Heartbeats that observe ready clusters without restarting a cluster during
+  gateway startup or shutdown.
+- SIGTERM-then-SIGKILL termination with verification and a hard deadline.
+- Generation-scoped IPC requests so replies from an old process cannot resolve
+  a new process's request.
+- ESM and CommonJS package entry points.
 
-## Comparison
+## Requirements
 
-Here's a comparison between Status Sharding, Discord Hybrid Sharding and Discord.js Sharding.
+- Node.js 20 or newer.
+- `discord.js` for `ShardingClient` (a peer dependency).
+- `@discordjs/core`, `@discordjs/rest`, and `@discordjs/ws` when using
+  `ShardingCoreClient` (optional peer dependencies).
 
-| Feature                     | Status Sharding | Discord Hybrid Sharding | Discord.js Sharding |
-| --------------------------- | --------------- | ----------------------- | ------------------- |
-| Flexible configuration      | ✔️              | ✔️                      | ✔️                  |
-| Clustering Support          | ✔️              | ✔️                      | ❌                  |
-| Processes & Workers         | ✔️              | ✔️                      | ❌                  |
-| Comprehensive documentation | ✔️              | ❌                      | ❌                  |
-| Performance optimization    | ✔️              | ❌                      | ❌                  |
-| Discord.js core lib support | ✔️              | ❌                      | ❌                  |
-
-## Installation
+## Install
 
 ```bash
-npm install status-sharding
-pnpm add status-sharding
-yarn add status-sharding
+pnpm add status-sharding discord.js
 ```
 
-## Usage
+The package provides both module formats:
 
-### Basic Cluster Setup
-
-This example demonstrates how to set up a cluster manager with Status Sharding. It works with any client implementation, providing automated shard distribution and cluster management.
-
-```javascript
-// import { ClusterManager } from 'status-sharding';
-const { ClusterManager } = require("status-sharding");
-
-const manager = new ClusterManager("./path-to-client.js", {
-  mode: "worker", // or process
-  token: "very-secret-token", // optional, for auto-calculation leave empty
-  totalShards: 1, // leave empty for auto calculation
-  totalClusters: 1, // shards are distributed over clusters
-  shardsPerClusters: 1,
-});
-
-manager.on("clusterReady", (cluster) => {
-  console.log(`Cluster ${cluster.id} is ready.`);
-});
-
-manager.on("ready", () => console.log("All clusters are ready."));
-
-manager.spawn();
+```ts
+import { ClusterManager } from 'status-sharding';
 ```
 
-> **Note:** Replace `'./path-to-client.js'` with your actual client file path, and `'very-secret-token'` with your Discord bot token.
+```js
+const { ClusterManager } = require('status-sharding');
+```
 
----
+## Documentation
 
-### Usage with discord.js
+Read [the usage and operations guide](./docs/USAGE.md) for manager setup, child clients, IPC, evaluation, heartbeat recovery, manual queues, re-clustering, and shutdown.
 
-Here’s a minimal example of using Status Sharding with **discord.js**. It leverages the `ShardingClient` class to handle shards automatically.
+Read [the v1 migration guide](./docs/MIGRATION.md) before upgrading an existing deployment.
 
-```javascript
-// import { ShardingClient } from 'status-sharding';
-// import { GatewayIntentBits, Events } from 'discord.js';
-const { ShardingClient } = require("status-sharding");
-const { GatewayIntentBits, Events } = require("discord.js");
+## Cluster manager
+
+The manager launches the file once per cluster. Shard IDs are passed through
+the environment and command-line arguments. Keep the token in an environment
+variable rather than in source control.
+
+```ts
+import { ClusterManager } from 'status-sharding';
+
+const manager = new ClusterManager('./dist/cluster.js', {
+  mode: 'process', // or 'worker'
+  token: process.env.DISCORD_TOKEN,
+  totalShards: 6,
+  totalClusters: 3,
+  shardsPerClusters: 2,
+  respawn: true,
+  heartbeat: {
+    enabled: true,
+    interval: 5_000,
+    timeout: 15_000,
+    maxMissedHeartbeats: 3,
+    maxRestarts: 10,
+  },
+  spawnOptions: {
+    delay: 8_000,
+    timeout: 120_000,
+  },
+  advanced: {
+    queueUntilReady: true,
+  },
+});
+
+manager.on('clusterReady', (cluster) => {
+  console.log(`cluster ${cluster.id} ready: ${cluster.shardList.join(',')}`);
+});
+
+manager.on('clusterDeath', (cluster, record) => {
+  console.error('cluster lifecycle failure', cluster.id, record);
+});
+
+manager.on('clusterError', (cluster, error) => {
+  console.error(`cluster ${cluster.id} error`, error);
+});
+
+manager.on('debug', (message) => console.debug(message));
+
+await manager.spawn();
+```
+
+When using a custom cluster class, override the protected factory so the
+runtime instance matches the manager's `InternalCluster` type:
+
+```ts
+class BotManager extends ClusterManager<BotClient, BotCluster> {
+	protected createClusterInstance(id: number, shards: readonly number[]): BotCluster {
+		return new BotCluster(this, id, [...shards]);
+	}
+}
+```
+
+Debug messages are emitted through the manager and cluster `debug` events only;
+the package never writes debug output directly. Multiple concurrent termination
+requests share one tracked termination operation, so a second request cannot
+start a competing kill sequence for the same runtime.
+
+Set `advanced.queueUntilReady` to `true` when child-side operations may be
+called before the Discord client becomes ready. Those operations wait in order,
+emit debug messages when queued and released, and reject with a debug message
+if the operation fails or the IPC channel closes. The default is `false`, which
+preserves the immediate `CLUSTERING_NOT_READY` rejection.
+
+When `totalShards` is `-1` (the default), a token is required so the manager
+can query Discord's gateway metadata. Set the counts explicitly in tests or
+when the gateway metadata is managed elsewhere.
+
+## Discord.js child
+
+Each process receives only its assigned shards. The cluster client reports
+ready after the Discord.js client is ready. Heartbeat acknowledgements always
+confirm IPC/process liveness; gateway readiness is tracked separately.
+
+```ts
+import { GatewayIntentBits } from 'discord.js';
+import { ShardingClient } from 'status-sharding';
 
 const client = new ShardingClient({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+  intents: [GatewayIntentBits.Guilds],
 });
 
-client.once(Events.ClientReady, () => {
-  console.log("Ready!");
+client.once('clientReady', () => {
+  console.log(`cluster ${client.cluster.id} ready`);
 });
 
-client.login("very-secret-token");
+await client.login(process.env.DISCORD_TOKEN);
 ```
 
-This setup ensures your bot scales efficiently without requiring manual shard management.
+## `@discordjs/core` child
 
----
+Install the core packages and import the core client from the `./core`
+subpath:
 
-### Usage with @discordjs/core
-
-For developers using **@discordjs/core**, Status Sharding provides `ShardingCoreClient` to integrate seamlessly with the core library and REST API.
-
-```javascript
-// import { ShardingCoreClient } from 'status-sharding/core';
-// import { GatewayDispatchEvents, GatewayIntentBits } from '@discordjs/core';
-const { ShardingCoreClient } = require("status-sharding/core");
-const { GatewayDispatchEvents, GatewayIntentBits } = require("@discordjs/core");
+```ts
+import { GatewayIntentBits } from '@discordjs/core';
+import { ShardingCoreClient } from 'status-sharding/core';
 
 const client = new ShardingCoreClient({
-  token: "very-secret-token",
+  token: process.env.DISCORD_TOKEN ?? '',
   gateway: {
-    intents: GatewayIntentBits.Guilds | GatewayIntentBits.GuildMembers,
+    intents: GatewayIntentBits.Guilds,
   },
-  rest: {
-    version: "10",
-  },
+  rest: { version: '10' },
 });
 
-client.once(GatewayDispatchEvents.Ready, () => {
-  console.log("Ready!");
-});
-
-client.gateway.connect();
+await client.gateway.connect();
 ```
 
-This example demonstrates full integration with `@discordjs/core`, including gateway connection and event handling, while still benefiting from automated shard and cluster management.
+## Lifecycle safety
 
----
+There is one lifecycle owner per cluster. A runtime is not replaced until its
+old process or worker is confirmed dead. On an unexpected process exit:
 
-For more information, please refer to the [documentation](https://help.crni.xyz/status-sharding/introduction).
+1. One `death` event is emitted for the affected generation.
+2. Pending IPC requests for that generation are rejected.
+3. The runtime is terminated, escalating from SIGTERM to SIGKILL.
+4. Recovery waits for the configured backoff and starts a new generation only
+   after termination is verified.
 
----
+If the runtime remains alive after both signals and the hard deadline, the
+manager emits `clusterError`, emits a `termination-unverified` lifecycle record,
+raises a `CLUSTERING_TERMINATION_UNVERIFIED` process warning, and suppresses
+automatic respawn. On Linux, debug output includes the `/proc` state; `D`
+means the process is blocked in uninterruptible kernel I/O and cannot be fixed
+from JavaScript.
 
-## Credits
+Heartbeat probes skip clusters in `starting` and `stopping` states. This is
+intentional: Discord gateway startup can take longer than one heartbeat
+interval and must not be mistaken for a crashed process. Restart limits are
+enforced inside the configured restart window.
 
-- This clone was created by [Digital](https://crni.xyz/). The original can be found [here](https://github.com/meister03/discord-hybrid-sharding).
-- Special thanks to maintainers for their work on the initial package, which served as the foundation for this clone. Their contributions are greatly appreciated.
-- Please note that this clone is an independent project and may have diverged from the original discord-hybrid-sharding package in certain aspects.
+Always shut down a manager during process termination:
 
-## Dependencies
+```ts
+process.once('SIGTERM', () => void manager.shutdown());
+process.once('SIGINT', () => void manager.shutdown());
+```
 
-- [discord.js](https://www.npmjs.com/package/discord.js) (v14.14.1 or higher)
-- [@discordjs/core](https://www.npmjs.com/package/@discordjs/core) (v2.2.1, optional)
-- [@discordjs/rest](https://www.npmjs.com/package/@discordjs/rest) (v2.6.0, optional)
-- [@discordjs/ws](https://www.npmjs.com/package/@discordjs/ws) (v2.0.3, optional)
+## Evaluation and IPC
+
+The manager and cluster clients expose `broadcastEval`, `evalOnClusterClient`,
+`evalOnCluster`, and `evalOnGuild`. Requests have bounded timeouts, payload
+limits, and generation-aware nonces. Do not use evaluation for untrusted input;
+it executes code in the target runtime.
+
+## Development
+
+```bash
+pnpm install
+pnpm run check
+pnpm run test
+pnpm run docs
+```
+
+`pnpm run test` type-checks and builds ESM (`.js`) and CommonJS (`.cjs`)
+outputs together in `dist/`. Documentation is generated outside the repository in
+`/tmp/status-sharding-docs`; the GitHub Actions Pages workflow publishes it
+without committing a `docs/` directory.
+
+Live API documentation: <https://status-team.github.io/Status-Sharding/>.
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0. See the [LICENSE](./LICENSE) file for details.
+GPL-3.0. See [LICENSE](./LICENSE).

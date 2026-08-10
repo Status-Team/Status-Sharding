@@ -1,9 +1,8 @@
-import { ClientEvents, ClientOptions, Client as DiscordClient } from 'discord.js';
-import { getDiscordVersion, getInfo } from '../other/utils';
-import { RefClusterManager } from './clusterManager';
-import { ClusterClient } from './clusterClient';
+import { Client, type ClientEvents, type ClientOptions } from 'discord.js';
+import type { RefClusterManager } from '../types.js';
+import { ClusterClient } from './clusterClient.js';
+import { getInfo } from '../other/utils.js';
 
-/** Modified ClientEvents such that the ready event has the ShardingClient instead of the normal Client. */
 export type ClientEventsModifiable = Omit<ClientEvents, 'ready' | 'clientReady'> & {
 	ready: [client: ShardingClient];
 	clientReady: [client: ShardingClient];
@@ -11,51 +10,42 @@ export type ClientEventsModifiable = Omit<ClientEvents, 'ready' | 'clientReady'>
 
 export type ShardingClientOptions = ClientOptions;
 
-/** Modified DiscordClient with bunch of new methods. */
 export class ShardingClient<
 	Ready extends boolean = boolean,
 	InternalManager extends RefClusterManager = RefClusterManager,
-> extends DiscordClient<Ready> {
-	/** Cluster associated with this client. */
-	cluster: ClusterClient<this, InternalManager>;
+> extends Client<Ready> {
+	public readonly cluster: ClusterClient<this, InternalManager>;
 
-	/** Creates an instance of ShardingClient. */
 	constructor (options: ShardingClientOptions) {
-		super({
-			...options,
-			shards: getInfo().ShardList,
-			shardCount: getInfo().TotalShards,
+		const info = getInfo();
+
+		super({ ...options, shards: info.ShardList, shardCount: info.TotalShards });
+		this.cluster = new ClusterClient<this, InternalManager>(this);
+
+		const synchronize = () => void this.synchronizeHealth();
+		const unready = () => void this.cluster._applyHealthState(false).catch((error: unknown) => {
+			this.cluster._debug(`Health synchronization failed with ${error instanceof Error ? error.message : String(error)}.`)
 		});
 
-		this.cluster = new ClusterClient<this, InternalManager>(this);
-		this.shardsReady();
+		this.on('clientReady', synchronize);
+		this.on('shardReady', synchronize);
+		this.on('shardResume', synchronize);
+		this.on('shardDisconnect', unready);
+		this.on('shardReconnecting', unready);
 	}
 
-	private async shardsReady() {
-		let readyEvent: 'ready' | 'clientReady';
-
+	private async synchronizeHealth(): Promise<void> {
 		try {
-			const { major, minor } = await getDiscordVersion('discord.js');
-			readyEvent = major > 14 || (major === 14 && minor >= 22) ? 'clientReady' : 'ready';
-		} catch {
-			readyEvent = 'ready';
+			await this.cluster._applyHealthState(await this.cluster.isReadyForHeartbeatAck());
+		} catch (error: unknown) {
+			this.cluster._debug(`Health synchronization failed with ${error instanceof Error ? error.message : String(error)}.`);
 		}
-
-		this.once(readyEvent, () => this.cluster.triggerReady());
 	}
 }
 
-export type RefShardingClient = ShardingClient;
-
-export declare interface ShardingClient {
-	/** Emit an event. */
-	emit: (<K extends keyof ClientEventsModifiable>(event: K, ...args: ClientEventsModifiable[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, ...args: unknown[]) => boolean);
-	/** Remove an event listener. */
-	off: (<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void) => this);
-	/** Listen for an event. */
-	on: (<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void) => this);
-	/** Listen for an event once. */
-	once: (<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void) => this);
-	/** Remove all listeners for an event. */
-	removeAllListeners: (<K extends keyof ClientEventsModifiable>(event?: K) => this) & (<S extends string | symbol>(event?: Exclude<S, keyof ClientEventsModifiable>) => this);
+export declare interface ShardingClient<Ready extends boolean = boolean, InternalManager extends RefClusterManager = RefClusterManager> {
+	on<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	once<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	off<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	emit<K extends keyof ClientEventsModifiable>(event: K, ...args: ClientEventsModifiable[K]): boolean;
 }

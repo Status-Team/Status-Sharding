@@ -1,0 +1,8 @@
+{
+	"$schema": "https://typedoc.org/schema.json",
+	"entryPoints": ["src/index.ts", "src/core.ts"],
+	"out": "/tmp/status-sharding-docs",
+	"validation": { "notExported": false },
+	"excludePrivate": true,
+	"hideGenerator": true
+}

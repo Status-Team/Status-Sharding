@@ -1,35 +1,25 @@
 {
-	"version": "1.9.11",
+	"version": "2.0.0",
 	"name": "status-sharding",
-	"packageManager": "pnpm@10.18.2",
-	"author": "Digital39999",
-	"scripts": {
-		"ts": "pnpm install typescript --save-dev -g",
-		"init": "pnpm install && pnpm run build && pnpm run start",
-		"start": "node dist/index.js",
-		"build": "tsc --build",
-		"watch": "tsc --watch",
-		"lint": "eslint .",
-		"docs": "pnpm typedoc --out docs src --validation.notExported false",
-		"updates": "pnpm npm-check-updates -i --format group",
-		"prepublish": "pnpm run build && pnpm run docs"
-	},
-	"main": "dist/index.js",
-	"types": "dist/index.d.ts",
+	"description": "A sharding manager that is easy to use and has a lot of features.",
 	"repository": "https://github.com/Status-Team/Status-Sharding",
-	"license": "MIT",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"require": "./dist/index.js",
-			"import": "./dist/index.js"
-		},
-		"./core": {
-			"types": "./dist/core.d.ts",
-			"require": "./dist/core.js",
-			"import": "./dist/core.js"
-		}
+	"author": "Digital39999",
+	"type": "module",
+	"scripts": {
+		"build": "tsup src/index.ts src/core.ts --clean --dts --format esm,cjs --sourcemap --target node20",
+		"watch": "tsup src/index.ts src/core.ts --dts --format esm,cjs --sourcemap --target node20 --watch",
+		"typecheck": "tsc --noEmit",
+		"test": "pnpm run typecheck && pnpm run build",
+		"docs": "typedoc",
+		"start": "node --no-deprecation dist/index.js",
+		"lint": "eslint . --cache --cache-location node_modules/.cache/eslint",
+		"lint:fix": "eslint . --fix --cache --cache-location node_modules/.cache/eslint",
+		"check": "pnpm run typecheck && pnpm run lint",
+		"docker:start": "pnpm start",
+		"updates": "pnpm dlx npm-check-updates -i --format group"
 	},
+	"main": "dist/index.cjs",
+	"types": "./dist/index.d.ts",
 	"typesVersions": {
 		"*": {
 			"core": [
@@ -37,48 +27,41 @@
 			]
 		}
 	},
-	"keywords": [
-		"discord",
-		"discord.js",
-		"sharding",
-		"discord-sharding",
-		"discord-bot",
-		"discord-sharding-bot",
-		"discord-bot-sharding",
-		"discord-bot-sharding-example",
-		"discord-sharding-example",
-		"discord.js-sharding-example",
-		"discord.js-bot-sharding-example",
-		"discord.js-sharding",
-		"discord.js-bot-sharding",
-		"discord.js-sharding-example",
-		"discord.js-bot-sharding-example",
-		"discord.js-sharding-example",
-		"discord.js-bot-sharding-example"
-	],
-	"devDependencies": {
-		"@discordjs/core": "^2.6.0",
-		"@discordjs/rest": "^2.6.3",
-		"@discordjs/ws": "^2.0.4",
-		"@eslint/js": "^10.0.1",
-		"@types/node": "26.1.1",
-		"@typescript-eslint/eslint-plugin": "8.65.0",
-		"@typescript-eslint/parser": "8.65.0",
-		"discord.js": "^14.27.0",
-		"eslint": "^10.8.0",
-		"typescript": "5.9.3",
-		"typescript-eslint": "^8.65.0"
+	"exports": {
+		".": {
+			"require": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/index.cjs"
+			},
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"default": "./dist/index.js"
+		},
+		"./core": {
+			"require": {
+				"types": "./dist/core.d.cts",
+				"default": "./dist/core.cjs"
+			},
+			"import": {
+				"types": "./dist/core.d.ts",
+				"default": "./dist/core.js"
+			},
+			"default": "./dist/core.js"
+		}
+	},
+	"license": "GPL-3.0",
+	"engines": {
+		"node": ">=20.0.0"
 	},
 	"peerDependencies": {
-		"@discordjs/core": ">=2.6.0",
-		"@discordjs/rest": ">=2.6.3",
-		"@discordjs/ws": ">=2.0.4",
-		"discord.js": ">=14.27.0"
+		"@discordjs/core": ">=2.2.1",
+		"@discordjs/rest": ">=2.6.0",
+		"@discordjs/ws": ">=2.0.3",
+		"discord.js": ">=14.14.1"
 	},
 	"peerDependenciesMeta": {
-		"discord.js": {
-			"optional": false
-		},
 		"@discordjs/core": {
 			"optional": true
 		},
@@ -89,30 +72,24 @@
 			"optional": true
 		}
 	},
-	"engines": {
-		"node": ">=18.4.0"
-	},
-	"dependencies": {
-		"net-ipc": "^2.2.0"
-	},
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"msgpackr-extract"
-		],
-		"overrides": {
-			"minimatch@<3.1.5": "3.1.5",
-			"brace-expansion@<1.1.16": "1.1.16",
-			"cross-spawn@<7.0.6": "7.0.6",
-			"flatted@<3.4.3": "3.4.3",
-			"ajv@<6.14.0": "6.14.0",
-			"js-yaml@>=4.0.0 <5.0.0": "4.3.0",
-			"lodash@<4.18.1": "4.18.1",
-			"ws@<8.21.1": "8.21.1"
-		}
+	"packageManager": "pnpm@10.33.0",
+	"devDependencies": {
+		"@discordjs/core": "^2.2.1",
+		"@discordjs/rest": "^2.6.0",
+		"@discordjs/ws": "^2.0.3",
+		"@eslint/js": "^10.0.1",
+		"@stylistic/eslint-plugin": "^5.10.0",
+		"@types/node": "^26.1.2",
+		"discord.js": "^14.27.0",
+		"eslint": "^10.8.0",
+		"tsup": "^8.5.1",
+		"typedoc": "^0.28.14",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.66.0"
 	},
 	"files": [
-		"src/**/*",
 		"dist/**/*",
-		"README.md"
+		"src/**/*",
+		"sharding.md"
 	]
 }

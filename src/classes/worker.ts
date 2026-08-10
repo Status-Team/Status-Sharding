@@ -1,148 +1,188 @@
-import { Worker as WorkerThread, WorkerOptions, parentPort, MessagePort } from 'worker_threads';
-import { ListenerManager, WorkerThreadEventMap } from './listen';
-import { Serializable, SerializableInput } from '../types';
+import WorkerThreads from 'node:worker_threads';
 
-export interface WorkerThreadOptions extends WorkerOptions {
-	/** Data to send to the cluster. */
-	clusterData?: NodeJS.ProcessEnv | undefined;
+export interface WorkerThreadOptions extends WorkerThreads.WorkerOptions {
+	clusterData?: Record<string, string | number | boolean>;
+
+	terminationTimeout?: number;
+	ipcMaxPayload?: number;
+}
+
+export interface WorkerClientOptions {
+	ipcMaxPayload?: number;
+}
+
+interface TerminationOperation<T> {
+	target: T;
+	promise: Promise<boolean>;
 }
 
 export class Worker {
-	/** The worker process. */
-	public process: WorkerThread | null = null;
-	/** The options for the worker process. */
-	public workerOptions: WorkerOptions;
+	public process: WorkerThreads.Worker | null = null;
 
-	/** Type-safe listener manager */
-	private _listeners = new ListenerManager<WorkerThreadEventMap>();
+	private readonly options: WorkerThreads.WorkerOptions;
+	private readonly terminationTimeout: number;
+	private readonly ipcMaxPayload: number;
 
-	/** Creates an instance of Worker. */
-	constructor (private file: string, options: WorkerThreadOptions) {
-		this.workerOptions = {
-			workerData: options.clusterData,
-			...options,
-		};
+	private readonly debugEmitter?: (message: string) => void;
+	private readonly exited = new WeakSet<WorkerThreads.Worker>();
+	private terminationOperation?: TerminationOperation<WorkerThreads.Worker>;
+
+	constructor (private readonly file: string, options: WorkerThreadOptions, debugEmitter?: (message: string) => void) {
+		const { clusterData, terminationTimeout, ipcMaxPayload, ...workerOptions } = options;
+		const inheritedData = isRecord(workerOptions.workerData) ? workerOptions.workerData : {};
+
+		this.options = { ...workerOptions, workerData: { ...inheritedData, ...clusterData } };
+		this.terminationTimeout = terminationTimeout ?? 15_000;
+		this.ipcMaxPayload = ipcMaxPayload ?? 8 * 1024 * 1024;
+
+		this.debugEmitter = debugEmitter;
 	}
 
-	/** Spawns the worker. */
-	public spawn(): WorkerThread {
-		if (this.process && this.process.threadId) return this.process;
+	/* ----------------------------------- Lifecycle ----------------------------------- */
 
-		this.process = new WorkerThread(this.file, this.workerOptions);
-		return this.process;
+	public isAlive(target: WorkerThreads.Worker | null = this.process): boolean {
+		return Boolean(target && target.threadId !== -1 && !this.exited.has(target));
 	}
 
-	/** Respawns the worker. */
-	public async respawn(): Promise<WorkerThread> {
-		await this.kill();
+	public spawn(): WorkerThreads.Worker {
+		const current = this.process;
+		if (current && this.isAlive(current)) return current;
+
+		const target = new WorkerThreads.Worker(this.file, this.options);
+		target.once('exit', () => this.exited.add(target));
+
+		this.process = target;
+		this.debug(`The worker thread with ID ${target.threadId} was spawned.`);
+
+		return target;
+	}
+
+	public async respawn(): Promise<WorkerThreads.Worker> {
+		if (!(await this.kill())) throw new Error('WORKER_TERMINATION_UNVERIFIED | Refusing to replace a live worker.');
+
 		return this.spawn();
 	}
 
-	/** Kills the worker with proper cleanup. */
-	public async kill(): Promise<boolean> {
-		if (!this.process) {
-			this._cleanup();
-			return false;
+	public kill(): Promise<boolean> {
+		const target = this.process;
+		if (!target) {
+			this.debug('A worker termination was requested, but no worker thread is active.');
+			return Promise.resolve(true);
 		}
-		if (!this.process.threadId) {
-			this._cleanup();
+
+		const activeOperation = this.terminationOperation;
+		if (activeOperation && activeOperation.target === target) return activeOperation.promise;
+		this.debug(`A termination was requested for worker thread ${target.threadId}.`);
+
+		const promise = this.killTarget(target).finally(() => {
+			const currentOperation = this.terminationOperation;
+			if (currentOperation && currentOperation.target === target) this.terminationOperation = undefined;
+		});
+
+		this.terminationOperation = { target, promise };
+
+		return promise;
+	}
+
+	private async killTarget(target: WorkerThreads.Worker): Promise<boolean> {
+		if (!this.isAlive(target)) {
+			if (this.process === target) this.process = null;
 			return true;
 		}
 
+		let timeout: NodeJS.Timeout | undefined;
 		try {
-			const forceTerminateTimer = setTimeout(() => {
-				if (this.process && this.process.threadId) {
-					console.warn('Force terminating worker thread.');
-					void this.process.terminate().catch((error) => console.error('Force worker termination failed:', error));
-				}
-			}, 5000);
+			let settled = false;
 
-			return new Promise<boolean>((resolve) => {
-				if (!this.process || !this.process.threadId) {
-					clearTimeout(forceTerminateTimer);
-					this._cleanup();
-					resolve(false);
-					return;
-				}
-
-				const cleanup = () => {
-					clearTimeout(forceTerminateTimer);
-					this._cleanup();
-				};
-
-				const onExit = () => {
-					cleanup();
-					resolve(true);
-				};
-
-				const onError = (err: Error) => {
-					console.error('Error during worker termination:', err);
-					if (!this.process?.threadId) cleanup();
-					resolve(false);
-				};
-
-				this.process.once('exit', onExit);
-				this.process.once('error', onError);
-
-				void this.process.terminate().catch(onError);
+			const termination = target.terminate().then(() => {
+				settled = true;
+				if (timeout) clearTimeout(timeout);
+				return true;
 			});
-		} catch (error) {
-			console.error('Worker termination failed:', error);
+
+			const deadline = new Promise<boolean>((resolve) => {
+				timeout = setTimeout(() => {
+					if (settled) return;
+					this.debug(`The worker thread ${target.threadId} did not terminate before the ${this.terminationTimeout} millisecond deadline and may be unkillable.`);
+					resolve(false);
+				}, this.terminationTimeout);
+			});
+
+			const result = await Promise.race([termination, deadline]);
+			if (timeout) clearTimeout(timeout);
+			if (!result && this.isAlive(target)) return false;
+
+			this.debug(`Termination was verified for worker thread ${target.threadId}.`);
+
+			this.exited.add(target);
+			if (this.process === target) this.process = null;
+
+			return true;
+		} catch (error: unknown) {
+			if (timeout) clearTimeout(timeout);
+			this.debug(`Worker thread ${target.threadId} termination failed with ${error instanceof Error ? error.message : String(error)}.`);
+			
+			if (!this.isAlive(target)) {
+				this.exited.add(target);
+				if (this.process === target) this.process = null;
+				return true;
+			}
+
 			return false;
 		}
 	}
 
-	/** Clean up worker and listeners */
-	private _cleanup(): void {
-		if (this.process) this.process.removeAllListeners();
-		this._listeners.clear();
-		this.process = null;
+	/* ----------------------------------- IPC ----------------------------------- */
+
+	public send<T extends object>(message: T): Promise<void> {
+		if (!this.process || !this.isAlive(this.process)) return Promise.reject(new Error('WORKER_UNAVAILABLE | Worker is unavailable.'));
+
+		if (JSON.stringify(message).length > this.ipcMaxPayload) return Promise.reject(new Error('IPC_PAYLOAD_TOO_LARGE | IPC payload exceeds the configured limit.'));
+
+		try {
+			this.debug(`An IPC message containing ${JSON.stringify(message).length} bytes is being sent to a worker thread.`);
+			this.process.postMessage(message);
+			return Promise.resolve();
+		} catch (error: unknown) {
+			this.debug(`Sending an IPC message to a worker thread failed with ${error instanceof Error ? error.message : String(error)}.`);
+			return Promise.reject(error);
+		}
 	}
 
-	/** Sends a message to the worker. */
-	public send<T extends Serializable>(message: SerializableInput<T, true> | unknown): Promise<void> {
-		return new Promise<void>((resolve, reject) => {
-			if (!this.process || !this.process.threadId) {
-				reject(new Error('No active worker to send message to'));
-				return;
-			}
-
-			try {
-				this.process.postMessage(message);
-				resolve();
-			} catch (error) {
-				console.error('Data sending failed:', message);
-				reject(error);
-			}
-		});
+	private debug(message: string): void {
+		const emitter = this.debugEmitter;
+		if (emitter) emitter(message);
 	}
 }
 
-/** Worker client class. */
 export class WorkerClient {
-	/** The IPC port of the worker. */
-	readonly ipc: MessagePort | null;
+	public readonly ipc: WorkerThreads.MessagePort | null = WorkerThreads.parentPort;
 
-	/** Creates an instance of WorkerClient. */
-	constructor () {
-		this.ipc = parentPort;
-	}
+	private readonly ipcMaxPayload: number;
+	private closed = false;
 
-	/** Sends a message to the worker. */
-	public send<T extends Serializable>(message: SerializableInput<T, true> | unknown): Promise<void> {
-		return new Promise<void>((resolve, reject) => {
-			if (!this.ipc) {
-				reject(new Error('No IPC port available'));
-				return;
-			}
-
-			try {
-				this.ipc.postMessage(message);
-				resolve();
-			} catch (error) {
-				console.error('Data sending failed:', message);
-				reject(error);
-			}
+	constructor (options: WorkerClientOptions = {}) {
+		this.ipcMaxPayload = options.ipcMaxPayload ?? 8 * 1024 * 1024;
+		const ipc = this.ipc;
+		if (ipc) ipc.once('close', () => {
+			this.closed = true;
 		});
 	}
+
+	public send<T extends object>(message: T): Promise<void> {
+		if (!this.ipc || this.closed) return Promise.reject(new Error('IPC_PORT_CLOSED | Worker IPC is unavailable.'));
+
+		if (JSON.stringify(message).length > this.ipcMaxPayload) return Promise.reject(new Error('IPC_PAYLOAD_TOO_LARGE | IPC payload exceeds the configured limit.'));
+
+		try {
+			this.ipc.postMessage(message);
+			return Promise.resolve();
+		} catch (error: unknown) {
+			return Promise.reject(error);
+		}
+	}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

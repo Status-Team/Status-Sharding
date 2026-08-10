@@ -1,84 +1,49 @@
-import { EvalOptions, MessageTypes, SerializableInput, Serializable, PackageType } from '../types';
-import { ClusterClient } from '../core/clusterClient';
-import { Cluster } from '../core/cluster';
+import { MessageTypes, type BaseMessage, type DataType, type DataTypes, type Serializable, type SerializableInput } from '../types.js';
 
-/** Eval message type. */
-export type EvalMessage<P extends object = object> = {
-	options?: EvalOptions<P>;
-	script: string;
-};
+export { MessageTypes };
+export type { BaseMessage, DataType, DataTypes };
 
-/** Respawn message type. */
-export type RespawnMessage = {
-	clusterDelay?: number; // Only when respawning all clusters.
-	respawnDelay?: number;
-	timeout?: number;
-	except?: number[];
-};
+export function isBaseMessage(value: unknown): value is BaseMessage<DataType> {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+	if (!('_type' in value)) return false;
+	const type = value._type;
 
-/** Respawn some message type. */
-export type RespawnSomeMessage = {
-	clusterIds: number[];
-	clusterDelay?: number; // Only when respawning all clusters.
-	respawnDelay?: number;
-	timeout?: number;
-};
-
-/** Result of an eval message. */
-export type EvalResultMessage = unknown;
-/** The type of the message. */
-export type DataType = 'normal' | 'eval' | 'respawnAll' | 'evalResult' | 'readyOrSpawn' | 'heartbeat' | 'error' | 'reply' | 'respawnSome';
-
-/** The type of the message. */
-export type DataTypes<A = object, P extends object = object> = {
-	normal: A extends never ? Serializable : A;
-	reply: DataTypes<A, P>['normal'];
-	eval: EvalMessage<P>;
-	readyOrSpawn: { packageType?: PackageType | null } | undefined;
-	heartbeat: undefined;
-	respawnAll: RespawnMessage;
-	respawnSome: RespawnSomeMessage;
-	evalResult: EvalResultMessage;
-	error: {
-		message: string;
-		script: string;
-		stack?: string;
-		name: string;
-	};
-};
-
-/** Base message for IPC communication. */
-export type BaseMessage<D extends DataType, A = Serializable, P extends object = object> = {
-	_type: MessageTypes;
-	_nonce: string;
-	data: DataTypes<A, P>[D];
+	if (!Number.isInteger(type) || type === MessageTypes.MissingType) return false;
+	if ('_nonce' in value && value._nonce !== undefined && (typeof value._nonce !== 'string' || value._nonce.length > 256)) return false;
+	
+	return true;
 }
 
-/** Serializable input. */
-export type BaseMessageInput<D extends DataType, A extends Serializable = Serializable> = Omit<BaseMessage<D, A>, '_nonce'>;
+interface MessageEndpoint {
+	_sendInstance(message: BaseMessage<DataType>): Promise<void>;
+}
 
-/** Message that is sent on IPC. */
-export class ProcessMessage<D extends DataType = 'normal', A extends Serializable = Serializable, P extends object = object> {
-	/** Instance of the cluster client or cluster. */
-	private _instance: ClusterClient | Cluster;
-	/** The nonce of the message. */
-	private _nonce: string;
-	/** The data of the message. */
-	public data: DataTypes<A, object>[D];
+export class ProcessMessage<D extends DataType = 'normal', Value extends Serializable = Serializable, Context extends object = object> {
+	public readonly data: DataTypes<Value, Context>[D] | undefined;
 
-	/** Creates an instance of ProcessMessage. */
-	constructor (instance: ClusterClient | Cluster, data: BaseMessage<D, A, P>) {
-		this.data = data.data;
-		this._nonce = data._nonce;
-		this._instance = instance;
+	private readonly nonce?: string;
+	private readonly clusterId?: number;
+	private readonly generation?: number;
+
+	private readonly replySender: (message: BaseMessage<'reply'>) => Promise<void>;
+
+	constructor (endpoint: MessageEndpoint, message: BaseMessage<D, Value, Context>, replySender?: (message: BaseMessage<'reply'>) => Promise<void>) {
+		this.data = message.data;
+		this.nonce = message._nonce;
+		this.clusterId = message._clusterId;
+		this.generation = message._generation;
+		this.replySender = replySender ?? ((reply) => endpoint._sendInstance(reply));
 	}
 
-	/** Replies to the message. */
-	public async reply<T extends Serializable>(message: SerializableInput<T>): Promise<void> {
-		return this._instance._sendInstance({
-			data: message,
+	public reply<Result extends Serializable>(message: SerializableInput<Result>): Promise<void> {
+		if (!this.nonce) return Promise.reject(new Error('CLUSTERING_REPLY_NONCE_MISSING | This message has no reply nonce.'));
+
+		return this.replySender({
 			_type: MessageTypes.CustomReply,
-			_nonce: this._nonce,
-		} as BaseMessage<'reply'>) as Promise<void>;
+			_nonce: this.nonce,
+			_clusterId: this.clusterId,
+			_generation: this.generation,
+			data: message,
+		});
 	}
 }

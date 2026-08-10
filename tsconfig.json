@@ -1,48 +1,48 @@
 {
 	"compilerOptions": {
 		/* Basic Options */
-		"incremental": true,		
-		"module": "CommonJS",
+		"module": "NodeNext",
 		"target": "ES2022",
 		"outDir": "./dist",
+		"rootDir": "./src",
+		"declaration": true,
 
 		/* Strict Type-Checking Options */
 		"strict": true,
+		"alwaysStrict": true,
 		"noImplicitAny": true,
+		"noImplicitThis": true,
 		"strictNullChecks": true,
 		"strictFunctionTypes": true,
 		"strictBindCallApply": true,
 		"strictPropertyInitialization": true,
-		"noImplicitThis": true,
-		"alwaysStrict": true,
 
 		/* Additional Checks */
 		"noUnusedLocals": true,
-		"noUnusedParameters": true,
 		"noImplicitReturns": true,
+		"noUnusedParameters": true,
 		"noFallthroughCasesInSwitch": true,
 
 		/* Module Resolution Options */
-		"moduleResolution": "node",
 		"esModuleInterop": true,
-		"baseUrl": ".",
+		"moduleResolution": "NodeNext",
+		"types": ["node"],
+		"allowSyntheticDefaultImports": true,
 
-		"declaration": true,
+		/* Source Map Options */
 		"skipLibCheck": true,
 		"resolveJsonModule": true,
 		"noUncheckedIndexedAccess": true,
-
-		/* Experimental Options */
-		"experimentalDecorators": true,
+		"ignoreDeprecations": "6.0",
 
 		/* Advanced Options */
-		"forceConsistentCasingInFileNames": true,
-
-		/* Alias */
-		"paths": {
-			"discord.js": ["./node_modules/discord.js"]
-		}
+		"forceConsistentCasingInFileNames": true
 	},
-	"include": ["src/**/*"],
-	"exclude": ["node_modules"]
+	"include": [
+		"src/**/*"
+	],
+	"exclude": [
+		"node_modules",
+		"dist"
+	]
 }

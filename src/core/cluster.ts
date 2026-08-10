@@ -1,403 +1,606 @@
-// core/cluster.ts
-import { ClusterEvents, ClusterKillOptions, EvalOptions, MessageTypes, Serialized, Awaitable, ValidIfSerializable, SerializableInput, Serializable } from '../types';
-import { ProcessMessage, BaseMessage, DataType } from '../other/message';
-import { Worker as WorkerThread } from 'worker_threads';
-import { ShardingUtils } from '../other/shardingUtils';
-import { RefClusterManager } from './clusterManager';
-import { ClusterHandler } from '../handlers/message';
-import { BrokerMessage } from '../handlers/broker';
-import { isChildProcess } from '../other/utils';
-import { ClientRefType } from './clusterClient';
-import { ChildProcess } from 'child_process';
-import { Worker } from '../classes/worker';
-import { Child } from '../classes/child';
-import { Guild } from 'discord.js';
-import EventEmitter from 'events';
-import path from 'path';
+import { MessageTypes, type BaseMessage, type ClusterKillOptions, type ClusterLifecycleReason, type ClusterLifecycleRecord, type DataType, type EvalOptions, type RefCluster, type RefClusterManager, type Serializable, type SerializableInput, type Serialized, type ValidIfSerializable, type Awaitable, type ClientRefType, type ClusterEvents } from '../types.js';
+import type { ChildProcess, ForkOptions } from 'node:child_process';
+import { ShardingUtils } from '../other/shardingUtils.js';
+import type { WorkerOptions } from 'node:worker_threads';
+import { Worker } from '../classes/worker.js';
+import { Child } from '../classes/child.js';
+import EventEmitter from 'node:events';
 
-/** A self-contained cluster created by the ClusterManager. */
+export type RuntimeHandle = Child | Worker;
+type WorkerThreadHandle = ReturnType<Worker['spawn']>;
+
+export interface ClusterHost<InternalClient extends ClientRefType = ClientRefType> extends RefClusterManager {
+	readonly file: string;
+	readonly clusters: ReadonlyMap<number, RefCluster<InternalClient>>;
+
+	createClusterEnvironment(cluster: RefCluster<InternalClient>): NodeJS.ProcessEnv;
+	handleClusterMessage(cluster: RefCluster<InternalClient>, generation: number, message: unknown): Promise<void>;
+	handleClusterExit(cluster: RefCluster<InternalClient>, generation: number, exitCode: number | null, signal: NodeJS.Signals | null): void;
+	handleClusterError(cluster: RefCluster<InternalClient>, generation: number, error: Error): void;
+	handleClusterReady(cluster: RefCluster<InternalClient>, generation: number, packageType?: 'discord.js' | '@discordjs/core' | null): void;
+	requestFromCluster<T>(cluster: RefCluster<InternalClient>, message: BaseMessage<DataType>, timeout?: number): Promise<T>;
+	rejectClusterGeneration?(cluster: RefCluster<InternalClient>, generation: number, error: Error): void;
+	broadcast<T extends Serializable>(message: SerializableInput<T>, ignore?: number[]): Promise<void>;
+	evalOnGuild<T, P extends object>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P> | undefined, guild: unknown) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+	_debug(message: string): void;
+}
+
+export declare interface Cluster<
+	InternalManager extends RefClusterManager = RefClusterManager,
+	InternalClient extends ClientRefType = ClientRefType,
+> {
+	emit<K extends keyof ClusterEvents<InternalManager, this>>(event: K, ...args: ClusterEvents<InternalManager, this>[K]): boolean;
+	on<K extends keyof ClusterEvents<InternalManager, this>>(event: K, listener: (...args: ClusterEvents<InternalManager, this>[K]) => void): this;
+	once<K extends keyof ClusterEvents<InternalManager, this>>(event: K, listener: (...args: ClusterEvents<InternalManager, this>[K]) => void): this;
+	off<K extends keyof ClusterEvents<InternalManager, this>>(event: K, listener: (...args: ClusterEvents<InternalManager, this>[K]) => void): this;
+}
+
+export type ClusterState = 'stopped' | 'starting' | 'ready' | 'degraded' | 'stopping' | 'failed';
+
+export interface SpawnWaiter {
+	generation: number;
+	resolve: () => void;
+	reject: (error: Error) => void;
+	timer?: NodeJS.Timeout;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isForkOptions(value: ForkOptions | WorkerOptions): value is ForkOptions {
+	return 'env' in value || 'stdio' in value || 'uid' in value;
+}
+
+function isWorkerOptions(value: ForkOptions | WorkerOptions): value is WorkerOptions {
+	return 'workerData' in value || 'argv' in value;
+}
+
 export class Cluster<
 	InternalManager extends RefClusterManager = RefClusterManager,
 	InternalClient extends ClientRefType = ClientRefType,
 > extends EventEmitter {
-	/** Represents whether the cluster is ready. */
-	public ready: boolean;
-	/** Exited. */
-	public exited: boolean = false;
-	/** Indicates that this cluster is currently in a respawn flow. */
-	public respawning: boolean = false;
-	/** Indicates that the current child is being intentionally stopped. */
-	private stopping: boolean = false;
-	/** The active respawn operation, if any. */
-	private respawnPromise?: Promise<ChildProcess | WorkerThread>;
-	/** The active termination operation, if any. */
-	private killPromise?: Promise<void>;
-	/** Represents the child process/worker of the cluster. */
-	public thread: null | Worker | Child;
-	/** Represents the last time the cluster received a heartbeat. */
-	public lastHeartbeatReceived?: number;
-	/** Message processor that handles messages from the child process/worker/manager. */
-	private messageHandler?: ClusterHandler;
-	/** Represents the environment data of the cluster. */
-	private envData: NodeJS.ProcessEnv & {
-		CLUSTER: number;
-		SHARD_LIST: number[];
-		TOTAL_SHARDS: number;
-		CLUSTER_COUNT: number;
-		CLUSTER_QUEUE_MODE: 'auto' | 'manual';
-		RESPOND_TO_HEARTBEAT_WHEN_NOT_READY: boolean;
-		CLUSTER_MANAGER_MODE: 'process' | 'worker';
-	};
+	private state: ClusterState = 'stopped';
+	private desiredState: 'running' | 'stopped' = 'stopped';
+	private generation = 0;
+	private activeThread: RuntimeHandle | null = null;
+	private operation: Promise<unknown> = Promise.resolve();
+	private spawnWaiter?: { generation: number; resolve: () => void; reject: (error: Error) => void; timer?: NodeJS.Timeout };
 
-	/** Creates an instance of Cluster. */
-	constructor (public manager: InternalManager, public id: number, public shardList: number[]) {
+	private deathGeneration: number | null = null;
+	private restartPromise?: Promise<void>;
+	private restartDelayTimer?: NodeJS.Timeout;
+	private restartDelayCancel?: () => void;
+	private restartCancelled = false;
+	private killPromise?: Promise<void>;
+	private restartTimes: number[] = [];
+	private restartAttempt = 0;
+
+	private exitCode: number | null = null;
+	private exitSignal: NodeJS.Signals | null = null;
+
+	constructor (public readonly manager: InternalManager & ClusterHost<InternalClient>, public readonly id: number, public readonly shardList: number[]) {
 		super();
 
-		this.ready = false;
-		this.thread = null;
-
-		this.envData = Object.assign({}, process.env, {
-			CLUSTER: this.id,
-			SHARD_LIST: this.shardList,
-			TOTAL_SHARDS: this.totalShards,
-			CLUSTER_COUNT: this.manager.options.totalClusters,
-			CLUSTER_QUEUE_MODE: this.manager.options.queueOptions?.mode ?? 'auto',
-			RESPOND_TO_HEARTBEAT_WHEN_NOT_READY: this.manager.options.respondToHeartbeatWhenNotReady,
-			CLUSTER_MANAGER_MODE: this.manager.options.mode,
-		});
+		if (!Number.isInteger(id) || id < 0) throw new RangeError('CLUSTER_ID_INVALID | Cluster IDs must be non-negative integers.');
+		if (!shardList.length || new Set(shardList).size !== shardList.length) throw new RangeError('CLUSTER_SHARD_LIST_INVALID | A cluster requires unique shard IDs.');
 	}
 
-	/** Count of shards assigned to this cluster. */
-	get totalShards(): number {
+	/* ----------------------------------- State ----------------------------------- */
+
+	public get totalShards(): number {
 		return this.manager.options.totalShards;
 	}
 
-	/** Count of clusters managed by the manager. */
-	get totalClusters(): number {
+	public get totalClusters(): number {
 		return this.manager.options.totalClusters;
 	}
 
-	/** Spawn function that spawns the cluster's child process/worker with proper event management. */
-	public async spawn(spawnTimeout: number = -1): Promise<ChildProcess | WorkerThread> {
-		if (!this.manager.file) throw new Error('NO_FILE_PROVIDED | Cluster ' + this.id + ' does not have a file provided.');
-		if (this.thread?.process) return this.thread.process;
+	public get ready(): boolean {
+		return this.state === 'ready';
+	}
 
-		try {
-			this.ready = false;
-			this.exited = false;
-			this.lastHeartbeatReceived = Date.now();
+	public get exited(): boolean {
+		return this.activeThread === null;
+	}
 
-			const options = {
-				...this.manager.options.clusterOptions,
-				execArgv: this.manager.options.execArgv,
-				env: this.envData,
-				args: [...(this.manager.options.shardArgs || []), '--clusterId ' + this.id, `--shards [${this.shardList.join(', ').trim()}]`],
-				clusterData: { ...this.envData, ...this.manager.options.clusterData },
-			};
+	public get respawning(): boolean {
+		return this.restartPromise !== undefined;
+	}
 
-			this.thread = this.manager.options.mode === 'process'
-				? new Child(path.resolve(this.manager.file), options)
-				: new Worker(path.resolve(this.manager.file), options);
+	public get thread(): RuntimeHandle | null {
+		return this.activeThread;
+	}
 
-			this.messageHandler = new ClusterHandler(this, this.thread);
-			const thread = this.thread.spawn();
+	public get lifecycleState(): ClusterState {
+		return this.state;
+	}
 
-			this._setupEventListeners(thread);
-			this.emit('spawn', this, this.thread.process);
+	public get generationNumber(): number {
+		return this.generation;
+	}
 
-			const shouldWaitForReady = spawnTimeout > 0 && spawnTimeout !== Infinity;
+	public get lastHeartbeatReceived(): number | undefined {
+		return this.lastAckAt;
+	}
 
-			if (shouldWaitForReady) {
-				await new Promise<void>((resolve, reject) => {
-					const cleanup = (removeListeners: boolean = false) => {
-						if (spawnTimeoutTimer) clearTimeout(spawnTimeoutTimer);
-						if (removeListeners) {
-							this.off('ready', onReady);
-							this.off('death', onDeath);
-						}
-					};
+	private lastAckAt?: number;
 
-					const onReady = () => {
-						cleanup(true);
-						resolve();
-					};
+	/* ----------------------------------- Lifecycle ----------------------------------- */
 
-					const onDeath = () => {
-						cleanup(true);
-						reject(new Error('CLUSTERING_READY_DIED | Cluster ' + this.id + ' died.'));
-					};
+	public _markHeartbeat(timestamp: number): void {
+		if (this.activeThread) this.lastAckAt = timestamp;
+	}
 
-					const onTimeout = () => {
-						cleanup(true);
-						void this.kill({ reason: 'Cluster did not become ready before the spawn timeout.' }).finally(() => {
-							reject(new Error('CLUSTERING_READY_TIMEOUT | Cluster ' + this.id + ' took too long to get ready.'));
-						});
-					};
+	public spawn(timeout = this.manager.options.spawnOptions.timeout): Promise<ChildProcess | WorkerThreadHandle> {
+		return this.serialized(async () => {
+			this.debug(`Cluster ${this.id} received a spawn request while it was ${this.state} at generation ${this.generation}.`);
 
-					const spawnTimeoutTimer = setTimeout(onTimeout, spawnTimeout);
+			if (this.activeThread && this.isAlive()) {
+				if (!(this.activeThread instanceof Child) || this.activeThread.isUsable()) return this.processAfterSpawn();
 
-					this.once('ready', onReady);
-					this.once('death', onDeath);
+				this.state = 'stopping';
+				this.desiredState = 'stopped';
+				const runtime = this.activeThread;
+
+				if (!(await runtime.kill())) throw new Error(`CLUSTERING_TERMINATION_UNVERIFIED | Cluster ${this.id} cannot replace a disconnected child.`);
+				if (this.activeThread === runtime) this.activeThread = null;
+			}
+
+			return this.spawnInternal(timeout);
+		});
+	}
+
+	private async spawnInternal(timeout: number): Promise<ChildProcess | WorkerThreadHandle> {
+		const previousState = this.state;
+		this.desiredState = 'running';
+		this.state = 'starting';
+
+		this.generation += 1;
+		const generation = this.generation;
+
+		this.exitCode = null;
+		this.exitSignal = null;
+		this.lastAckAt = Date.now();
+
+		this.debug(`Cluster ${this.id} is starting generation ${generation} for shards ${this.shardList.join(', ')}.`);
+		this.emitSafe('lifecycle', this.record('starting', 'spawn', previousState));
+
+		const metadata = this.manager.createClusterEnvironment(this);
+		const options = this.manager.options;
+		const configured = options.clusterOptions ?? {};
+		const requiredArgs = [...options.shardArgs, '--clusterId', String(this.id), '--shards', this.shardList.join(',')];
+
+		let runtime: RuntimeHandle;
+		if (options.mode === 'process') {
+			const processOptions = isForkOptions(configured) ? configured : {};
+			runtime = new Child(this.manager.file, {
+				...processOptions,
+				args: requiredArgs,
+				env: { ...process.env, ...(processOptions.env ?? {}), ...metadata },
+				execArgv: options.execArgv.length ? options.execArgv : (processOptions.execArgv ?? []),
+
+				terminationTimeout: options.advanced.terminationTimeout,
+				forceKillAfter: options.advanced.forceKillAfter,
+				ipcTimeout: options.advanced.ipcTimeout,
+				ipcMaxPayload: options.advanced.ipcMaxPayload,
+			}, (message) => this.debug(`Cluster ${this.id}: ${message}`));
+		} else {
+			const workerOptions = isWorkerOptions(configured) ? configured : {};
+			runtime = new Worker(this.manager.file, {
+				...workerOptions,
+				workerData: { ...(isRecord(workerOptions.workerData) ? workerOptions.workerData : {}), ...metadata },
+				argv: [...(workerOptions.argv ?? []), ...requiredArgs],
+
+				terminationTimeout: options.advanced.terminationTimeout,
+				ipcMaxPayload: options.advanced.ipcMaxPayload,
+			}, (message) => this.debug(`Cluster ${this.id}: ${message}`));
+		}
+
+		this.activeThread = runtime;
+		const thread = runtime.spawn();
+		this.debug(`Cluster ${this.id} spawned its runtime for generation ${generation}.`);
+
+		let exited = false;
+		let disconnectTimer: NodeJS.Timeout | undefined;
+		if ('on' in thread) {
+			thread.on('error', (error) => this.manager.handleClusterError(this, generation, error));
+			thread.on('message', (message) => void this.manager.handleClusterMessage(this, generation, message));
+
+			if (options.mode === 'process') {
+				thread.on('disconnect', () => {
+					this.debug(`Cluster ${this.id} lost its IPC connection during generation ${generation}.`);
+					if (disconnectTimer) return;
+
+					disconnectTimer = setTimeout(() => {
+						disconnectTimer = undefined;
+						if (!exited && this.activeThread === runtime && runtime.isAlive()) this.manager.handleClusterExit(this, generation, null, null);
+					}, 250);
+
+					disconnectTimer.unref();
 				});
 			}
 
-			return this.thread.process as ChildProcess | WorkerThread;
-		} catch (error) {
-			console.error(`Failed to spawn cluster ${this.id}:`, error);
+			thread.on('exit', (code: number | null, signal?: NodeJS.Signals | null) => {
+				this.debug(`Cluster ${this.id} runtime exited during generation ${generation} with code ${code ?? 'null'} and signal ${signal ?? 'null'}.`);
+				if (exited) return;
+				exited = true;
+
+				if (disconnectTimer) clearTimeout(disconnectTimer);
+				this.manager.handleClusterExit(this, generation, code, signal ?? null);
+			});
+		}
+
+		this.emitSafe('spawn', this, thread);
+
+		try {
+			await this.waitForReady(generation, timeout);
+			if (generation !== this.generation || this.activeThread !== runtime || !this.isAlive()) throw new Error('CLUSTER_GENERATION_LOST | Cluster changed while starting.');
+			return thread;
+		} catch (error: unknown) {
+			this.rejectSpawn(error instanceof Error ? error : new Error(String(error)));
+			if (this.activeThread === runtime) {
+				this.desiredState = 'stopped';
+				this.state = 'stopping';
+
+				const terminated = await runtime.kill();
+				if (terminated) this.activeThread = null;
+				else this.reportTerminationFailure(generation, 'spawn cleanup');
+			}
+
+			this.state = 'failed';
+			this.emitSafe('lifecycle', this.record('failed', error instanceof Error && error.message.includes('READY_TIMEOUT') ? 'spawn-timeout' : 'spawn-error', 'starting'));
 			throw error;
 		}
 	}
 
-	private _setupEventListeners(thread: ChildProcess | WorkerThread): void {
-		if (!thread) return;
+	private waitForReady(generation: number, timeout: number): Promise<void> {
+		if (this.ready && generation === this.generation) return Promise.resolve();
 
-		if (isChildProcess(thread)) {
-			// Child process.
-			thread.on('disconnect', () => this._handleDisconnect(thread));
-			thread.on('message', (message) => this._handleMessage(thread, message));
-			thread.on('error', this._handleError.bind(this));
-			thread.on('exit', (exitCode, signal) => this._handleExit(thread, exitCode, signal));
-		} else {
-			// Worker thread.
-			thread.on('messageerror', this._handleError.bind(this));
-			thread.on('message', (message) => this._handleMessage(thread, message));
-			thread.on('error', this._handleError.bind(this));
-			thread.on('exit', (exitCode) => this._handleExit(thread, exitCode, null));
-		}
+		return new Promise<void>((resolve, reject) => {
+			const waiter: SpawnWaiter = { generation, resolve, reject };
+			if (timeout >= 0) {
+				waiter.timer = setTimeout(() => {
+					this.spawnWaiter = undefined;
+					reject(new Error(`CLUSTERING_READY_TIMEOUT | Cluster ${this.id} did not become ready within ${timeout}ms.`));
+				}, timeout);
+			}
+
+			this.spawnWaiter = waiter;
+		});
 	}
 
-	public kill(options?: ClusterKillOptions): Promise<void> {
+	public async kill(options: ClusterKillOptions = {}): Promise<void> {
 		if (this.killPromise) return this.killPromise;
+		this.debug(`Cluster ${this.id} received a kill request because ${options.lifecycleReason ?? 'manual-kill'}.`);
 
-		this.killPromise = this.killCluster(options).finally(() => {
+		if (this.restartPromise) {
+			this.restartCancelled = true;
+			this.restartDelayCancel?.();
+			this.debug(`Cluster ${this.id} cancelled its pending respawn before handling the kill request.`);
+		}
+
+		if (this.spawnWaiter) {
+			this.debug(`Cluster ${this.id} cancelled its pending ready wait before handling the kill request.`);
+			this.rejectSpawn(new Error(`CLUSTER_SPAWN_CANCELLED | Cluster ${this.id} was asked to stop before becoming ready.`));
+		}
+
+		this.killPromise = this.serialized(async () => {
+			this.desiredState = 'stopped';
+			if (!this.activeThread) {
+				this.state = 'stopped';
+				return;
+			}
+
+			const previousState = this.state;
+			this.state = 'stopping';
+
+			const runtime = this.activeThread;
+			const terminated = await runtime.kill();
+			if (!terminated) {
+				this.state = 'failed';
+				throw this.reportTerminationFailure(this.generation, 'manual kill');
+			}
+
+			if (this.activeThread === runtime) this.activeThread = null;
+
+			this.state = 'stopped';
+			this.resolveSpawn();
+
+			this.emitSafe('lifecycle', this.record('stopped', options.lifecycleReason ?? 'manual-kill', previousState));
+		}).finally(() => {
 			this.killPromise = undefined;
 		});
 
 		return this.killPromise;
 	}
 
-	/** Terminates the current child process or worker. */
-	private async killCluster(options?: ClusterKillOptions): Promise<void> {
-		if (!this.thread) {
-			console.warn(`Cluster ${this.id} has no thread to kill.`);
+	public respawn(delay = this.manager.options.spawnOptions.delay, timeout = this.manager.options.spawnOptions.timeout): Promise<ChildProcess | WorkerThreadHandle> {
+		if (this.restartPromise) return this.restartPromise.then(() => this.processAfterRespawn());
+		this.debug(`Cluster ${this.id} received a respawn request with a ${delay} millisecond delay and a ${timeout} millisecond timeout.`);
+
+		this.restartCancelled = false;
+		this.restartPromise = this.serialized(async () => {
+			this.desiredState = 'stopped';
+			this.restartAttempt += 1;
+			const rejectGeneration = this.manager.rejectClusterGeneration;
+			if (rejectGeneration) rejectGeneration.call(this.manager, this, this.generation, new Error(`CLUSTER_RESTARTING | Cluster ${this.id} generation ${this.generation} is being replaced.`));
+
+			await this.killForRestart();
+			await this.waitForRestartDelay(delay);
+			if (this.restartCancelled) return;
+
+			await this.spawnInternal(timeout);
+		}).finally(() => {
+			this.restartPromise = undefined;
+		});
+
+		return this.restartPromise.then(() => this.processAfterRespawn());
+	}
+
+	private processAfterSpawn(): ChildProcess | WorkerThreadHandle {
+		const runtime = this.activeThread;
+		const process = runtime ? runtime.process : null;
+
+		if (!process) throw new Error(`CLUSTERING_NO_CHILD_EXISTS | Cluster ${this.id} has no runtime after spawn.`);
+		return process;
+	}
+
+	private processAfterRespawn(): ChildProcess | WorkerThreadHandle {
+		if (this.restartCancelled) throw new Error(`CLUSTER_RESPAWN_CANCELLED | Cluster ${this.id} respawn was cancelled.`);
+		return this.processAfterSpawn();
+	}
+
+	private async killForRestart(): Promise<void> {
+		if (!this.activeThread) return;
+
+		this.state = 'stopping';
+		const runtime = this.activeThread;
+
+		if (!(await runtime.kill())) throw this.reportTerminationFailure(this.generation, 'respawn cleanup');
+		if (this.activeThread === runtime) this.activeThread = null;
+	}
+
+	private waitForRestartDelay(delay: number): Promise<void> {
+		if (delay <= 0) return Promise.resolve();
+
+		return new Promise<void>((resolve) => {
+			let settled = false;
+
+			const finish = () => {
+				if (settled) return;
+				settled = true;
+
+				if (this.restartDelayTimer) clearTimeout(this.restartDelayTimer);
+				this.restartDelayTimer = undefined;
+				this.restartDelayCancel = undefined;
+				resolve();
+			};
+
+			this.restartDelayCancel = finish;
+			this.restartDelayTimer = setTimeout(finish, delay);
+		});
+	}
+
+	public async recover(reason: ClusterLifecycleReason): Promise<void> {
+		if (!this.manager.options.respawn || this.desiredState !== 'running' || this.restartPromise) return;
+		this.debug(`Cluster ${this.id} requested recovery because of ${reason}.`);
+
+		const now = Date.now();
+		const window = this.manager.options.heartbeat.restartWindow;
+
+		this.restartTimes = this.restartTimes.filter((timestamp) => now - timestamp <= window);
+		if (this.manager.options.heartbeat.maxRestarts !== -1 && this.restartTimes.length >= this.manager.options.heartbeat.maxRestarts) {
+			this.state = 'failed';
+			this.emitSafe('lifecycle', this.record('failed', 'restart-budget-exhausted'));
 			return;
 		}
 
-		try {
-			this.stopping = true;
-			const killResult = await this.thread.kill();
-			if (!killResult) throw new Error(`CLUSTERING_KILL_FAILED | Cluster ${this.id} process did not exit.`);
-
-			this.thread = null;
-			this.ready = false;
-			this.exited = true;
-			this.manager.ready = false;
-
-			this.manager.heartbeat?.removeCluster(this.id);
-			this.manager._debug('[KILL] Cluster ' + this.id + ' killed with reason: ' + (options?.reason || 'Unknown reason.'));
-
-		} catch (error) {
-			console.error(`Error killing cluster ${this.id}:`, error);
-			this.ready = false;
-			this.manager.ready = false;
-			throw error;
-		} finally {
-			this.stopping = false;
-		}
-	}
-
-	/** Respawn function that respawns the cluster's child process/worker. */
-	public respawn(delay: number = this.manager.options.spawnOptions.delay || 5500, timeout: number = this.manager.options.spawnOptions.timeout || -1): Promise<ChildProcess | WorkerThread> {
-		if (this.respawnPromise) return this.respawnPromise;
-
-		this.respawnPromise = this.respawnCluster(delay, timeout).finally(() => {
-			this.respawnPromise = undefined;
-		});
-
-		return this.respawnPromise;
-	}
-
-	/** Performs a single cluster restart. */
-	private async respawnCluster(delay: number, timeout: number): Promise<ChildProcess | WorkerThread> {
-		this.respawning = true;
-		this.ready = false;
-		this.exited = false;
-		this.manager.ready = false;
+		this.restartTimes.push(now);
+		const backoff = Math.min(this.manager.options.heartbeat.maxRestartBackoff, this.manager.options.heartbeat.restartBackoff * this.restartTimes.length);
+		this.emitSafe('restart', this.record('starting', reason));
 
 		try {
-			if (this.thread) await this.kill();
-			if (delay > 0) await ShardingUtils.delayFor(delay);
-
-			return await this.spawn(timeout);
-		} finally {
-			this.respawning = false;
-		}
-	}
-
-	/** Send function that sends a message to the cluster's child process/worker. */
-	public async send<T extends Serializable>(message: SerializableInput<T>): Promise<void> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#2).'));
-		this.manager._debug(`[IPC] [Cluster ${this.id}] Sending message to child.`);
-
-		return this.thread.send({
-			_type: MessageTypes.CustomMessage,
-			data: message,
-		} as BaseMessage<'normal'>);
-	}
-
-	/** Request function that sends a message to the cluster's child process/worker and waits for a response. */
-	public async request<T extends Serializable, O>(message: SerializableInput<T>, options: { timeout?: number; } = {}): Promise<Serialized<O>> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#3).'));
-		const nonce = ShardingUtils.generateNonce();
-
-		this.thread.send<BaseMessage<'reply'>>({
-			_type: MessageTypes.CustomRequest,
-			_nonce: nonce,
-			data: message,
-		});
-
-		return this.manager.promise.create(nonce, options.timeout);
-	}
-
-	/** Broadcast function that sends a message to all clusters. */
-	public async broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf: boolean = false): Promise<void> {
-		return await this.manager.broadcast(message, sendSelf ? undefined : [this.id]);
-	}
-
-	/** Eval function that evaluates a script on the current cluster. */
-	public async eval<T, P extends object, C = Cluster<InternalManager, InternalClient>>(script: string | ((cluster: C, context: Serialized<P>) => Awaitable<T>), options?: Exclude<EvalOptions<P>, 'cluster'>): Promise<ValidIfSerializable<T>> {
-		return eval(ShardingUtils.parseInput(script, options?.context, this.manager.options.packageType, 'this'));
-	}
-
-	/** EvalOnClient function that evaluates a script on a specific cluster. */
-	public async evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#4).'));
-
-		const nonce = ShardingUtils.generateNonce();
-
-		this.thread.send<BaseMessage<'eval'>>({
-			_type: MessageTypes.ClientEvalRequest,
-			_nonce: nonce,
-			data: {
-				script: ShardingUtils.parseInput(script, options?.context),
-				options: options,
-			},
-		});
-
-		return this.manager.promise.create(nonce, options?.timeout);
-	}
-
-	/** EvalOnCluster function that evaluates a script on a specific cluster. */
-	public async evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#5).'));
-		else if (this.manager.options.packageType !== 'discord.js') return Promise.reject(new Error('CLUSTERING_EVAL_GUILD_UNSUPPORTED | evalOnGuild is only supported in discord.js package type.'));
-
-		return this.manager.evalOnGuild(guildId, script, options);
-	}
-
-	/** Function that allows you to construct your own BaseMessage and send it to the cluster. */
-	public _sendInstance<D extends DataType, A = Serializable, P extends object = object>(message: BaseMessage<D, A, P>): Promise<void> {
-		if (!this.thread) return Promise.reject(new Error('CLUSTERING_NO_CHILD_EXISTS | Cluster ' + this.id + ' does not have a child process/worker (#6).'));
-
-		this.emit('debug', `[IPC] [Child ${this.id}] Sending message to cluster.`);
-		return this.thread.send(message);
-	}
-
-	/** Message handler function that handles messages from the cluster's child process/worker/manager. */
-	private _handleMessage(thread: ChildProcess | WorkerThread, message: BaseMessage<'normal'> | BrokerMessage | unknown): void {
-		if (this.thread?.process !== thread) return;
-		if (!message || typeof message !== 'object') return;
-		if ('_data' in message) return this.manager.broker.handleMessage(message as BrokerMessage);
-		if (!('_type' in message)) return;
-		if (!this.messageHandler) throw new Error('CLUSTERING_NO_MESSAGE_HANDLER | Cluster ' + this.id + ' does not have a message handler.');
-
-		const ipcMessage = message as BaseMessage<'normal'>;
-
-		if (this.manager.options.advanced?.logMessagesInDebug) {
-			this.manager._debug(`[IPC] [Cluster ${this.id}] Received message from child.`);
-		}
-
-		void this.messageHandler.handleMessage(ipcMessage).catch((error) => this._handleError(error as Error));
-
-		if ([MessageTypes.CustomMessage, MessageTypes.CustomRequest].includes(ipcMessage._type)) {
-			const processMessage = new ProcessMessage(this, ipcMessage);
-			if (ipcMessage._type === MessageTypes.CustomRequest) {
-				this.manager.emit('clientRequest', processMessage);
+			await this.respawn(backoff, this.manager.options.spawnOptions.timeout);
+		} catch (error: unknown) {
+			if (this.restartCancelled) {
+				this.debug(`Cluster ${this.id} cancelled automatic recovery because a stop request was received.`);
+				return;
 			}
 
-			this.emit('message', processMessage);
-			this.manager.emit('message', processMessage);
+			this.manager.handleClusterError(this, this.generation, error instanceof Error ? error : new Error(String(error)));
 		}
 	}
 
-	/** Exit handler function that handles the cluster's child process/worker exiting. */
-	private _handleExit(thread: ChildProcess | WorkerThread, exitCode: number | null, signal: NodeJS.Signals | null): void {
-		if (this.thread?.process !== thread) return;
+	/* ----------------------------------- IPC ----------------------------------- */
 
-		this.manager._debug(`[Cluster ${this.id}] Process exited with code ${exitCode}, signal ${signal}`);
-		this.ready = false;
-		this.exited = true;
-		this.thread = null;
+	public async send<T extends Serializable>(message: SerializableInput<T>): Promise<void> {
+		if (!this.activeThread) throw new Error(`CLUSTERING_NO_CHILD_EXISTS | Cluster ${this.id} has no runtime.`);
+		await this.activeThread.send({ _type: MessageTypes.CustomMessage, data: message });
+	}
+
+	public request<T extends Serializable, O = unknown>(message: SerializableInput<T>, options: { timeout?: number } = {}): Promise<Serialized<O>> {
+		return this.manager.requestFromCluster<Serialized<O>>(this, { _type: MessageTypes.CustomRequest, _nonce: ShardingUtils.generateNonce(), data: message }, options.timeout);
+	}
+
+	public broadcast<T extends Serializable>(message: SerializableInput<T>, sendSelf = false): Promise<void> {
+		return this.manager.broadcast(message, sendSelf ? [] : [this.id]);
+	}
+
+	public async eval<T, P extends object>(script: string | ((cluster: Cluster<InternalManager, InternalClient>, context: Serialized<P> | undefined) => Awaitable<T>), options?: { context?: P }): Promise<ValidIfSerializable<T>> {
+		if (typeof script === 'function') return await script(this, options?.context);
+		return await new Function('cluster', 'context', `return (${script})`).call(this, this, options?.context);
+	}
+
+	public evalOnClient<T, P extends object>(script: string | ((client: InternalClient, context: Serialized<P> | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+		return this.manager.requestFromCluster<ValidIfSerializable<T>>(this, {
+			_type: MessageTypes.ClientEvalRequest,
+			_nonce: ShardingUtils.generateNonce(),
+			data: { script: typeof script === 'function' ? script.toString() : script, options },
+		}, options?.timeout);
+	}
+
+	public evalOnGuild<T, P extends object>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P> | undefined, guild: unknown) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+		return this.manager.requestFromCluster<ValidIfSerializable<T>>(this, {
+			_type: MessageTypes.ClientEvalRequest,
+			_nonce: ShardingUtils.generateNonce(),
+			data: { script: typeof script === 'function' ? script.toString() : script, options: { ...options, guildId } },
+		}, options?.timeout);
+	}
+
+	public _sendInstance(message: BaseMessage<DataType>): Promise<void> {
+		if (!this.activeThread) return Promise.reject(new Error(`CLUSTERING_NO_CHILD_EXISTS | Cluster ${this.id} has no runtime.`));
+		return this.activeThread.send(message);
+	}
+
+	public _setReady(generation: number, packageType?: 'discord.js' | '@discordjs/core' | null): void {
+		if (generation !== this.generation || !this.activeThread || this.desiredState !== 'running') return;
+		this.debug(`Cluster ${this.id} accepted its ready signal for generation ${generation}.`);
+
+		const previousState = this.state;
+		this.state = 'ready';
+		this.lastAckAt = Date.now();
+		this.resolveSpawn();
+
+		this.emitSafe('lifecycle', this.record('ready', 'ready', previousState));
+		this.emitSafe('ready', this);
+
+		this.manager.handleClusterReady(this, generation, packageType);
+	}
+
+	public _setHeartbeat(timestamp: number): void {
+		this.lastAckAt = timestamp;
+	}
+
+	public _unexpectedExit(generation: number, exitCode: number | null, signal: NodeJS.Signals | null, reason: ClusterLifecycleReason): void {
+		if (generation !== this.generation || this.desiredState === 'stopped') return;
+		if (this.deathGeneration === generation) return;
+
+		this.debug(`Cluster ${this.id} exited unexpectedly during generation ${generation} because of ${reason}.`);
+		this.deathGeneration = generation;
+		this.exitCode = exitCode;
+		this.exitSignal = signal;
+
+		const runtime = this.activeThread;
+		const thread = runtime ? runtime.process : null;
+
+		if (!runtime || !runtime.isAlive()) this.activeThread = null;
+		const previousState = this.state;
+
+		this.state = 'failed';
+		this.manager.ready = false;
+		this.rejectSpawn(new Error(`CLUSTER_EXITED | Cluster ${this.id} exited unexpectedly.`));
+
+		const error = new Error(`CLUSTER_EXITED | Cluster ${this.id} exited unexpectedly.`);
+		const rejectGeneration = this.manager.rejectClusterGeneration;
+		if (rejectGeneration) rejectGeneration.call(this.manager, this, generation, error);
+
+		this.emitSafe('death', this, thread);
+		this.emitSafe('lifecycle', this.record('failed', reason, previousState));
+
+		void (async () => {
+			try {
+				const terminated = runtime ? await runtime.kill() : true;
+				if (!terminated) {
+					this.state = 'failed';
+					this.reportTerminationFailure(generation, 'automatic recovery cleanup');
+					this.emitSafe('lifecycle', this.record('failed', 'termination-unverified'));
+					return;
+				}
+				if (this.activeThread === runtime) this.activeThread = null;
+				await this.recover(reason);
+			} catch (error: unknown) {
+				this.manager.handleClusterError(this, generation, error instanceof Error ? error : new Error(String(error)));
+			}
+		})();
+	}
+
+	public _markDegraded(reason: ClusterLifecycleReason): void {
+		if (this.state === 'degraded') {
+			if (reason === 'heartbeat-timeout') void this.recover(reason);
+			return;
+		}
+
+		if (this.state !== 'ready') return;
+		this.debug(`Cluster ${this.id} was marked degraded because of ${reason}.`);
+		const previousState = this.state;
+
+		this.state = 'degraded';
 		this.manager.ready = false;
 
-		if (this.stopping) return;
+		this.emitSafe('degraded', this.record('degraded', reason, previousState));
+		if (reason === 'heartbeat-timeout') void this.recover(reason);
+	}
 
-		this.emit('death', this, thread);
+	/* ----------------------------------- Internal ----------------------------------- */
 
-		if (!this.manager.heartbeat) {
-			this._scheduleRecovery();
+	private isAlive(): boolean {
+		const runtime = this.activeThread;
+		if (!runtime) return false;
+		return runtime.isAlive();
+	}
+
+	private debug(message: string): void {
+		this.emitSafe('debug', message);
+		this.manager._debug(message);
+	}
+
+	private reportTerminationFailure(generation: number, operation: string): Error {
+		const error = new Error(`CLUSTERING_TERMINATION_UNVERIFIED | Cluster ${this.id} remained alive after ${operation}. Automatic respawn is suppressed.`);
+		this.debug(`Cluster ${this.id} could not verify termination during ${operation} for generation ${generation}; automatic respawn is suppressed.`);
+		this.manager.handleClusterError(this, generation, error);
+		return error;
+	}
+
+	private serialized<T>(operation: () => Promise<T>): Promise<T> {
+		const next = this.operation.then(operation, operation);
+		this.operation = next.then(
+			() => undefined,
+			() => undefined,
+		);
+
+		return next;
+	}
+
+	private resolveSpawn(): void {
+		if (!this.spawnWaiter) return;
+		if (this.spawnWaiter.timer) clearTimeout(this.spawnWaiter.timer);
+
+		this.spawnWaiter.resolve();
+		this.spawnWaiter = undefined;
+	}
+
+	private rejectSpawn(error: Error): void {
+		if (!this.spawnWaiter) return;
+		if (this.spawnWaiter.timer) clearTimeout(this.spawnWaiter.timer);
+		
+		this.spawnWaiter.reject(error);
+		this.spawnWaiter = undefined;
+	}
+
+	private record(state: ClusterState, reason: ClusterLifecycleReason, previousState = this.state): ClusterLifecycleRecord {
+		return {
+			clusterId: this.id,
+			generation: this.generation,
+			state,
+			previousState,
+			desired: this.desiredState,
+			reason,
+			timestamp: Date.now(),
+			pid: this.activeThread instanceof Child && this.activeThread.process ? this.activeThread.process.pid ?? null : null,
+			exitCode: this.exitCode,
+			signal: this.exitSignal,
+			restartAttempt: this.restartAttempt,
+		};
+	}
+
+	private emitSafe(event: string, ...args: unknown[]): void {
+		for (const listener of this.rawListeners(event)) {
+			try {
+				Reflect.apply(listener, this, args);
+			} catch (error: unknown) {
+				if (event !== 'error') this.emitSafe('error', error instanceof Error ? error : new Error(String(error)));
+			}
 		}
 	}
-
-	/** Error handler function that handles errors from the cluster's child process/worker/manager. */
-	private _handleError(error: Error): void {
-		this.emit('error', error);
-		this.manager._debug(`[Cluster ${this.id}] Process error: ${error.message}`);
-
-		if (this.manager.listenerCount('error') > 0) this.manager.emit('error', error);
-	}
-
-	/** Handle unexpected disconnection. */
-	private _handleDisconnect(thread: ChildProcess | WorkerThread): void {
-		this.manager._debug(`[Cluster ${this.id}] Process disconnected unexpectedly.`);
-		this._handleUnexpectedExit(thread);
-	}
-
-	/** Handle unexpected exit/crash. */
-	private _handleUnexpectedExit(thread: ChildProcess | WorkerThread): void {
-		if (this.thread?.process !== thread || this.exited || this.stopping) return;
-
-		this.manager._debug(`[Cluster ${this.id}] Detected unexpected exit/crash.`);
-		this.ready = false;
-		this.exited = true;
-		this.thread = null;
-		this.manager.ready = false;
-		this.emit('death', this, thread);
-
-		if (!this.manager.heartbeat) this._scheduleRecovery();
-	}
-
-	/** Schedules one recovery attempt when heartbeat supervision is disabled. */
-	private _scheduleRecovery(): void {
-		if (!this.manager.options.respawn || this.respawning) return;
-
-		void this.respawn().catch((error) => {
-			this.manager._debug(`[Cluster ${this.id}] Failed to respawn after crash: ${(error as Error).message}`);
-		});
-	}
-}
-
-export type RefCluster = Cluster;
-
-export declare interface Cluster {
-	/** Emit an event. */
-	emit: (<K extends keyof ClusterEvents>(event: K, ...args: ClusterEvents[K]) => boolean) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, ...args: unknown[]) => boolean);
-	/** Remove an event listener. */
-	off: (<K extends keyof ClusterEvents>(event: K, listener: (...args: ClusterEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, listener: (...args: unknown[]) => void) => this);
-	/** Listen for an event. */
-	on: (<K extends keyof ClusterEvents>(event: K, listener: (...args: ClusterEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, listener: (...args: unknown[]) => void) => this);
-	/** Listen for an event once. */
-	once: (<K extends keyof ClusterEvents>(event: K, listener: (...args: ClusterEvents[K]) => void) => this) & (<S extends string | symbol>(event: Exclude<S, keyof ClusterEvents>, listener: (...args: unknown[]) => void) => this);
-	/** Remove all listeners for an event. */
-	removeAllListeners: (<K extends keyof ClusterEvents>(event?: K) => this) & (<S extends string | symbol>(event?: Exclude<S, keyof ClusterEvents>) => this);
 }

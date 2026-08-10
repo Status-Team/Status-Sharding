@@ -1,82 +1,88 @@
-import { ShardingUtils } from '../other/shardingUtils';
-import { QueueOptions } from '../types';
+import { ShardingUtils } from '../other/shardingUtils.js';
 
-/** Item of the queue. */
-export interface QueueItem<A = unknown[]> {
-    /** Runs the item. */
-	run(...args: unknown[]): Promise<unknown>;
-    /** Arguments to pass to the item. */
-	args: A;
-    /** Time when the item was added to the queue. */
-	time?: number;
-    /** Time to wait until next item. */
-	timeout: number;
+interface QueueItem<T> {
+	work: () => Promise<T>;
+	resolve(value: T): void;
+	reject: (error: Error) => void;
 }
 
-/** Queue class. */
 export class Queue {
-	/** Whether the queue is paused. */
-	private paused: boolean = false;
-	/** List of items in the queue. */
-	private queue: QueueItem[] = [];
+	private readonly items: QueueItem<unknown>[] = [];
+	private running = false;
+	private stopped = false;
+	private activeItem?: QueueItem<unknown>;
 
-	/** Creates an instance of Queue. */
-	constructor(public options: QueueOptions) {}
+	constructor (private readonly options: { mode: 'auto' | 'manual'; delay: number; timeout: number }) { }
 
-	/** Starts the queue and run's the item functions. */
-	public async start(): Promise<Queue> {
-		if (this.options.mode !== 'auto') {
-			return new Promise((resolve) => {
-				const interval = setInterval(() => {
-					if (this.queue.length === 0) {
-						clearInterval(interval);
-						resolve(this); // Queue successfully finished.
-					}
-				}, 200);
+	public get size(): number {
+		return this.items.length;
+	}
+
+	public get active(): boolean {
+		return this.running;
+	}
+
+	public add<T>(work: () => Promise<T>): Promise<T> {
+		if (this.stopped) return Promise.reject(new Error('QUEUE_STOPPED | Queue has been stopped.'));
+
+		const promise = new Promise<T>((resolve, reject) => {
+			this.items.push({
+				work, reject,
+				resolve(value: T): void {
+					resolve(value);
+				},
 			});
-		}
-
-		const length = this.queue.length;
-
-		for (let i = 0; i < length; i++) {
-			if (!this.queue[0]) continue;
-			const timeout = this.queue[0].timeout;
-			await this.next(); await ShardingUtils.delayFor(timeout);
-		}
-
-		return this;
-	}
-
-	/** Runs the next item in the queue. */
-	public async next(): Promise<unknown> {
-		if (this.paused) return;
-		const item = this.queue.shift();
-
-		if (!item) return true;
-		return item.run(...item.args);
-	}
-
-	/** Stops the queue. */
-	public stop(): this {
-		this.paused = true;
-		return this;
-	}
-
-	/** Resumes the queue. */
-	public resume(): this {
-		this.paused = false;
-		return this;
-	}
-
-	/** Adds an item to the queue. */
-	public add(item: QueueItem): this {
-		this.queue.push({
-			run: item.run,
-			args: item.args,
-			time: Date.now(),
-			timeout: item.timeout ?? this.options.timeout,
 		});
 
-		return this;
+		if (this.options.mode === 'auto') void this.start();
+		return promise;
+	}
+
+	public async start(): Promise<void> {
+		if (this.running || this.stopped) return;
+		this.running = true;
+
+		try {
+			while (!this.stopped && this.items.length) {
+				const item = this.items.shift();
+				if (!item) break;
+				this.activeItem = item;
+				let timer: NodeJS.Timeout | undefined;
+
+				try {
+					const timeout = new Promise<unknown>((_, reject) => {
+						timer = setTimeout(() => reject(new Error('QUEUE_TIMEOUT | Queue item timed out.')), this.options.timeout);
+					});
+
+					const value = await Promise.race([item.work(), timeout]);
+					item.resolve(value);
+				} catch (error: unknown) {
+					item.reject(error instanceof Error ? error : new Error(String(error)));
+				} finally {
+					if (timer) clearTimeout(timer);
+					this.activeItem = undefined;
+				}
+
+				if (this.items.length && this.options.delay) await ShardingUtils.delayFor(this.options.delay);
+			}
+		} finally {
+			this.running = false;
+			if (!this.stopped && this.items.length) void this.start();
+		}
+	}
+
+	public next(): Promise<void> {
+		return this.start();
+	}
+
+	public resume(): Promise<void> {
+		this.stopped = false;
+		return this.start();
+	}
+
+	public stop(error = new Error('QUEUE_STOPPED | Queue has been stopped.')): void {
+		this.stopped = true;
+		if (this.activeItem) this.activeItem.reject(error);
+		for (const item of this.items.splice(0)) item.reject(error);
 	}
 }
