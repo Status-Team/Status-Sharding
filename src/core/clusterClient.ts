@@ -6,6 +6,7 @@ import { IPCBrokerClient } from '../handlers/broker.js';
 import { WorkerClient } from '../classes/worker.js';
 import { ChildClient } from '../classes/child.js';
 import { getInfo } from '../other/utils.js';
+import type { Guild } from 'discord.js';
 import EventEmitter from 'node:events';
 
 interface QueuedReadyOperation {
@@ -285,12 +286,14 @@ export class ClusterClient<
 		return this.ensureReady('evalOnManager', () => this.requestWithNonce<ValidIfSerializable<T>>({ _type: MessageTypes.ClientManagerEvalRequest, data: { script: script.toString(), options } }, options?.timeout));
 	}
 
-	public broadcastEval<T, P extends object>(script: string | ((client: InternalClient, context: Serialized<P> | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
+	public broadcastEval<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>[]> {
 		return this.ensureReady('broadcastEval', () => this.requestWithNonce<ValidIfSerializable<T>[]>({
 			_type: MessageTypes.ClientBroadcastRequest,
 			data: { script: typeof script === 'function' ? script.toString() : script, options },
 		}, options?.timeout));
 	}
+
+	public evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
 
 	public async evalOnClient<T, P extends object>(script: string | ((client: InternalClient, context: Serialized<P> | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		return this.ensureReady('evalOnClient', async () => {
@@ -299,7 +302,9 @@ export class ClusterClient<
 		});
 	}
 
-	public async evalOnGuild<T, P extends object>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P> | undefined, guild: unknown) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+	public evalOnGuild<T, P extends object, C = InternalClient, E extends boolean = false>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: E extends true ? Guild : Guild | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+
+	public async evalOnGuild<T, P extends object>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P> | undefined, guild: Guild | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		return this.ensureReady('evalOnGuild', async () => {
 			if (this.packageType !== 'discord.js') throw new Error('CLUSTERING_EVAL_GUILD_UNSUPPORTED | evalOnGuild requires discord.js.');
 			const guild = guildFor(this.client, guildId);
@@ -527,11 +532,14 @@ async function coreShardStatusesFor(value: object): Promise<Map<number, number> 
 	}
 }
 
-function guildFor(value: object, guildId: string): unknown {
-	if (!('guilds' in value) || !isRecord(value.guilds) || !('cache' in value.guilds) || !isRecord(value.guilds.cache)) return undefined;
-	if (!('get' in value.guilds.cache) || typeof value.guilds.cache.get !== 'function') return undefined;
+function guildFor(value: object, guildId: string): Guild | undefined {
+	if (!hasGuildCache(value)) return undefined;
 
 	return value.guilds.cache.get(guildId);
+}
+
+function hasGuildCache(value: object): value is { guilds: { cache: { get(id: string): Guild | undefined } } } {
+	return 'guilds' in value && isRecord(value.guilds) && 'cache' in value.guilds && isRecord(value.guilds.cache) && 'get' in value.guilds.cache && typeof value.guilds.cache.get === 'function';
 }
 
 export declare interface ClusterClient<

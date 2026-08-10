@@ -45,7 +45,17 @@ export class ShardingClient<
 
 export declare interface ShardingClient<Ready extends boolean = boolean, InternalManager extends RefClusterManager = RefClusterManager> {
 	on<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	on<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+
 	once<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	once<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+
 	off<K extends keyof ClientEventsModifiable>(event: K, listener: (...args: ClientEventsModifiable[K]) => void): this;
+	off<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, listener: (...args: unknown[]) => void): this;
+
 	emit<K extends keyof ClientEventsModifiable>(event: K, ...args: ClientEventsModifiable[K]): boolean;
+	emit<S extends string | symbol>(event: Exclude<S, keyof ClientEventsModifiable>, ...args: unknown[]): boolean;
+
+	removeAllListeners<K extends keyof ClientEventsModifiable>(event?: K): this;
+	removeAllListeners<S extends string | symbol>(event?: Exclude<S, keyof ClientEventsModifiable>): this;
 }

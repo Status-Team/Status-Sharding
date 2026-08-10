@@ -2,6 +2,7 @@ import { MessageTypes, type BaseMessage, type ClusterKillOptions, type ClusterLi
 import type { ChildProcess, ForkOptions } from 'node:child_process';
 import { ShardingUtils } from '../other/shardingUtils.js';
 import type { WorkerOptions } from 'node:worker_threads';
+import type { Guild } from 'discord.js';
 import { Worker } from '../classes/worker.js';
 import { Child } from '../classes/child.js';
 import EventEmitter from 'node:events';
@@ -21,7 +22,7 @@ export interface ClusterHost<InternalClient extends ClientRefType = ClientRefTyp
 	requestFromCluster<T>(cluster: RefCluster<InternalClient>, message: BaseMessage<DataType>, timeout?: number): Promise<T>;
 	rejectClusterGeneration?(cluster: RefCluster<InternalClient>, generation: number, error: Error): void;
 	broadcast<T extends Serializable>(message: SerializableInput<T>, ignore?: number[]): Promise<void>;
-	evalOnGuild<T, P extends object>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P> | undefined, guild: unknown) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+	evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
 	_debug(message: string): void;
 }
 
@@ -432,12 +433,12 @@ export class Cluster<
 		return this.manager.broadcast(message, sendSelf ? [] : [this.id]);
 	}
 
-	public async eval<T, P extends object>(script: string | ((cluster: Cluster<InternalManager, InternalClient>, context: Serialized<P> | undefined) => Awaitable<T>), options?: { context?: P }): Promise<ValidIfSerializable<T>> {
-		if (typeof script === 'function') return await script(this, options?.context);
+	public async eval<T, P extends object, C = Cluster<InternalManager, InternalClient>>(script: string | ((cluster: C, context: Serialized<P>) => Awaitable<T>), options?: { context?: P }): Promise<ValidIfSerializable<T>> {
+		if (typeof script === 'function') return await new Function('cluster', 'context', `return (${script.toString()})(cluster, context);`).call(this, this, options?.context);
 		return await new Function('cluster', 'context', `return (${script})`).call(this, this, options?.context);
 	}
 
-	public evalOnClient<T, P extends object>(script: string | ((client: InternalClient, context: Serialized<P> | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+	public evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		return this.manager.requestFromCluster<ValidIfSerializable<T>>(this, {
 			_type: MessageTypes.ClientEvalRequest,
 			_nonce: ShardingUtils.generateNonce(),
@@ -445,7 +446,7 @@ export class Cluster<
 		}, options?.timeout);
 	}
 
-	public evalOnGuild<T, P extends object>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P> | undefined, guild: unknown) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+	public evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		return this.manager.requestFromCluster<ValidIfSerializable<T>>(this, {
 			_type: MessageTypes.ClientEvalRequest,
 			_nonce: ShardingUtils.generateNonce(),

@@ -8,6 +8,7 @@ import { Cluster, type ClusterHost } from './cluster.js';
 import { PromiseHandler } from '../handlers/promise.js';
 import { Queue } from '../handlers/queue.js';
 import { ClusterMap } from '../other/map.js';
+import type { Guild } from 'discord.js';
 import EventEmitter from 'node:events';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -315,48 +316,49 @@ export class ClusterManager<
 		if (failures.length) throw new AggregateError(failures, 'CLUSTER_BROKER_FAILED | One or more clusters rejected the broker message.');
 	}
 
-	public async eval<T, P extends object>(script: string | ((manager: this, context: Serialized<P> | undefined) => Awaitable<T>), options?: { context?: P }): Promise<ValidIfSerializable<T>> {
-		if (typeof script === 'function') return await script(this, options?.context);
+	public async eval<T, P extends object, M = this>(script: string | ((manager: M, context: Serialized<P>) => Awaitable<T>), options?: { context?: P }): Promise<ValidIfSerializable<T>> {
+		if (typeof script === 'function') return await new Function('manager', 'context', `return (${script.toString()})(manager, context);`).call(this, this, options?.context);
 		return await new Function('manager', 'context', `return (${script})`).call(this, this, options?.context);
 	}
 
-	public async broadcastEval<T extends Serializable, P extends object>(script: string | ((client: InternalClient, context: Serialized<P> | undefined) => Awaitable<T>), options: EvalOptions<P> = {}): Promise<ValidIfSerializable<T>[]> {
+	public async broadcastEval<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options: EvalOptions<P> = {}): Promise<ValidIfSerializable<T>[]> {
 		if (!this.clusters.size) throw new Error('CLUSTERING_NO_CLUSTERS | No clusters have been spawned.');
 		if (options.guildId !== undefined && (options.cluster !== undefined || options.shard !== undefined)) throw new Error('CLUSTERING_INVALID_OPTION | Cannot use guildId with cluster or shard options.');
 
 		const targets = this.targetClusters(options);
 		if (!targets.length) throw new Error('CLUSTERING_CLUSTER_NOT_FOUND | No clusters matched the evaluation options.');
 
-		const operations = targets.map((cluster) => cluster.evalOnClient(script, options));
+		const source = typeof script === 'function' ? script.toString() : script;
+		const operations = targets.map((cluster) => cluster.evalOnClient<T, P>(source, options));
 		if (!options.useAllSettled) return Promise.all(operations);
 
 		const settled = await Promise.allSettled(operations);
 		return settled.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
 	}
 
-	public evalOnClusterClient<T, P extends object>(clusterId: number, script: string | ((client: InternalClient, context: Serialized<P> | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+	public evalOnClusterClient<T, P extends object, C = InternalClient>(clusterId: number, script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		const cluster = this.clusters.get(clusterId);
 		if (!cluster) return Promise.reject(new Error(`CLUSTER_NOT_FOUND | Cluster ${clusterId} does not exist.`));
 
-		return cluster.evalOnClient(script, options);
+		return cluster.evalOnClient<T, P>(typeof script === 'function' ? script.toString() : script, options);
 	}
 
-	public evalOnCluster<T, P extends object>(clusterId: number, script: string | ((cluster: InternalCluster, context: Serialized<P> | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+	public evalOnCluster<T, P extends object, C = InternalCluster>(clusterId: number, script: string | ((cluster: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		const cluster = this.clusters.get(clusterId);
 		if (!cluster) return Promise.reject(new Error(`CLUSTER_NOT_FOUND | Cluster ${clusterId} does not exist.`));
 
-		if (typeof script === 'function') return Promise.resolve(script(cluster, options?.context));
-		return cluster.eval(script, options);
+		if (typeof script === 'function') return new Function('cluster', 'context', `return (${script.toString()})(cluster, context);`).call(cluster, cluster, options?.context);
+		return cluster.eval<T, P>(script, options);
 	}
 
-	public async evalOnGuild<T, P extends object>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P> | undefined, guild: unknown) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
+	public async evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>> {
 		const shard = ShardingUtils.shardIdForGuildId(guildId, this.options.totalShards);
 		const clusterId = ShardingUtils.clusterIdForShardId(shard, this.options.totalShards, this.options.totalClusters);
 
 		const cluster = this.clusters.get(clusterId);
 		if (!cluster) return Promise.reject(new Error(`CLUSTER_NOT_FOUND | Cluster ${clusterId} does not exist.`));
 
-		return cluster.evalOnGuild(guildId, script, {
+		return cluster.evalOnGuild<T, P>(guildId, typeof script === 'function' ? script.toString() : script, {
 			...options,
 			guildId,
 		});
@@ -526,7 +528,7 @@ export class ClusterManager<
 		const options = data.options ?? {};
 
 		try {
-			const values = await this.broadcastEval(data.script, options);
+			const values = await this.broadcastEval<Serializable, object>(data.script, options);
 			await cluster._sendInstance({
 				_type: MessageTypes.ClientBroadcastResponse,
 				_nonce: message._nonce,

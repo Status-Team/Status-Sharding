@@ -1,5 +1,6 @@
 import type { ChildProcess, ForkOptions } from 'node:child_process';
 import type { Worker, WorkerOptions } from 'node:worker_threads';
+import type { Guild } from 'discord.js';
 import type { ProcessMessage } from './other/message.js';
 
 /* ----------------------------------- Core ----------------------------------- */
@@ -280,11 +281,11 @@ export interface RefCluster<InternalClient extends ClientRefType = ClientRefType
 
 	request<T extends Serializable, O = unknown>(message: SerializableInput<T>, options?: { timeout?: number }): Promise<Serialized<O>>;
 
-	evalOnClient<T, P extends object>(script: string | ((client: InternalClient, context: Serialized<P> | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+	evalOnClient<T, P extends object, C = InternalClient>(script: string | ((client: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
 
-	evalOnGuild<T, P extends object>(guildId: string, script: string | ((client: InternalClient, context: Serialized<P> | undefined, guild: unknown) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+	evalOnGuild<T, P extends object, C = InternalClient>(guildId: string, script: string | ((client: C, context: Serialized<P>, guild: Guild | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
 
-	eval<T, P extends object>(script: string | ((cluster: unknown, context: Serialized<P> | undefined) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
+	eval<T, P extends object, C = unknown>(script: string | ((cluster: C, context: Serialized<P>) => Awaitable<T>), options?: EvalOptions<P>): Promise<ValidIfSerializable<T>>;
 
 	_sendInstance(message: BaseMessage<DataType>): Promise<void>;
 

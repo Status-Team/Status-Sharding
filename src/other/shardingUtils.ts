@@ -72,6 +72,16 @@ export class ShardingUtils {
 		return visit(value);
 	}
 
+	public static removeNonExisting<T>(array: Array<T | undefined>): T[] | undefined {
+		const values: T[] = [];
+
+		for (const item of array) {
+			if (item !== undefined && item !== null) values.push(item);
+		}
+
+		return values;
+	}
+
 	public static parseInput<T>(input: string | ((...args: unknown[]) => T), context?: unknown, packageType?: PackageType | null, ...argumentsList: string[]): string {
 		if (typeof input === 'string') return input;
 		const receiver = packageType === '@discordjs/core' ? 'client' : 'this';
